@@ -85,7 +85,7 @@ const MAT = {high: 3, medium: 2, low: 1};
 const scopeOf = n => n.scope;          /* the catalogue's scope: market-wide when the tagger found no primary watchlist company */
 const hoursBefore = (p, iso) => (dt2(p.cutoff) - dt2(iso)) / 36e5;
 const dt2 = iso => new Date(iso).getTime();
-const ago = (p, iso) => { const h = hoursBefore(p, iso); return h < 1 ? 'under an hour before the cut-off' : h < 24 ? `${Math.floor(h)} h before the cut-off` : `${Math.floor(h / 24)} day${h < 48 ? '' : 's'} before the cut-off`; };
+const ago = (p, iso) => { const h = hoursBefore(p, iso); return h < 1 ? 'under an hour before the cut-off' : h < NEWS_RECENT_HOURS ? `${Math.floor(h)} h before the cut-off` : `${Math.floor(h / NEWS_RECENT_HOURS)} day${h < 2 * NEWS_RECENT_HOURS ? '' : 's'} before the cut-off`; };
 const dayKey = (iso, m) => fmtLocal(iso, m, true).replace(/\s\d{1,2}:\d{2}.*$/, '');   /* the local date part of the shell's local time */
 const canCarry = n => CAN_CARRY.includes(n.status);
 
@@ -129,21 +129,22 @@ function moversCard(p) {
 
 function feedCard(p) {
   const m = market, card = el('section', {class:'card', 'aria-label':'All stories of the window'});
-  const last24 = p.news.filter(n => hoursBefore(p, n.first_seen_at) < 24).length;
-  card.append(el('div', {class:'head'}, el('h2', {}, `Last ${p.window.days} days`, help(`Every story first seen in the ${p.window.days} days before the cut-off, newest first, ${NEWS_PAGE_SIZE} a page and at most ${p.window.max_items} in all (the owner's rule: a short trading window needs no older news). Older stories stay in the data; the Company page shows every stored story about a company. Filters: the last 24 hours, market-wide, one company, or only stories that can carry a call (confirmed or corroborated).`)), el('span', {class:'end muted'}, `${p.news.length} stor${p.news.length === 1 ? 'y' : 'ies'} · ${last24} in the last 24 h`)));
+  const last24 = p.news.filter(n => hoursBefore(p, n.first_seen_at) < NEWS_RECENT_HOURS).length;
+  card.append(el('div', {class:'head'}, el('h2', {}, `Last ${p.window.days} days`, help(`Every story first seen in the ${p.window.days} days before the cut-off, newest first, ${NEWS_PAGE_SIZE} a page and at most ${p.window.max_items} in all (the owner's rule: a short trading window needs no older news). Older stories stay in the data; the Company page shows every stored story about a company. Filters: the last ${NEWS_RECENT_HOURS} hours, market-wide, the engine's market-moving flag, one company, or only stories that can carry a call (confirmed or corroborated).`)), el('span', {class:'end muted'}, `${p.news.length} stor${p.news.length === 1 ? 'y' : 'ies'} · ${last24} in the last ${NEWS_RECENT_HOURS} h`)));
   const bar = el('div', {class:'toolbar'});
   const chip = (key, label, tipText) => { const b = el('button', {type:'button', class:'md-chip filter', 'aria-pressed': String(filter === key && !ticker), 'data-tip': tipText}, label); b.addEventListener('click', () => { filter = key; ticker = null; pageNo = 1; render(); }); return b; };
-  bar.append(chip('all', 'All', 'Every story of the window.'), chip('24h', 'Last 24 h', 'First seen in the 24 hours before the cut-off.'), chip('market', 'Market-wide', 'Stories about no single company.'), chip('moving', 'Market moving', 'The engine’s flag: high materiality and market-wide or a results item.'), chip('carry', 'Can carry a call', 'Confirmed by a filing or corroborated by independent outlets: the only statuses that may be the main evidence of a call.'));
+  bar.append(chip('all', 'All', 'Every story of the window.'), chip('24h', `Last ${NEWS_RECENT_HOURS} h`, `First seen in the ${NEWS_RECENT_HOURS} hours before the cut-off.`), chip('market', 'Market-wide', 'Stories about no single company.'), chip('moving', 'Market moving', 'The engine’s flag: high materiality and market-wide or a results item.'), chip('carry', 'Can carry a call', 'Confirmed by a filing or corroborated by independent outlets: the only statuses that may be the main evidence of a call.'));
   const withNews = p.companies.filter(c => p.news.some(n => n.tickers.includes(c.ticker)));
   if (withNews.length) { const sel = el('select', {'aria-label':'Company'}); sel.append(el('option', {value:''}, 'Company…')); for (const c of withNews) sel.append(el('option', {value: c.ticker, selected: ticker === c.ticker ? 'selected' : null}, `${c.ticker} · ${c.name}`)); sel.addEventListener('change', () => { ticker = sel.value || null; filter = ticker ? 'company' : 'all'; pageNo = 1; render(); }); bar.append(sel); }
   card.append(bar);
+  const noSummary = p.news.filter(n => !n.summary).length; if (noSummary > p.news.length / 2) card.append(el('p', {class:'note', style:'margin:8px 0 0'}, `${noSummary} of the ${p.news.length} stories have no summary line yet (the analyst’s summaries were templated), so they show the headline alone; the article is one click away.`));
   let items = p.news;
-  if (filter === '24h') items = items.filter(n => hoursBefore(p, n.first_seen_at) < 24);
+  if (filter === '24h') items = items.filter(n => hoursBefore(p, n.first_seen_at) < NEWS_RECENT_HOURS);
   else if (filter === 'market') items = items.filter(n => scopeOf(n) === 'market');
   else if (filter === 'moving') items = items.filter(n => n.market_moving);
   else if (filter === 'carry') items = items.filter(canCarry);
   else if (filter === 'company' && ticker) items = items.filter(n => n.tickers.includes(ticker));
-  if (!items.length) { card.append(el('div', {class:'empty', style:'margin-top:12px'}, p.news.length ? 'No story matches this filter in the window.' : `No story first seen in the last ${p.window.days} days in the example data (${p.window.older_hidden} older stor${p.window.older_hidden === 1 ? 'y is' : 'ies are'} hidden by the window; the Company page shows them).`)); return card; }
+  if (!items.length) { card.append(el('div', {class:'empty', style:'margin-top:12px'}, p.news.length ? (filter === 'carry' ? 'No story in the window is confirmed by a filing or corroborated by independent outlets yet: the stored statuses so far are unverified, single source, rumour and promotional. Such stories lower a call’s confidence and never carry it.' : 'No story matches this filter in the window.') : `No story first seen in the last ${p.window.days} days in the example data (${p.window.older_hidden} older stor${p.window.older_hidden === 1 ? 'y is' : 'ies are'} hidden by the window; the Company page shows them).`)); return card; }
   const pages = Math.ceil(items.length / NEWS_PAGE_SIZE); if (pageNo > pages) pageNo = pages;
   const slice = items.slice((pageNo - 1) * NEWS_PAGE_SIZE, pageNo * NEWS_PAGE_SIZE);
   const feed = el('div', {class:'feed'}); let lastDay = null;
@@ -189,7 +190,7 @@ function companiesCard(p) {
   if (!rows.length) { card.append(el('div', {class:'empty'}, 'No watchlist company has a story in the window.')); return card; }
   const list = el('div', {class:'cos'});
   for (const {c, items} of rows) {
-    const up = items.filter(n => n.enrichment.sentiment > 0.05).length, dn = items.filter(n => n.enrichment.sentiment < -0.05).length, flat = items.length - up - dn;
+    const up = items.filter(n => n.enrichment.sentiment > SENTIMENT_FLAT_BAND).length, dn = items.filter(n => n.enrichment.sentiment < -SENTIMENT_FLAT_BAND).length, flat = items.length - up - dn;
     const mix = el('span', {class:'mix', 'data-tip': `${up} positive, ${flat} neutral, ${dn} negative by the news analyst’s sentiment.`, role:'img', 'aria-label': `${up} positive, ${flat} neutral, ${dn} negative`});
     for (const [k, v] of [['up', up], ['flat', flat], ['dn', dn]]) if (v) mix.append(el('i', {class: k, style: `width:${v / items.length * 100}%`}));
     const b = el('button', {type:'button', class:'md-btn text small ct', 'data-tip': 'Show only this company in the feed.'}, String(items.length)); b.addEventListener('click', () => { ticker = c.ticker; filter = 'company'; pageNo = 1; render(); document.querySelector('.card[aria-label="All stories of the window"]').scrollIntoView({block:'start'}); });

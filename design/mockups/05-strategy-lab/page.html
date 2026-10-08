@@ -747,7 +747,9 @@ const CAN_CARRY = ['confirmed_primary', 'corroborated'];
 const GO_LIVE_MONTHS = 2, GO_LIVE_TRADES_ABOUT = 300, INTRADAY_CHECKS_PER_SESSION = 2, MIN_TRADES_TO_RANK = 20, BACKTEST_YEARS = 15, LUCK_INTERVAL_PCT = 95, REASON_MAX_WORDS = 60;
 const ASSISTANT_QUESTION_MAX_CHARS = 500, ASSISTANT_DAILY_USD = 0.65, ASSISTANT_MONTHLY_USD_CAP = 20, ASSISTANT_LOG_DAYS = 90;
 /* News page rules (owner decision 2026-10-08, design/mockups/09-news/rationale.md): at most 10 market movers, 10 stories a page; the 3-day window and the 50-item cap are the build's (data.json `window`). */
-const NEWS_MOVERS_MAX = 10, NEWS_PAGE_SIZE = 10;
+const NEWS_MOVERS_MAX = 10, NEWS_PAGE_SIZE = 10, NEWS_RECENT_HOURS = 24;
+/* Sentiment words: the news analyst's score (-1..1) reads positive above +0.05 and negative below -0.05 (the Home page's convention, decision of the design track). */
+const SENTIMENT_FLAT_BAND = 0.05;
 const DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'], DOWL = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'], MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const dt = iso => new Date(iso.slice(0,10)+'T00:00:00Z');
 const fmtD = (iso, dow=true) => { const d = dt(iso); return (dow? DOW[d.getUTCDay()]+' ' : '') + d.getUTCDate() + ' ' + MON[d.getUTCMonth()]; };
@@ -780,7 +782,7 @@ const viableLine = (picked) => { const mk = picked.filter(k => k.expected_gain_p
 const avatar = (ico, kind='', size='') => el('span', {class:`mb-avatar ${kind} ${size}`, 'aria-hidden':'true'}, icon(ico));
 const famLabel = (f, text) => el('span', {class:'mb-label ' + ({rule:'', baseline:'warn', ai:'info'}[f])}, el('i', {class:'sw ' + FAMILY[f][2]}), text);
 const statusBadge = st => { const s = STATUS[st] || [st, '', null]; return el('span', {class:'md-badge ' + st, 'data-tip': s[1]}, s[2] ? icon(s[2]) : null, s[0]); };
-const sentSquare = v => { const s = v == null ? 'flat' : v > 0.05 ? 'up' : v < -0.05 ? 'dn' : 'flat'; return el('span', {class:'mb-dir ' + s, 'aria-label': 'sentiment ' + (v ?? 'n/a'), 'data-tip': v == null ? 'sentiment not scored' : `sentiment ${v > 0 ? '+' : ''}${v} (−1 very negative to +1 very positive), the news analyst’s score`}, icon(s === 'up' ? 'ms-arrow_upward' : s === 'dn' ? 'ms-arrow_downward' : 'ms-remove')); };
+const sentSquare = v => { const s = v == null ? 'flat' : v > SENTIMENT_FLAT_BAND ? 'up' : v < -SENTIMENT_FLAT_BAND ? 'dn' : 'flat'; return el('span', {class:'mb-dir ' + s, 'aria-label': 'sentiment ' + (v ?? 'n/a'), 'data-tip': v == null ? 'sentiment not scored' : `sentiment ${v > 0 ? '+' : ''}${v} (−1 very negative to +1 very positive), the news analyst’s score`}, icon(s === 'up' ? 'ms-arrow_upward' : s === 'dn' ? 'ms-arrow_downward' : 'ms-remove')); };
 /* range bar: the trade's or prediction's 50% and 80% bands, the entry dotted, the target as a triangle, the last price as the dark line */
 function rangeBar(cur, r, last, entry) {
   const lo = Math.min(r.lo80, entry ?? r.lo80, last ?? r.lo80) * 0.997, hi = Math.max(r.hi80, entry ?? r.hi80, last ?? r.hi80, r.target_price) * 1.003, X = v => (v - lo) / (hi - lo) * 96 + 2;

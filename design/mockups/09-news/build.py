@@ -83,7 +83,7 @@ def compose() -> dict:
         "market-wide items, a summary line per item, volume and an engine-side market_moving flag: answered by W1 on "
         "2026-10-08 (data request 8: 56 real stored items, 28 per market, with scope, category, feed, summary, "
         "market_moving and origin). Not in the stored data and not invented: a region, confirmed or corroborated statuses "
-        "on the stored items (only the six invented items carry them), clusters with more than one origin, and "
+        "on the stored items (only four of the six invented items carry them), clusters with more than one origin, and "
         "summaries for most US items (the analyst's are templated)",
     ]
     return data

@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+from datetime import datetime, timedelta
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -37,6 +38,8 @@ SETTLED_FIELDS = ("trade_id", "view", "pick_rule", "strategy_id", "family", "tic
                   "reason_code", "settled_at")
 PICK_RULE_ROW_FIELDS = ("scope", "market", "view", "family", "pick_rule", "horizon_days", "trades", "net_pnl",
                         "mean_return_pct", "win_rate", "sample_badge", "basis", "as_of")
+
+NEWS_WINDOW_DAYS = 3   # owner decision 2026-10-08: the news window (the News page shows it in full)
 
 
 def catalogue(name: str) -> dict:
@@ -77,10 +80,12 @@ def market_payload(market: str, files: dict, cutoff: str) -> dict:
     settled = sorted((pick(r, SETTLED_FIELDS) for r in files["paper_trade"]["records"]
                       if r["market"] == market and r["status"] == "settled" and r["settled_at"] <= cutoff),
                      key=lambda r: (r["exit_date_actual"], r["trade_id"]))
-    # the Home news card (owner, earlier design round: "add the news card to Home and drop the News screen"):
-    # this market's items first seen by the cut-off, newest first
-    news = sorted((r for r in files["news_item"]["records"] if r["market"] == market and r["first_seen_at"] <= cutoff),
-                  key=lambda r: r["published_at"], reverse=True)
+    # the Home news card (owner, 2026-10-08: the News page holds the last 3 days; Home shows the market movers of that
+    # window and links to it): this market's items first seen in the 3 days before the cut-off and by it, newest first
+    window_start = (datetime.fromisoformat(cutoff.replace("Z", "+00:00")) - timedelta(days=NEWS_WINDOW_DAYS)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    news = sorted((r for r in files["news_item"]["records"]
+                   if r["market"] == market and window_start < r["first_seen_at"] <= cutoff),
+                  key=lambda r: (r["first_seen_at"], r["id"]), reverse=True)
     return {
         "market": market, "name": status["name"], "currency": status["currency"],
         "as_of": status["as_of"], "cutoff": cutoff, "built_at": status["freshness"]["built_at"],

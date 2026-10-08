@@ -38,7 +38,7 @@ from any site, only the conventions.
    twice shows once. A market-wide story carries "not verified per company" instead of a status, because
    verification is per company. An honest empty state when the window has none.
 3. **Last 3 days** (the feed): filter chips (All, Last 24 h, Market-wide, Market moving, Can carry a call) and a
-   company select;
+   company select; a note when most stories have no summary line;
    stories grouped by the local day with a sticky header ("Today · n stories"), each row with the local time (its
    tooltip has the first-stored and published times), the sentiment arrow, the same item body as the band; a pager
    (10 a page, at most 50 in the window) that scrolls the feed into view.
@@ -61,9 +61,10 @@ from any site, only the conventions.
 - Data request 8 to W1 (recorded in `_data_requests`), answered the same day: 56 real stored stories with `scope`,
   `category`, `feed`, `summary` (`summary_source` article or analyst), `market_moving` and `origin`. What the stored
   data cannot supply is not invented: no region; the stored statuses are unverified, single source, rumour and
-  promotional only (confirmed and corroborated exist on the six invented items, so "can carry a call" finds one India
-  story and no US story); no cluster with more than one origin; most US items have no summary (the analyst's are
-  templated), so they show the headline alone. The page says each of these where it shows.
+  promotional only (confirmed and corroborated exist on four of the six invented items, so "can carry a call" finds
+  one India story and no US story, and its empty state says why); no cluster with more than one origin; most US items have no summary (the analyst's are
+  templated), so they show the headline alone and a note under the filters says so. The window hides the older
+  invented items (1 in India, 2 in the US) and the US invented item first seen after the cut-off.
 
 ## Design rules kept
 Design system v2 only; light theme; phone and desktop (the band's two columns and the rail collapse; the feed row
@@ -80,6 +81,13 @@ markets: the band holds 10 stories (India: 5 flagged first; US: 5 flagged first)
 (India 14 in the last 24 h, US 29), the filters give India 14 / 12 / 5 / 1 stories and the US 29 / 12 / 5 / none for
 last 24 h / market-wide / market moving / can carry a call, page 2 adds the 5 Oct day group in India, the company
 rail counts RELIANCE 8 and HDFCBANK 4 (India) and NVDA 4, AAPL 2, JPM 1 (US), no page error.
+
+Judge round 1 (2026-10-08) found three blockers, fixed before round 2: the notes said two older items are hidden in
+each market (India hides one, the US two, and the US invented item first seen after the cut-off is excluded); the
+rationale said the page states the data's limits where it shows them, which it did not (the "can carry a call" filter
+now explains its empty state and a note says when stories show the headline alone); and the 24-hour rule and the
+0.05 sentiment band were typed in the template (now the shell's `NEWS_RECENT_HOURS` and `SENTIMENT_FLAT_BAND`, the
+latter also used by the shell's sentiment arrow).
 
 ## Decisions taken for the owner (reported to the orchestrator; to confirm)
 - The movers are a ranked band of cards above the feed, not a separate tab, so the first screen answers "what
