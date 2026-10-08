@@ -109,16 +109,22 @@ def raw_config(market: str) -> dict:
     return yaml.safe_load((REAL_CONFIG / "markets" / f"{market}.yaml").read_text())
 
 
+def company_key(raw: dict) -> str:
+    """The real config's company key: `company_meta` (Wave 5) or the legacy `tickers`."""
+    return "company_meta" if "company_meta" in raw else "tickers"
+
+
 # ---------------- loader and seed ----------------
 
 @pytest.mark.parametrize("market", ["india", "us"])
 def test_without_events_the_loader_reproduces_the_config(market):
     cfg, raw = load_market(market), raw_config(market)
-    assert list(cfg["tickers"]) == list(raw["tickers"])
+    companies = raw[company_key(raw)]
+    assert list(cfg["tickers"]) == list(companies)
     assert cfg["sectors"] == raw["sectors"]
-    assert cfg["active_tickers"] == list(raw["tickers"])
+    assert cfg["active_tickers"] == list(companies)
     assert [c["ticker"] for c in watchlist(market, state="collected")] == sorted(
-        raw["tickers"], key=lambda t: (next(s for s, m in raw["sectors"].items() if t in m), t))
+        companies, key=lambda t: (next(s for s, m in raw["sectors"].items() if t in m), t))
 
 
 @pytest.mark.parametrize("market", ["india", "us"])
@@ -134,7 +140,7 @@ def test_seed_reproduces_the_config_even_without_config_tickers(root, monkeypatc
     config = root / "config"
     shutil.copytree(REAL_CONFIG, config)
     stripped = raw_config(market)
-    stripped.pop("tickers")
+    stripped.pop(company_key(stripped))
     stripped["sectors"] = {}
     (config / "markets" / f"{market}.yaml").write_text(yaml.safe_dump(stripped, sort_keys=False))
     monkeypatch.setattr(common, "CONFIG", config)

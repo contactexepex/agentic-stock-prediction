@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from marketbrief.core.market_config import load_ranges_config
 from marketbrief.pipeline.review import model_skill
+from marketbrief.pipeline.review.intraday_review import markdown_lines as intraday_lines
 from marketbrief.pipeline.review.markdown_sections import (
     call_lines,
     header_lines,
@@ -29,6 +30,8 @@ def markdown(cfg: dict, review_config: dict, rec: dict, review_data: dict) -> st
     lines += call_lines(review_config, review_data, win_names)
     lines += score_lines(review_config, review_data, win_names)
     lines += model_skill.markdown_lines(review_data["model"])
+    if review_data.get("intraday"):
+        lines += intraday_lines(review_data["intraday"], win_names)
     lines += aci_lines(review_data)
     lines += calibration_lines(rec, review_data)
     lines += ablation_lines(rec, review_data, by_horizon)

@@ -48,7 +48,8 @@ Contents:
 - Strategies and predictions: [Strategy](#strategy), [Prediction](#prediction),
   [Abstention](#abstention), [Agreement](#agreement)
 - Trades: [Head-to-head pick](#head-to-head-pick), [Paper trade](#paper-trade) (with its
-  [automatic reason](#automatic-reason)), [Cost view](#cost-view), [Open trade](#open-trade), [Intraday trade check](#trade-check)
+  [automatic reason](#automatic-reason)), [Cost view](#cost-view), [Open trade](#open-trade), [Intraday trade check](#trade-check),
+  [Intraday alert](#intraday-alert)
 - Explanations and scores: [AI reason](#ai-reason), [End-of-day analysis](#eod-analysis),
   [Scoreboard row](#scoreboard-row), [Heatmap cell](#heatmap-cell), [Cumulative line](#cumulative-line),
   [Research review](#research-review), [Track record](#track-record), [Assistant answer](#assistant-answer)
@@ -351,7 +352,7 @@ trades).
 | exit_quantity, adjustment_ids | Shares after a split or bonus in the window, and that adjustment | `adjustments` (exists) | shares, ids | `4.36167`, empty |
 | entry_value, exit_value | Quantity × price | engine | ₹ / $ | `1000.00` -> `1042.00` |
 | gross_pnl | Profit before costs | engine | ₹ / $ | `42.00` |
-| costs, cost_lines | Round-trip charges with their parts, the **market-cost view** that strategies are ranked on (F1.6; rates in `config/costs.yaml`, marked verify). India: brokerage (0.75 %, at least ₹50 per order), STT, exchange, SEBI, stamp duty, GST. US: BUX order fee converted to $, SEC fee. The owner's own extra charges are in the [Cost view](#cost-view) | B2's engine | ₹ / $ | `2.34` = order fee `2.32` + SEC fee `0.02`; India RELIANCE N+1 `1966.41` |
+| costs, cost_lines | Round-trip charges with their parts, the **market-cost view** that strategies are ranked on (F1.6; rates in `config/costs.yaml`: the statutory ones marked verify, the `broker:` charges owner-confirmed 2026-10-08). India: brokerage (0.75 %, at least ₹50 per order), STT, exchange, SEBI, stamp duty, GST. US: BUX order fee converted to $, SEC fee. The owner's own extra charges are in the [Cost view](#cost-view) | B2's engine | ₹ / $ | `2.34` = order fee `2.32` + SEC fee `0.02`; India RELIANCE N+1 `1966.41` |
 | net_pnl | Profit after costs (the headline number) | engine | ₹ / $ | `39.66` |
 | return_pct | Net profit as % of the amount (compares across amounts, decision 44) | engine | % | `3.97` |
 | prob_up, target_price, lo80, hi80 | What was predicted | prediction | 0-1, ₹ / $ | `0.583`, `227.84`, `218.36`-`237.72` |
@@ -477,6 +478,38 @@ Example file: `trade_check.json` (the RELIANCE N+4 trade checked at 11:13 IST is
 A day's path for one prediction (made -> checks -> settled -> explained) combines a [prediction](#prediction),
 its trade checks, its [settled trade](#paper-trade) and any [AI reason](#ai-reason) (read model `rm.lifecycle`,
 last 30 sessions).
+
+<a id="intraday-alert"></a>
+## Intraday alert
+
+What a check found worth telling the owner about open paper trades (monitoring only: an alert never predicts or
+recommends a trade). Each check writes one **trade alert** per company with at least one flagged open trade, and one
+**news alert** per news item tagged with a company that has an open trade. A news alert needs an item first seen
+since the previous session's close, published by the check, and of a materiality in `config/intraday.yaml`
+`alerts.news_materiality` (`high`); each item is alerted once per session and company. Status: kind
+`intraday_alerts`; session **B9** writes it (contract: docs/ws/b9.md, "The alerts feed"). The view
+`intraday_alerts_feed` adds the deviation explainer's note on the check row (`explanation_id`, `attribution`,
+`explanation`, `cited_ids`, `explained_at`); `python scripts/intraday_check.py alerts [--check ID]` prints one check's
+alerts. B6's Slack alerts read it (the Home page's alerts card shows flagged [trade checks](#trade-check), read model
+`rm.home`). Example file: `intraday_alert.json`, built with B9's
+code from the example [trade checks](#trade-check) and the news stored by each check's time (both checks are the first
+of their session, so no example is a repeat). Like the trade checks, the US rows run to that check's time
+(16:27Z), past the file's 12:00Z `as_of`.
+
+| Field | Meaning | Source | Unit | Example |
+|---|---|---|---|---|
+| id | `<check_id>-<ticker>-trades` (trade alert) or `<check_id>-<ticker>-news-<news_id>` (news alert) | B9 | id | `ic-us-2026-10-07T16:27Z-NVDA-trades` |
+| check_id, check_at, session_date, market, ticker | The check and the company | intraday run | id, time, date, text | `ic-us-2026-10-07T16:27Z`, `2026-10-07T16:27:00Z`, `2026-10-07`, `us`, `NVDA` |
+| alert_type | Which alert | B9 | `open_trade_flagged`, `material_news_open_trade` | `open_trade_flagged` |
+| check_row_id | The company's intraday check row (its explainer note joins on it); null for a company not on the watchlist | `intraday_checks` | id | `ic-us-2026-10-07T16:27Z-NVDA` |
+| trade_ids | The flagged trades (trade alert), or every open trade of the company (news alert) | trade checks | ids | `acc:rule.model_news.v1:2026-09-29-NVDA-5d`, `acc:base.always_up.v1:2026-09-29-NVDA-5d` |
+| trades | Trade alert only: each flagged trade's `trade_id`, `strategy_id`, `view`, `horizon_days`, `flags`, `band`, `ret_since_entry_pct`, `to_target_pct`, `target_reached`; empty for news | [trade checks](#trade-check) | list | rule.model_news.v1 N+5: `above80`, `5.1599`, `-5.421`, `true` |
+| flags | The trades' flags together (trade alert); empty for news | trade checks | `outside_range`, `far_from_target`, `against_prediction` | `["outside_range"]` |
+| repeat | Trade alert: every listed trade was already alerted with the same flags earlier that session (B6 posts only `false`); news: always `false` | B9 | yes/no | `false` |
+| news_id, news_title, news_source | News alert only: the item | `news` | id, text | `7adc88b52892f54c`, "AAPL Falls After Jefferies Downgrades Stock ...", `Stocktwits` |
+| news_status, news_materiality | News alert only: the item's verification status and the news analyst's materiality, both as of `check_at` | `news_verified`, `news_enriched` | see [News item](#news-item) | `unverified`, `high` |
+| news_first_seen_at | News alert only: when the item was first collected | `news` | time | `2026-10-07T12:28:07Z` |
+| method_version, computed_at | The check's method and run time | B9 | text, time | `tc-v1`, `2026-10-07T16:27:00Z` |
 
 ---
 
@@ -793,7 +826,7 @@ and positions **exist**; the € view is **B2**. Example file: `portfolio.json`.
 | positions.quantity, avg_price, last_close | Holding and its marks | FIFO (exists) | shares, ₹ / $ | `3`, `330.80`, `333.63` |
 | positions.cost, value, pnl, pnl_pct | In the trade currency | exists | ₹ / $, % | `992.40`, `1000.89`, `8.49`, `0.86` |
 | eur_view.eurusd_at_buy, eurusd_now, mark_date | EUR/USD on the buy date and now (`EURUSD=X`, added by B2); the date of the mark | Yahoo | rate, date | `1.165`, `1.17`, `2026-10-06` |
-| eur_view.fx_fee_rate | BUX's FX markup on each EUR/USD conversion (`config/costs.yaml`, verify) | config | fraction | `0.0075` |
+| eur_view.fx_fee_rate | BUX's FX markup on each EUR/USD conversion (`config/costs.yaml` broker.us, owner-confirmed 2026-10-08) | config | fraction | `0.0075` |
 | eur_view.cost_usd, value_usd | Dollars paid, including the buy order's cost, and dollars held now | B2 | $ | `993.55`, `1000.89` |
 | eur_view.cost_eur | Euros needed to buy those dollars: `cost_usd / eurusd_at_buy × (1 + fx_fee_rate)` | B2 (`portfolio/eur_view.py`) | € | `859.23` |
 | eur_view.value_eur | Euros back if converted now: `value_usd / eurusd_now × (1 − fx_fee_rate)` | B2 | € | `849.05` |

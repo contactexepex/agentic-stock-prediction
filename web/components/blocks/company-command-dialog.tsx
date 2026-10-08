@@ -3,16 +3,19 @@
 // manageDialog) on B11's routes: the form, then the server's preview (its summary and, for an add, the resolved
 // identifiers), then Confirm, which sends that summary back unchanged. One Idempotency-Key per dialog, so a double
 // click or a retry never records twice. A request is pending until the next run imports it; nothing here trades.
+// Shared component (B7) since 2026-10-08, lifted unchanged from B14's companies/_parts/command-dialog.tsx (main 17172de8)
+// for the Companies page (B14) and the company page (B15); the client and the helpers it imports stay B14's
+// (web/lib/market-pages/company-commands-client.ts, companies.ts).
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
-import { Icon } from "../../../../../components/ui/icon.tsx";
-import type { Market } from "../../../../../lib/data/constants.ts";
+import { Icon } from "../ui/icon.tsx";
+import type { Market } from "../../lib/data/constants.ts";
 import {
   newIdempotencyKey, previewCommand, refusalWords, submitCommand, type CommandPreview, type CompanyTool,
-} from "../../../../../lib/market-pages/company-commands-client.ts";
-import { cleanReason, deleteConfirmed, parseAmount, REASON_MAX_CHARS } from "../../../../../lib/market-pages/companies.ts";
-import { fmtDateYear, money } from "../../../../../lib/ui/format.ts";
-import "./command-dialog.css";
-import type { CompanyRecord } from "../../../../../lib/ui/types.ts";
+} from "../../lib/market-pages/company-commands-client.ts";
+import { cleanReason, deleteConfirmed, parseAmount, REASON_MAX_CHARS } from "../../lib/market-pages/companies.ts";
+import { fmtDateYear, money } from "../../lib/ui/format.ts";
+import "./company-command-dialog.css";
+import type { CompanyRecord } from "../../lib/ui/types.ts";
 
 export type Intent =
   | { kind: "add" }

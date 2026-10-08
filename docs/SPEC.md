@@ -29,7 +29,7 @@ questions) from the dashboard, Slack, Claude Code and the Claude app.
 | 3 | Down signals | Buy-only in both markets: a "down" prediction creates no trade (it is still scored as a prediction). |
 | 4 | India share price above the amount | Skip the trade unless the company's amount is raised. Whole shares only in India. |
 | 5 | US shares | Fractional shares: exactly the amount is invested. |
-| 6 | Costs | India: Axis Direct. US: BUX (ABN AMRO), owner trades from the Netherlands. Charges in F1.6 (provisional until confirmed). Refined by decisions 49 and 52: the plans and charges the owner provided. |
+| 6 | Costs | India: Axis Direct. US: BUX (ABN AMRO), owner trades from the Netherlands. Charges in F1.6. Refined by decisions 49 and 52: the plans and charges the owner provided, confirmed final by the owner on 2026-10-08. |
 | 7 | Trades per day | No limit on trades: every qualifying forecast is its own paper trade (accuracy view). The per-strategy money-view budget is superseded by decision 40. |
 | 8 | Who is better | Headline = profit after costs on the same trades and amounts; beside it win rate, price-prediction error, worst losing streak, drawdown and a luck test. |
 | 9 | AI traders | 3 on Sonnet (news & results; price pattern & market mood; combined) + 1 on Opus (combined), from day one. |
@@ -73,10 +73,11 @@ questions) from the dashboard, Slack, Claude Code and the Claude app.
 | 46 | News: two markets | An article may be stored once per market (India, US), never twice within a market. |
 | 47 | News de-duplication timing | Fixed now as a small batch, before the waves (Wave 0). |
 | 48 | Waves | The wave plan of section 10: each session in its own cloud session, built, judged and merged to main in parallel; sessions merge to main themselves after a PASS (no pull requests); the orchestrator watches and resolves clashes. More automation and autonomy, less owner attention. |
-| 49 | India broker plan | Axis Direct NRI, 0.75% plan, Normal tier, Non-PIS (charges in F1.6; owner-provided from the published schedule, marked verify in `config/costs.yaml` `broker:` until a contract note confirms them). |
+| 49 | India broker plan | Axis Direct NRI, 0.75% plan, Normal tier, Non-PIS (charges in F1.6; owner-provided from the published schedule, confirmed final for paper trading by the owner on 2026-10-08, `config/costs.yaml` `broker:`). |
 | 50 | Two cost views on every trade | "Market cost" = brokerage + statutory taxes + exchange/regulatory fees (US: the order fee, SEC fee and FINRA TAF, no FX); strategies are ranked on it. "Your cost" = market cost + the owner-specific items: India the ₹200 NRI reporting charge on the buy date and on the sell date and the DP charge; US BUX's FX markup of 0.75% each way and the 0.20% a year portfolio fee pro-rated over the calendar days held. The go-live bar and the owner's money decisions use your cost. |
 | 51 | Cost-viable flag | A prediction or pick is `cost_viable` when its expected gain after your cost is positive: P(up) × move − (1 − P(up)) × loss − your cost > 0, with move and loss the conditional expected rise/shortfall of the pick (lab/gain.py); null without a probability or 80% range, and when the amount buys no whole share at the reference close (no trade, no costs). It is still made, traded and scored either way; picks and Slack show the flag. (Owner decision in the B6 session, 2026-10-07, replacing the first wording "predicted move exceeds your cost".) |
-| 52 | US broker plan | BUX Basic: €0.99 per order, FX markup 0.75% on each EUR↔USD conversion, 0.20% a year portfolio fee (charges in F1.6; owner-provided, marked verify in `config/costs.yaml` `broker:`). |
+| 52 | US broker plan | BUX Basic: €0.99 per order, FX markup 0.75% on each EUR↔USD conversion, 0.20% a year portfolio fee (charges in F1.6; owner-provided, confirmed final for paper trading by the owner on 2026-10-08, `config/costs.yaml` `broker:`). |
+| 53 | Broker charges final | The `broker:` values of decisions 49 and 52 (Axis Direct: 0.75% brokerage, ₹50 minimum, ₹200 NRO reporting per trade date, DP charge ₹30 or 0.04%, AMC ₹885 a year; BUX Basic: €0.99 per order, 0.75% FX markup each way, 0.20% a year portfolio fee) are final for paper trading (owner, 2026-10-08); `config/costs.yaml` no longer marks them verify. The statutory rates keep their own source notes. |
 
 Proposals made by the orchestrator that are still open (decision 34 accepted the weekly
 research time, the chat-log retention and the Slack form; the owner may change any of these): every
@@ -132,26 +133,27 @@ part already does it, the feature says "exists" and what changes.
    entry and exit prices are the raw official open and close. A later correction of an adjustment
    (`supersedes`) re-settles the trade as a new settlement row (append-only), never an edit.
 6. **Costs** (applied to entry and exit value; the table lives in `config/costs.yaml`, each value
-   marked verify with its source; engine code `marketbrief/lab/costs.py`). Owner decisions 49-52 (2026-10-07):
-   the broker values below are **owner-provided from the brokers' published schedules and marked verify** in
-   `config/costs.yaml` `broker:`; no contract note (India) or BUX fee page (US) has confirmed them yet. Each charge
+   with its source; engine code `marketbrief/lab/costs.py`). Owner decisions 49-52 (2026-10-07): the broker values
+   below are **owner-provided from the brokers' published schedules**, in `config/costs.yaml` `broker:`; the owner
+   confirmed them as final for paper trading on 2026-10-08 (no "verify" mark on them; the statutory rates keep their
+   own source notes). Each charge
    belongs to one of the two cost views of decision 50: **market** (brokerage, statutory taxes and
    exchange/regulatory fees; strategies are ranked on it) or **your** (the owner-specific items added to the market
    cost; the go-live bar and the owner's money decisions use it).
 
    | Market | Charge | Value | View | Source |
    |---|---|---|---|---|
-   | India (Axis Direct NRI, 0.75% plan, Normal tier, Non-PIS; decision 49) | Brokerage, delivery | 0.75% of the order value each side, at least ₹50 per order | market | owner-provided; verify with a contract note |
+   | India (Axis Direct NRI, 0.75% plan, Normal tier, Non-PIS; decision 49) | Brokerage, delivery | 0.75% of the order value each side, at least ₹50 per order | market | owner-provided; confirmed final (owner, 2026-10-08) |
    | India | GST | 18% on brokerage + exchange transaction charge + SEBI fee | market | owner-provided; verify |
    | India | STT | 0.1% each side | market | owner-provided (agrees with `config/costs.yaml`); verify |
    | India | Stamp duty | 0.015% on the buy side | market | owner-provided (agrees with `config/costs.yaml`); verify |
    | India | NSE transaction charge, SEBI fee | 0.00307% and 0.0001% each side, as already in `config/costs.yaml` | market | as documented there (search-only sources) |
-   | India | NRO Non-PIS reporting charge | ₹200 per trade date: the full ₹200 on a paper trade's buy date and again on its sell date | your | owner-provided; verify with a contract note |
-   | India | DP charge per scrip sold | provisional: ₹30 or 0.04% of the sale value, the higher | your | SECONDARY SOURCE, unchanged; verify with a contract note |
-   | India | Demat AMC | about ₹885 a year: an account charge, in no trade's cost | none | owner-provided; verify |
-   | US (BUX Basic; decision 52) | Order fee | €0.99 per order, converted at the EUR/USD close on or before that side's session (when none is stored that early, the oldest stored close, i.e. a later rate known by the run's clock: `lab/market_data.py` `MarketData.eurusd_on`) | market | owner-provided; verify with BUX |
-   | US | FX markup | 0.75% of the value on each EUR↔USD conversion (on the buy and on the sale) | your | owner-provided; verify with BUX |
-   | US | Portfolio fee | 0.20% a year on the entry value, pro-rated over the calendar days from D to the exit session | your | owner-provided; verify with BUX |
+   | India | NRO Non-PIS reporting charge | ₹200 per trade date: the full ₹200 on a paper trade's buy date and again on its sell date | your | owner-provided; confirmed final (owner, 2026-10-08) |
+   | India | DP charge per scrip sold | ₹30 or 0.04% of the sale value, the higher | your | secondary source; confirmed final (owner, 2026-10-08) |
+   | India | Demat AMC | about ₹885 a year: an account charge, in no trade's cost | none | owner-provided; confirmed final (owner, 2026-10-08) |
+   | US (BUX Basic; decision 52) | Order fee | €0.99 per order, converted at the EUR/USD close on or before that side's session (when none is stored that early, the oldest stored close, i.e. a later rate known by the run's clock: `lab/market_data.py` `MarketData.eurusd_on`) | market | owner-provided; confirmed final (owner, 2026-10-08) |
+   | US | FX markup | 0.75% of the value on each EUR↔USD conversion (on the buy and on the sale) | your | owner-provided; confirmed final (owner, 2026-10-08) |
+   | US | Portfolio fee | 0.20% a year on the entry value, pro-rated over the calendar days from D to the exit session | your | owner-provided; confirmed final (owner, 2026-10-08) |
    | US | SEC fee, FINRA TAF | as already in `config/costs.yaml` | market | official, as documented there |
 
    No GST is added to the reporting and DP charges (the owner's facts put GST on brokerage + exchange + SEBI only).
@@ -161,7 +163,7 @@ part already does it, the feature says "exists" and what changes.
    arithmetic at the latest close `C`), from `lab/costs.py`:
    - India, ₹1,00,000: brokerage 2 × ₹750 = ₹1,500.00; STT ₹200.00; exchange ₹6.14; SEBI ₹0.20; stamp duty ₹15.00;
      GST 18% × (1,500.00 + 6.14 + 0.20) = ₹271.14. **Market cost ₹1,992.48 = 1.99%.** Plus NRI reporting 2 × ₹200
-     and the provisional DP charge ₹40.00 (0.04% of ₹1,00,000 > ₹30): **your cost ₹2,432.48 = 2.43%.**
+     and the DP charge ₹40.00 (0.04% of ₹1,00,000 > ₹30): **your cost ₹2,432.48 = 2.43%.**
    - US, $1,000 at an example EUR/USD of 1.17 (the stored close is used): order fee 2 × €0.99 × 1.17 = $2.32; SEC
      fee $20.60 per million on the sale = $0.02; FINRA TAF $0.00 until 2026-12-31. **Market cost $2.34 = 0.23%.**
      Plus the FX markup 0.75% on the buy and on the sale = $15.00 and the portfolio fee $0.01 for a one-day hold
@@ -820,7 +822,7 @@ review at 2 months (decision 23).
 
 | When | Action |
 |---|---|
-| Before Wave 5 switches on paper trading (B2 merges with the owner-provided values) | Confirm the broker charges of decisions 49 and 52 (F1.6): from an Axis Direct contract note, the 0.75% brokerage and its ₹50 minimum, GST, STT, stamp duty, the ₹200 NRO Non-PIS reporting charge per trade date and the DP charge per sale (still provisional); from the BUX app or site, the €0.99 order fee, the 0.75% FX markup and the 0.20% a year portfolio fee |
+| Done 2026-10-08 (decision 53) | ~~Confirm the broker charges of decisions 49 and 52 (F1.6)~~: the owner confirmed the Axis Direct and BUX Basic charges in `config/costs.yaml` `broker:` as final for paper trading; no contract note is needed before Wave 5 switches paper trading on |
 | Before B4/B5 go live (Waves 2-3) | Create the two Vercel projects; MotherDuck read token and the inbox token (the owner's all-privileges token, decision 2026-10-08); GitHub fine-grained token |
 | Before B5 Slack | Add `/company`, `/trade`, `/ask` and the interactivity URL to the Slack app |
 | Before B8 | Anthropic workspace with a $20 monthly limit and a key in it |

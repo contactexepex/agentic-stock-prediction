@@ -13,16 +13,22 @@ Input: the market name and `work/lesson_facts.jsonl`, written by `python scripts
 Each line is one settled call: the call (`direction`, `confidence`, `horizon_days`, `rationale`,
 `evidence_ids` and `evidence` = what each cited id said), the outcome (`base_close`, `target_close`,
 `actual_return`, `hit`) and, when one was published, its price range (`lo80`, `lo50`, `hi50`,
-`hi80`, `range_actual_close`, `hit50`, `hit80`, `range_position`). Read nothing else: no news,
-prices or data after the call, no web.
+`hi80`, `range_actual_close`, `hit50`, `hit80`, `range_position`). Optional context:
+`intraday_notes`, the deviation explainer's notes on the ticker during the call's window (each with
+`session_date`, `flags`, `attribution`, `explanation` and `outcome` = how that move ended by the close:
+held, reversed, faded or pending); often empty. Read nothing else: no news, prices or data after the
+call, no web.
 
 For each line write one JSON object to `work/lessons.jsonl`:
-`{"prediction_id": "<the line's prediction_id>", "lesson": "<text>", "prompt_version": "reflect-v2"}`.
+`{"prediction_id": "<the line's prediction_id>", "lesson": "<text>", "prompt_version": "reflect-v3"}`.
 The lesson is ONE paragraph of at most 60 words, plain prose, covering in order:
 1. the call and what happened, with the return (and where the close landed vs the range, if any);
 2. what the cited evidence did or did not predict (the rationale's reasoning held or failed);
 3. one concrete, testable takeaway for a similar call (e.g. "this kind of headline alone was not
    enough for a 5-day call"). A single call proves little: say so when the evidence was thin.
+   When `intraday_notes` exist, you may say in words whether an intraday deviation during the window
+   foreshadowed the outcome (e.g. "an intraday drop on news that held by the close came before the
+   miss"). Do not quote numbers from the notes: the gate only accepts numbers of the call's facts.
 
 Rules (`python scripts/lessons.py validate work/lessons.jsonl` checks them deterministically):
 - Cite only the line's stored facts. Every number in the text must be one of them: the return in %
