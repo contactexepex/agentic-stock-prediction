@@ -1,12 +1,13 @@
 // The assistant's fixed settings (docs/SPEC.md F11; mcp/tools.yaml `explain`; design/mockups/_shared/shell.js holds the
-// same numbers for the pages). Changing one is an owner decision: the budget figures are the spec's.
+// same numbers for the pages). Owner decision 2026-10-08: no money budget in code (the Anthropic console's workspace
+// spend limit is the only one); every question's cost is logged and the spend shown.
 import { getTool } from "../tools/registry.ts";
 
 /** F11: "calling the Claude API (Sonnet)"; mcp/tools.yaml explain budget.model: sonnet -> the current Sonnet. */
 export const MODEL = "claude-sonnet-5-5";
 
 /** Refusal fallback (owner decision 2026-10-08: on). Pinned with the array form, not `"default"`, so its price is known
- * and the caps stay hard: Claude Sonnet 5, the model `"default"` routes Sonnet 5.5's cyber and frontier_llm declines to
+ * and the logged cost exact: Claude Sonnet 5, the model `"default"` routes Sonnet 5.5's cyber and frontier_llm declines to
  * (claude-api skill), at the same price as MODEL. */
 export const FALLBACK_MODEL = "claude-sonnet-5";
 export const FALLBACK_BETA = "server-side-fallback-2026-06-01";
@@ -25,35 +26,17 @@ export const PRICES: Record<string, Price> = {
   [FALLBACK_MODEL]: { input: 2.0, cache_write: 2.5, cache_read: 0.2, output: 10.0 },
 };
 
-/** Any other model an attempt reports is charged at the dearest listed price (Claude Fable 5.1: $10 / $50; its cache
+/** Any other model an attempt reports is logged at the dearest listed price (Claude Fable 5.1: $10 / $50; its cache
  * write at 1.25 x and its cache read at 0.1 x input, both rounded up), so an unexpected model never under-counts. */
 export const UNKNOWN_MODEL_PRICE: Price = { input: 10.0, cache_write: 12.5, cache_read: 1.0, output: 50.0 };
 
-/** The dearest of MODEL and FALLBACK_MODEL: what a pre-call ceiling assumes for each attempt. */
-export const PRICE_PER_MTOK: Price = {
-  input: Math.max(PRICES[MODEL].input, PRICES[FALLBACK_MODEL].input),
-  cache_write: Math.max(PRICES[MODEL].cache_write, PRICES[FALLBACK_MODEL].cache_write),
-  cache_read: Math.max(PRICES[MODEL].cache_read, PRICES[FALLBACK_MODEL].cache_read),
-  output: Math.max(PRICES[MODEL].output, PRICES[FALLBACK_MODEL].output),
-};
-
 const explainTool = getTool("explain");
-const explainBudget = (explainTool?.budget ?? {}) as { daily_usd?: number; monthly_usd_cap?: number };
-
-/** Code-side caps (F11): about $0.65 a day and the $20 monthly hard cap, both enforced before every model call. */
-export const DAILY_USD = explainBudget.daily_usd ?? 0.65;
-export const MONTHLY_USD = explainBudget.monthly_usd_cap ?? 20;
 
 /** mcp/tools.yaml explain question.max_length. */
 export const QUESTION_MAX = explainTool?.inputs.question?.max_length ?? 500;
 
 /** F11: conversations are kept 90 days in MotherDuck schema `app` (an operational log, not a fact store). */
 export const RETENTION_DAYS = 90;
-
-/** One question may cost at most this much; it is reserved against the day and month before the first model call.
- * $0.20 since the fallback (owner decision 2026-10-08): each call's ceiling covers the primary attempt and a fallback
- * attempt (two full attempts), and with the conversation history a second round must still fit. */
-export const QUESTION_USD = 0.2;
 
 /** Per model call: the most output (thinking included) one call may write. */
 export const MAX_TOKENS = 1500;
@@ -68,8 +51,7 @@ export const CALL_TIMEOUT_MS = 25000;
 
 /** Multi-turn (owner decision 2026-10-08): a question carries at most the last HISTORY_TURNS finished questions and
  * answers of its conversation, as plain text, each answer cut to HISTORY_ANSWER_CHARS (a question is at most
- * QUESTION_MAX). So the history adds at most 4 x (500 + 1000) = 6,000 characters to a request; every call's ceiling
- * counts it, and a question whose next call cannot fit QUESTION_USD stops. */
+ * QUESTION_MAX). So the history adds at most 4 x (500 + 1000) = 6,000 characters to a request. */
 export const HISTORY_TURNS = 4;
 export const HISTORY_ANSWER_CHARS = 1000;
 

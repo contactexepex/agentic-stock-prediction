@@ -4,11 +4,11 @@ import Anthropic from "@anthropic-ai/sdk";
 import { ASSISTANT, assistantRig, finalAnswer, toolUse, usage } from "./fakes.ts";
 import { LOG_DOWN, MODEL_DECLINED, NOT_CONFIGURED, STOPPED, SWITCHED_OFF, UNCITED } from "../explainer.ts";
 import { ADVICE_DECLINE } from "../guard.ts";
-import { callCeilingUsd, costUsd } from "../budget.ts";
-import { DEADLINE_MS, HISTORY_TURNS, MAX_ROUNDS, MAX_TOOL_CALLS, MODEL, QUESTION_USD, TOOL_RESULT_MAX_CHARS } from "../constants.ts";
+import { costUsd } from "../cost.ts";
+import { DEADLINE_MS, HISTORY_TURNS, MAX_ROUNDS, MAX_TOOL_CALLS, MODEL, TOOL_RESULT_MAX_CHARS } from "../constants.ts";
 import { githubContext, slackContext } from "../../tools/identity.ts";
 import { SYSTEM_PROMPT } from "../prompt.ts";
-import type { AnswerRecord, BudgetState } from "../types.ts";
+import type { AnswerRecord, SpendState } from "../types.ts";
 
 const TRADE = "acc:rule.model_news.v1:2026-09-29-NVDA-3d@20261005T221500Z";
 
@@ -41,10 +41,9 @@ test("a question is answered from a read tool, cites a verified id and logs its 
   const expected = (1000 * 2 + 200 * 10 + 3000 * 2 + 1200 * 0.2 + 150 * 10) / 1e6;
   assert.equal(r.store.answers[0].cost_usd, expected);
   assert.equal(answer.cost_usd, expected);
-  assert.equal(r.store.questions[0].reserved_usd, QUESTION_USD);
   assert.equal(r.store.answers[0].model, MODEL);
-  const budget = (out.data as { budget: BudgetState }).budget;
-  assert.equal(budget.day.spent_usd, expected, "the day's spend counts the real cost, not the reservation");
+  const spend = (out.data as { spend: SpendState }).spend;
+  assert.equal(spend.day.spent_usd, expected, "the spend shown is the logged real cost");
   assert.equal(r.store.purged[0], "2026-07-09T10:00:00.000Z", "rows older than 90 days are purged");
 });
 
@@ -114,7 +113,6 @@ test("a question asking for advice is declined without a model call and costs no
   assert.equal(answer.declined, "advice");
   assert.equal(answer.text, ADVICE_DECLINE);
   assert.equal(r.model.calls.length, 0);
-  assert.equal(r.store.questions[0].reserved_usd, 0);
   assert.equal(r.store.answers[0].cost_usd, 0);
 });
 
@@ -131,28 +129,7 @@ test("an answer that reads as advice, or that the model declined as advice, is r
   assert.equal(second.text, ADVICE_DECLINE);
 });
 
-test("over the day's budget the question is refused before any model call", async () => {
-  const r = assistantRig();
-  r.store.prior.day = 0.6;
-  const out = await r.ask({ market: "us", question: "How did the rule strategies do?" });
-  assert.equal(out.result, "refused");
-  assert.equal(out.refusal_code, "budget_exceeded");
-  assert.match(out.message ?? "", /Over budget: nothing was asked\. Assistant budget: \$0\.60 of \$0\.65 used today/);
-  assert.equal(r.model.calls.length, 0);
-  assert.equal(r.store.questions.length, 0);
-  assert.equal((out.data as { budget: BudgetState }).budget.over_budget, true);
-});
-
-test("over the month's cap the question is refused even with the day unused", async () => {
-  const r = assistantRig();
-  r.store.prior.month = 19.95;
-  const out = await r.ask({ market: "india", question: "How did the rule strategies do?" });
-  assert.equal(out.refusal_code, "budget_exceeded");
-  assert.match(out.message ?? "", /\$19\.95 of \$20\.00 this month/);
-  assert.equal(r.model.calls.length, 0);
-});
-
-test("the kill switch, a missing key and an unreadable log stop before anything is reserved", async () => {
+test("the kill switch, a missing key and an unreadable log stop before anything is logged or asked", async () => {
   const r = assistantRig();
   r.store.kill = false;
   const off = await r.ask({ market: "us", question: "Anything?" });
@@ -166,19 +143,6 @@ test("the kill switch, a missing key and an unreadable log stop before anything 
   assert.deepEqual([none.result, none.message], ["failed", NOT_CONFIGURED]);
   assert.equal(r.store.questions.length + bare.store.questions.length, 0);
   assert.equal(r.model.calls.length, 0);
-});
-
-test("a question whose next call could pass its reserved cost is stopped, and its real cost is kept", async () => {
-  const r = assistantRig();
-  r.reads.put("home", "us", "_", { picks: [] });
-  r.model.script = [{ ...toolUse("get_overview", {}), usage: usage(80000, 500) }];
-  const out = await r.ask({ market: "us", question: "Everything about today?" });
-  const answer = answerOf(out.data);
-  assert.equal(answer.status, "stopped");
-  assert.equal(answer.text, STOPPED);
-  assert.equal(r.model.calls.length, 1);
-  assert.equal(r.store.answers[0].cost_usd, costUsd({ input_tokens: 80000, output_tokens: 500, cache_read_tokens: 0, cache_write_tokens: 0 }));
-  assert.ok(r.store.answers[0].cost_usd <= QUESTION_USD);
 });
 
 test("the last round may not call tools and the tool calls are capped", async () => {
@@ -274,12 +238,13 @@ test("a cited id that is only a JSON key name does not count", async () => {
   assert.equal(answerOf((await r.ask({ market: "us", question: "Is it open?" })).data).status, "not_in_data");
 });
 
-test("a failed call keeps the reservation counted; no new call starts after the deadline", async () => {
+test("a failed call is logged at the cost it reported; no new call starts after the deadline", async () => {
   const r = assistantRig();
   r.model.script = [new Error("socket hang up")];
   const out = await r.ask({ market: "us", question: "Anything?" });
   assert.equal(out.result, "failed");
-  assert.equal(r.store.answers[0].cost_usd, QUESTION_USD, "a call that may have been billed counts its reservation");
+  assert.equal(r.store.answers[0].status, "failed");
+  assert.equal(r.store.answers[0].cost_usd, 0, "no usage came back; the Anthropic console shows what was billed");
 
   const slow = assistantRig();
   slow.reads.put("home", "us", "_", { picks: [] });
@@ -295,7 +260,7 @@ test("a failed call keeps the reservation counted; no new call starts after the 
   assert.equal(slow.model.calls.length, 1);
 });
 
-test("the refusal fallback is pinned, every attempt is charged at its own model's price and the ceiling covers two", async () => {
+test("the refusal fallback is pinned and every attempt is logged at its own model's price", async () => {
   const r = assistantRig();
   r.model.script = [{ ...finalAnswer({ text: "Not in the data.", not_in_data: true }), model: "claude-sonnet-5",
     usage: usage(2000, 300, 0, 0, [
@@ -317,7 +282,6 @@ test("the refusal fallback is pinned, every attempt is charged at its own model'
       cache_creation_input_tokens: 0, cache_read_input_tokens: 0 }]) }];
   await odd.ask({ market: "us", question: "Anything?" });
   assert.equal(odd.store.answers[0].cost_usd, (1000 * 10 + 100 * 50) / 1e6, "an unlisted model is charged at the dearest price");
-  assert.equal(callCeilingUsd({ messages: [] }), 2 * callCeilingUsd({ messages: [] }, 1));
 });
 
 test("multi-turn: the panel continues its own conversation with the last 4 turns, never another asker's", async () => {
@@ -383,4 +347,16 @@ test("no read runs after the deadline, and no further call starts", async () => 
   assert.equal(answer.status, "stopped");
   assert.equal(r.reads.calls.length, 0, "the read was skipped");
   assert.equal(r.store.answers[0].tool_calls, 0);
+});
+
+test("no money budget in code: a question is answered whatever the day's or month's spend (owner decision 2026-10-08)", async () => {
+  const r = assistantRig();
+  r.store.prior = { day: 50, month: 500 };
+  r.model.script = [finalAnswer({ text: "Not in the data.", not_in_data: true })];
+  const out = await r.ask({ market: "us", question: "Anything?" });
+  assert.equal(out.result, "accepted");
+  assert.equal(r.model.calls.length, 1);
+  const spend = (out.data as { spend: SpendState }).spend;
+  assert.equal(spend.day.spent_usd, 50 + r.store.answers[0].cost_usd, "the spend is still shown");
+  assert.equal(spend.month.starts_at, "2026-10-01T00:00:00Z");
 });

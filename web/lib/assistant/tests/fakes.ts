@@ -11,7 +11,7 @@ import type { CallContext, ToolArgs } from "../../tools/types.ts";
 export class FakeConversationStore implements ConversationStore {
   questions: QuestionRow[] = [];
   answers: AnswerRow[] = [];
-  /** Spend from before the test (e.g. earlier questions this day or month), added to the rows' spend. */
+  /** Spend from before the test (earlier questions this day or month), added to the rows' spend. */
   prior = { day: 0, month: 0 };
   kill: boolean | null = null;
   down = false;
@@ -19,15 +19,12 @@ export class FakeConversationStore implements ConversationStore {
 
   private spent(since: string, extra: number): number {
     return extra + this.questions.filter((q) => q.asked_at >= since)
-      .reduce((sum, q) => sum + (this.answers.find((a) => a.id === q.id)?.cost_usd ?? q.reserved_usd), 0);
+      .reduce((sum, q) => sum + (this.answers.find((a) => a.id === q.id)?.cost_usd ?? 0), 0);
   }
 
-  async reserve(row: QuestionRow, caps: { dayStart: string; monthStart: string; dayUsd: number; monthUsd: number }) {
+  async ask(row: QuestionRow) {
     if (this.down) throw new Error("log down");
-    if (this.spent(caps.dayStart, this.prior.day) + row.reserved_usd > caps.dayUsd + 1e-9) return false;
-    if (this.spent(caps.monthStart, this.prior.month) + row.reserved_usd > caps.monthUsd + 1e-9) return false;
-    this.questions.push(structuredClone(row));
-    return true;
+    if (!this.questions.some((q) => q.id === row.id)) this.questions.push(structuredClone(row));
   }
 
   async answer(row: AnswerRow) {
@@ -51,7 +48,7 @@ export class FakeConversationStore implements ConversationStore {
       .sort((a, b) => (a.asked_at < b.asked_at ? 1 : -1)).slice(0, limit)
       .map((q) => {
         const a = this.answers.find((item) => item.id === q.id);
-        return recordFrom({ ...q, ...(a ?? {}), cost_usd: a?.cost_usd ?? q.reserved_usd, status: a?.status ?? null });
+        return recordFrom({ ...q, ...(a ?? {}), cost_usd: a?.cost_usd ?? 0, status: a?.status ?? null });
       });
   }
 

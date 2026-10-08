@@ -5,8 +5,8 @@ import { ToolLayer } from "../../tools/executor.ts";
 import { type AssistantApiDeps, LIMITS, getConversation, postQuestion } from "../api.ts";
 import { formatSlackAnswer } from "../slack.ts";
 import { asksForAdvice, readsAsAdvice, verifyCitations } from "../guard.ts";
-import { budgetState, callCeilingUsd } from "../budget.ts";
-import { DAILY_USD, MONTHLY_USD, QUESTION_MAX, RETENTION_DAYS } from "../constants.ts";
+import { spendLine, spendState } from "../cost.ts";
+import { HISTORY_TURNS, QUESTION_MAX, RETENTION_DAYS } from "../constants.ts";
 import type { CallContext, ToolOutcome } from "../../tools/types.ts";
 
 function outcome(fields: Partial<ToolOutcome>): ToolOutcome {
@@ -14,7 +14,7 @@ function outcome(fields: Partial<ToolOutcome>): ToolOutcome {
     inbox_id: null, budget_left: null, ...fields };
 }
 
-function apiRig(answer: ToolOutcome = outcome({ data: { answer: { id: "ask-1" }, budget: null } })) {
+function apiRig(answer: ToolOutcome = outcome({ data: { answer: { id: "ask-1" }, spend: null } })) {
   const calls: { ctx: CallContext; tool: string; args: unknown }[] = [];
   const tools = { execute: async (ctx: CallContext, tool: string, args: unknown) => { calls.push({ ctx, tool, args }); return answer; } };
   const store = new FakeConversationStore();
@@ -36,7 +36,7 @@ test("POST runs the explain tool as the dashboard's assistant agent; identity ne
   const body = await res.json();
   assert.equal(body.answer.id, "ask-1");
   assert.deepEqual(body.limits, LIMITS);
-  assert.deepEqual([LIMITS.question_max, LIMITS.daily_usd, LIMITS.monthly_usd, LIMITS.retention_days], [500, 0.65, 20, 90]);
+  assert.deepEqual(LIMITS, { question_max: 500, history_turns: 4, retention_days: 90 });
 });
 
 test("POST maps refusals to HTTP statuses and refuses other origins, other types, big bodies and the gateway", async () => {
@@ -56,10 +56,10 @@ test("POST maps refusals to HTTP statuses and refuses other origins, other types
   assert.equal(r.calls.length, 1, "only the same-origin request reached the tool layer");
 });
 
-test("GET returns the market's conversation oldest first, within 90 days, with the budget state", async () => {
+test("GET returns the market's conversation oldest first, within 90 days, with the spend", async () => {
   const r = apiRig();
-  const q = (id: string, market: string, at: string, reserved = 0.1) => ({ id, market, channel: "slack", actor: "slack:U1",
-    agent: "assistant", question: id, ticker: null, strategy_id: null, asked_at: at, reserved_usd: reserved, conversation_id: id });
+  const q = (id: string, market: string, at: string) => ({ id, market, channel: "slack", actor: "slack:U1",
+    agent: "assistant", question: id, ticker: null, strategy_id: null, asked_at: at, conversation_id: id });
   r.store.questions.push(q("old", "us", "2026-06-01T00:00:00Z"), q("a", "us", "2026-10-07T09:00:00Z"),
     q("b", "us", "2026-10-07T09:30:00Z"), q("in", "india", "2026-10-07T09:00:00Z"));
   r.store.answers.push({ id: "a", status: "answered", text: "A.", cited: [], sources: [], not_in_data: false, declined: null,
@@ -70,46 +70,37 @@ test("GET returns the market's conversation oldest first, within 90 days, with t
   const body = await res.json();
   assert.deepEqual(body.answers.map((a: { id: string }) => a.id), ["a", "b"]);
   assert.equal(body.answers[1].status, "pending", "a question without an answer yet");
-  assert.equal(body.budget.day.spent_usd, 0.22, "both markets share the budget; an unanswered question counts its reservation");
-  assert.equal(body.budget.month.spent_usd, 0.22);
+  assert.equal(body.spend.day.spent_usd, 0.02, "the logged answers' real costs, both markets together");
+  assert.equal(body.spend.month.spent_usd, 0.02);
+  assert.equal(body.answers[1].cost_usd, 0, "a pending question has no logged cost");
   assert.equal((await getConversation(new Request("https://omenix.vercel.app/api/assistant?market=eu"), r.deps)).status, 404);
   r.store.down = true;
   assert.equal((await getConversation(new Request("https://omenix.vercel.app/api/assistant?market=us"), r.deps)).status, 503);
 });
 
-test("the budget state says over budget when less than one question's reservation is left", () => {
-  const at = new Date("2026-10-31T12:00:00Z");
-  assert.equal(budgetState({ day: 0.45, month: 3 }, at, null).over_budget, false);
-  assert.equal(budgetState({ day: 0.46, month: 3 }, at, null).over_budget, true);
-  assert.equal(budgetState({ day: 0, month: 19.85 }, at, true).over_budget, true);
-  const state = budgetState({ day: 0.1, month: 1 }, at, true);
-  assert.equal(state.month.starts_at, "2026-10-01T00:00:00Z");
-  assert.equal(state.day.starts_at, "2026-10-31T00:00:00Z");
-  assert.deepEqual([DAILY_USD, MONTHLY_USD, QUESTION_MAX, RETENTION_DAYS], [0.65, 20, 500, 90]);
+test("the spend state and line show the day and the month in UTC, with no cap", () => {
+  const state = spendState({ day: 0.1234567, month: 1.5 }, new Date("2026-10-31T12:00:00Z"), true);
+  assert.deepEqual(state, { day: { spent_usd: 0.123457, starts_at: "2026-10-31T00:00:00Z" },
+    month: { spent_usd: 1.5, starts_at: "2026-10-01T00:00:00Z" }, enabled: true });
+  assert.equal(spendLine(state), "Assistant spend: $0.12 today and $1.50 this month (UTC).");
+  assert.deepEqual([QUESTION_MAX, RETENTION_DAYS, HISTORY_TURNS], [500, 90, 4]);
 });
 
-test("a call's cost ceiling grows with its input and covers the full output", () => {
-  const small = callCeilingUsd({ model: "m", max_tokens: 1500, messages: [{ role: "user", content: "hi" }] });
-  const big = callCeilingUsd({ model: "m", max_tokens: 1500, messages: [{ role: "user", content: "x".repeat(20000) }] });
-  assert.ok(small >= 1500 * 10 / 1e6);
-  assert.ok(big - small >= 9990 * 2.5 / 1e6);
-});
-
-test("the Slack answer escapes stored and model text, lists the records and the budget, and says paper", () => {
+test("the Slack answer escapes stored and model text, lists the records and the spend, and says paper", () => {
   const answer = { id: "ask-1", market: "us", channel: "slack", asked_at: "2026-10-07T10:00:00Z", question: "q",
     text: "Gain <!channel> & <https://x.example|click>", cited_ids: ["id<1>"], cited: [{ id: "id<1>", kind: "news", as_of: "2026-10-07T01:00:00Z", source: "rm.news _" }],
     as_of: "2026-10-07T10:00:00Z", not_in_data: false, declined: null, status: "answered", sources: [], cost_usd: 0.01 };
-  const budget = budgetState({ day: 0.01, month: 0.01 }, new Date("2026-10-07T10:00:00Z"), null);
-  const msg = formatSlackAnswer(outcome({ data: { answer, budget } }));
+  const spend = spendState({ day: 0.01, month: 0.01 }, new Date("2026-10-07T10:00:00Z"), null);
+  const msg = formatSlackAnswer(outcome({ data: { answer, spend } }));
   assert.equal(msg.response_type, "ephemeral");
   assert.doesNotMatch(msg.text, /<!channel>|<https/);
   assert.match(msg.text, /Gain &lt;!channel&gt; &amp; &lt;https:\/\/x\.example\|click&gt;/);
   assert.match(msg.text, /^\*Answered from the data\*/);
   assert.match(msg.text, /news item `id&lt;1&gt;` \(data as of 2026-10-07T01:00:00Z\)/);
-  assert.match(msg.text, /\$0\.01 of \$0\.65 used today/);
+  assert.match(msg.text, /Assistant spend: \$0\.01 today and \$0\.01 this month \(UTC\)/);
   assert.match(msg.text, /Paper only, research, never advice\./);
-  const refused = formatSlackAnswer(outcome({ result: "refused", refusal_code: "budget_exceeded", message: "Over <budget>" }));
-  assert.match(refused.text, /^Not answered: Over &lt;budget&gt;/);
+  const refused = formatSlackAnswer(outcome({ result: "refused", refusal_code: "kill_switch", message: "Off <now>" }));
+  assert.match(refused.text, /^Not answered: Off &lt;now&gt;/);
 });
 
 test("advice is recognised in questions and answers, plain research questions are not", () => {
@@ -144,7 +135,7 @@ test("end to end through B5's real executor: the dashboard's assistant asks, rea
   assert.equal(res.status, 200, JSON.stringify(body));
   assert.equal(body.answer.status, "answered");
   assert.deepEqual(body.answer.cited_ids, ["trade-0001"]);
-  assert.equal(body.budget.day.budget_usd, 0.65);
+  assert.equal(body.spend.day.starts_at, "2026-10-07T00:00:00Z");
   const logged = r.inbox.commands.map((row) => [row.tool, row.agent, row.kind, row.result]);
   assert.deepEqual(logged, [["get_trades", "assistant", "read", "accepted"], ["explain", "assistant", "read_ai", "accepted"]]);
 

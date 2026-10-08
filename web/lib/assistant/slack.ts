@@ -2,9 +2,9 @@
 // text escaped with B5's slackEscape, so nothing in it can ping or hide a link. Ephemeral: only the asker sees it.
 import type { ToolOutcome } from "../tools/types.ts";
 import { slackEscape } from "../tools/text.ts";
-import { budgetLine } from "./budget.ts";
+import { spendLine } from "./cost.ts";
 import { kindWords, stateWords } from "./words.ts";
-import type { AnswerRecord, BudgetState } from "./types.ts";
+import type { AnswerRecord, SpendState } from "./types.ts";
 
 export interface SlackAnswer {
   response_type: "ephemeral";
@@ -15,7 +15,7 @@ export interface SlackAnswer {
 export const SLACK_FOOTER = "Paper only, research, never advice.";
 
 export function formatSlackAnswer(outcome: ToolOutcome): SlackAnswer {
-  const data = (outcome.data ?? {}) as { answer?: AnswerRecord; budget?: BudgetState | null };
+  const data = (outcome.data ?? {}) as { answer?: AnswerRecord; spend?: SpendState | null };
   const answer = data.answer;
   const lines: string[] = [];
   if (answer && outcome.result === "accepted") {
@@ -30,7 +30,7 @@ export function formatSlackAnswer(outcome: ToolOutcome): SlackAnswer {
   } else {
     lines.push(`Not answered: ${slackEscape(outcome.message ?? outcome.result)}`);
   }
-  if (data.budget) lines.push(`_${slackEscape(budgetLine(data.budget))}_`);
+  if (data.spend) lines.push(`_${slackEscape(spendLine(data.spend))}_`);
   lines.push(`_${SLACK_FOOTER}_`);
   return { response_type: "ephemeral", replace_original: true, text: lines.join("\n").slice(0, 3900) };
 }

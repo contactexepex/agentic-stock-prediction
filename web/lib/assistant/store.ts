@@ -45,11 +45,9 @@ export class MotherDuckConversationStore implements ConversationStore {
     this.query = query;
   }
 
-  async reserve(row: QuestionRow, caps: { dayStart: string; monthStart: string; dayUsd: number; monthUsd: number }): Promise<boolean> {
-    const { rows } = await this.query(SQL.reserve, [row.id, row.market, row.channel, row.actor, row.agent, row.question,
-      row.ticker, row.strategy_id, row.asked_at, row.reserved_usd, caps.dayStart, caps.monthStart, caps.dayUsd, caps.monthUsd,
-      row.conversation_id]);
-    return rows.length > 0;
+  async ask(row: QuestionRow): Promise<void> {
+    await this.query(SQL.ask, [row.id, row.market, row.channel, row.actor, row.agent, row.question, row.ticker,
+      row.strategy_id, row.asked_at, row.conversation_id]);
   }
 
   async answer(row: AnswerRow): Promise<void> {
