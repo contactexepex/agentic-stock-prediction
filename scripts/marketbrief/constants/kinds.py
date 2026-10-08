@@ -50,3 +50,4 @@ KIND_NEWS_IMPACT = "news_impact"
 
 # ---------- B2: strategy lab cost views (owner decisions 50-51; schema in core/schema_b2.py; docs/ws/b2.md) ----------
 KIND_COST_VIEWS = "cost_views"
+KIND_LAB_BACKTESTS = "lab_backtests"     # F2.3 back-test rows stored by `lab.py backtest --store`

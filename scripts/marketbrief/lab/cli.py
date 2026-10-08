@@ -5,7 +5,8 @@
   lab.py --market us settle           post-close: settle every due trade of both views (re-settle on a split fix)
   lab.py --market us news-impact      weekly: the news-impact rows of the ISO week (F3)
   lab.py --market us summary [--out FILE]          scoreboard, paired comparisons and heatmap data (forward)
-  lab.py --market us backtest [--history] [--eurusd R] [--out FILE]   F2.3 back-test of the no-news strategies
+  lab.py --market us backtest [--history] [--eurusd R] [--store] [--out FILE]   F2.3 back-test of the no-news
+                                      strategies (--store also appends the rows to lab_backtests, once per run_id)
   lab.py pick-study [--out FILE]      where "best expected gain" picks under the draft and the corrected formula
 
 stdout is one JSON object (with --out: the full result goes to FILE and stdout gets a short summary). Every read is
@@ -24,7 +25,7 @@ from marketbrief.core.clock import clock
 from marketbrief.core.database import connect
 from marketbrief.core.market_config import load_market
 from marketbrief.lab import costs as lab_costs
-from marketbrief.lab import pick_study, predict_inputs, registry, reports, run, settle_run
+from marketbrief.lab import backtest_store, pick_study, predict_inputs, registry, reports, run, settle_run
 from marketbrief.lab.constants import MSG_NO_HORIZON_SCORES
 from marketbrief.lab.strategies import company_rows
 from marketbrief.model.settings import load_model_config
@@ -48,6 +49,8 @@ def parser():
         if name == "backtest":
             command.add_argument("--history", action="store_true", help="add the long-history cache's earlier bars")
             command.add_argument("--eurusd", type=float, help="assumed EUR/USD when no EURUSD bars are stored (US)")
+            command.add_argument("--store", action="store_true",
+                                 help="append the rows to data/<market>/lab_backtests/ (skips ids already stored)")
     return root
 
 
@@ -81,6 +84,14 @@ def pick_study_result() -> dict:
     return out
 
 
+def backtest(con, cfg: dict, now, args) -> dict:
+    """The F2.3 back-test; with --store its rows are also appended to lab_backtests (not when it refused)."""
+    result = reports.run_backtest(con, cfg, now, args.history, args.eurusd)
+    if args.store and result.get("ok", True):
+        result["stored"] = backtest_store.store_backtest(con, result, now)
+    return result
+
+
 def dispatch(args) -> dict:
     """Run one subcommand."""
     if args.command == "pick-study":
@@ -95,7 +106,7 @@ def dispatch(args) -> dict:
         "settle": lambda: settle_run.settle_due(con, cfg, now),
         "news-impact": lambda: reports.write_news_impact(con, cfg, now),
         "summary": lambda: reports.lab_summary(con, now),
-        "backtest": lambda: reports.run_backtest(con, cfg, now, args.history, args.eurusd),
+        "backtest": lambda: backtest(con, cfg, now, args),
     }
     return commands[args.command]()
 

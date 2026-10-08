@@ -1,9 +1,9 @@
-"""Column types of the strategy lab's own kind (B2; docs/ws/b2.md, owner decisions 50-51). Research only: a paper
+"""Column types of the strategy lab's own kinds (B2; docs/ws/b2.md, owner decisions 50-51). Research only: a paper
 trade is a record, never an order. Conventions as in core/schema_lab.py (money in the market currency, `_pct` in
 percent points)."""
 from __future__ import annotations
 
-from marketbrief.constants.kinds import KIND_COST_VIEWS
+from marketbrief.constants.kinds import KIND_COST_VIEWS, KIND_LAB_BACKTESTS
 from marketbrief.core.schema_base import Schemas
 
 B2_SCHEMAS: Schemas = {
@@ -31,5 +31,24 @@ B2_SCHEMAS: Schemas = {
         "your_cost_lines": "JSON", "net_pnl_market": "DOUBLE", "return_pct_market": "DOUBLE",
         "net_pnl_your": "DOUBLE", "return_pct_your": "DOUBLE", "holding_days": "INTEGER", "eurusd_entry": "DOUBLE",
         "eurusd_exit": "DOUBLE", "computed_at": "TIMESTAMPTZ", "method_version": "VARCHAR",
+    }),
+    # The F2.3 back-test (lab/backtest.py; basis backtest, never pooled with forward results) as stored by
+    # `lab.py backtest --store` (lab/backtest_store.py), in the day file of computed_at: one row per strategy and
+    # horizon ("1".."5" or "all" = pooled). run_id = <market>-<as_of_date>-<stored|history>, id =
+    # bt:<run_id>:<strategy_id>:<horizon>; a rerun of a run_id stores nothing new. as_of_date = the clock's last
+    # complete session; history = the long-history cache was added; splice = its diagnostics per symbol;
+    # eurusd_source = how the BUX order fee was converted; probs_source = walk_forward:<model_version> when the
+    # model strategies without news got B10's walk-forward probabilities, else null; note = why they did not (null
+    # otherwise); data_first_date / data_last_date = the bars' span. Row numbers in the market-cost view, your_* in
+    # the owner's (cost_views); luck_test JSON as lab/luck.py; sample_badge ok | too_few_to_rank.
+    KIND_LAB_BACKTESTS: ("jsonl", {
+        "id": "VARCHAR", "run_id": "VARCHAR", "market": "VARCHAR", "computed_at": "TIMESTAMPTZ",
+        "as_of_date": "DATE", "history": "BOOLEAN", "splice": "JSON", "eurusd_source": "VARCHAR",
+        "probs_source": "VARCHAR", "note": "VARCHAR", "data_first_date": "DATE", "data_last_date": "DATE",
+        "method_version": "VARCHAR", "strategy_id": "VARCHAR", "family": "VARCHAR", "horizon": "VARCHAR",
+        "trades": "INTEGER", "net_pnl": "DOUBLE", "mean_return_pct": "DOUBLE", "win_rate": "DOUBLE",
+        "worst_losing_streak": "INTEGER", "max_drawdown": "DOUBLE", "your_net_pnl": "DOUBLE",
+        "your_mean_return_pct": "DOUBLE", "luck_test": "JSON", "sample_badge": "VARCHAR", "first_entry": "DATE",
+        "last_exit": "DATE",
     }),
 }
