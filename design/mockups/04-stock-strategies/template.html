@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Market brief · Stock strategies</title>
+<meta name="description" content="Stock strategies page of the personal stock cockpit: for one company, who agrees at each horizon, today's head-to-head picks and why, the best strategy on this company and overall, and every strategy ranked by profit after costs with its prediction for today. Research only, every signal Paper.">
+<!--@@SYSTEM_CSS@@-->
+<!--@@SHARED_CSS@@-->
+<style>
+/* Stock strategies mockup (design track, SPEC section 6 page 4). Page-local layout only; every colour is a token. */
+.cohead{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.cohead .px{font:700 22px/1.1 var(--md-ref-typeface-plain);letter-spacing:-.4px}
+.cohead .mb-delta{font-size:14px}
+/* agreement by horizon: grouped stacked bars */
+.agc svg{width:100%;height:200px;display:block}
+.agc .grid line{stroke:var(--mb-chart-grid)} .agc .axis text{font-size:11px;fill:var(--mb-chart-label)}
+.agc .axis text.on{fill:var(--md-sys-color-primary);font-weight:700}
+.agc rect.r{fill:var(--mb-chart-1)} .agc rect.b{fill:var(--mb-chart-2)} .agc rect.a{fill:var(--mb-chart-3)}
+.agc rect.dim{opacity:.45} .agc rect.hit{fill:transparent}
+.agc text.tot{font-size:12px;font-weight:700;fill:var(--md-sys-color-on-surface)}
+.agl{display:grid;gap:8px;margin-top:10px}
+.agl .r{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;font-size:13px}
+.agl .r .l{color:var(--md-sys-color-on-surface-variant);width:70px}
+.agl .bar{height:8px;border-radius:4px;background:var(--md-sys-color-surface-container-highest);overflow:hidden;display:flex}
+.agl .bar i{display:block;height:100%}
+/* head-to-head (as on Home) */
+.fams{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.fam-box{border-radius:10px;padding:12px 14px;background:var(--md-sys-color-surface-container-low);min-width:0}
+.fam-box .fh{display:flex;align-items:center;gap:8px;font-size:12px;margin-bottom:6px;flex-wrap:wrap}
+.fam-box .fh b{font-weight:700;font-size:13px}
+.fam-box .fh small{color:var(--md-sys-color-on-surface-variant);min-width:0;overflow-wrap:anywhere}
+.pk{display:grid;grid-template-columns:1fr;gap:3px;padding:8px 0;border-top:1px solid var(--md-sys-color-surface-container-high);font-size:12.5px;min-width:0}
+.pk .rule{font-size:11.5px;color:var(--md-sys-color-on-surface-variant)}
+.pk .line{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0}
+.pk .det{font-size:11.5px;color:var(--md-sys-color-on-surface-variant);overflow-wrap:anywhere}
+.pk .gain{font-weight:700;font-size:14px;margin-left:auto;display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap}
+.pk .gain .mb-label{font-size:11px;padding:1px 6px}
+.cand{margin-top:8px;font-size:12px} .cand summary{cursor:pointer;color:var(--md-sys-color-primary);font-weight:600;font-size:12.5px}
+.cand table{margin-top:6px} .cand td,.cand th{padding:5px 6px;font-size:12px}
+.sumline{display:flex;align-items:center;gap:10px;font-size:13px;padding:10px 14px;border-radius:var(--mb-panel-radius);background:var(--md-sys-color-surface-container-low);margin-bottom:12px}
+/* ranked strategies table */
+.rk td{vertical-align:middle}
+.rk .nm b{display:block;font-size:13.5px} .rk .nm small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:11.5px;max-width:220px}
+.rk .pn b{font-size:14px;font-weight:700} .rk .pn small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:11px;white-space:nowrap}
+.rk tr.few td{color:var(--md-sys-color-on-surface-variant)} .rk tr.few .pn b{color:var(--md-sys-color-on-surface-variant)}
+.rk tr.none td{color:var(--md-sys-color-on-surface-variant)}
+.rk .call{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.rk .rank{font-weight:700;color:var(--md-sys-color-primary);text-align:center;width:28px}
+.rk tr.best td{background:color-mix(in srgb, var(--md-sys-color-primary) 6%, transparent)}
+.pick-co{display:inline-flex;align-items:center;gap:8px}
+.head .end{min-width:0;max-width:100%} .md-segmented{max-width:100%;flex-wrap:wrap}
+.rk .ov b{font-size:13px;font-weight:600} .rk .ov small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:11px;white-space:nowrap}
+@media (max-width:1599px){ .rk th.c4,.rk td.c4{display:none} }
+@media (max-width:1439px){ .rk th{padding:8px 8px} .rk td{padding:8px 8px} }
+@media (max-width:1359px){ .rk th.cw,.rk td.cw{display:none} }
+@media (max-width:1199px){ .rk th.c2,.rk td.c2{display:none} .rk .call{display:grid;gap:4px;justify-items:start} }
+@media (max-width:760px){ .rk th.cm,.rk td.cm{display:none} .fams{grid-template-columns:1fr} .rk .nm small{white-space:normal;max-width:none} .rk th,.rk th.num{padding:8px 6px;white-space:normal;line-height:1.25} .rk td{padding:8px 6px} .rk .pn small{white-space:normal} .rk .nm b{white-space:normal} .rk .call .mb-odds svg{width:40px} .rk .call > .muted{white-space:normal} .rk .call .mb-label{white-space:normal} .rk .pn > span{white-space:normal;display:inline-block;max-width:112px} .rk .pn small .sep{display:block;height:0;overflow:hidden} }
+</style>
+</head>
+<body>
+<!--@@ICONS@@-->
+<div id="tip" class="md-tooltip" role="tooltip"></div>
+
+<div class="mb-app">
+  <nav class="mb-sidebar" aria-label="Pages" id="sidebar"></nav>
+  <div class="mb-scrim" id="scrim"></div>
+  <header class="mb-topbar" id="topbar">
+    <button class="md-icon-btn mb-menu-btn" type="button" id="menu-btn" aria-label="Open the menu" aria-controls="sidebar" aria-expanded="false"><svg class="ms"><use href="#ms-menu"/></svg></button>
+    <div class="mb-topbar-title" id="title">Stock strategies</div>
+    <div class="mb-topbar-actions">
+      <div class="md-segmented dense light" role="group" aria-label="Market" id="market-seg"></div>
+      <a class="md-btn filled" href="../11-assistant/page.html" data-tip="Ask the assistant (page 11): answers cite ids and as-of times, read-only." aria-label="Ask the assistant"><svg class="ms"><use href="#ms-bolt"/></svg><span class="ask-l">Ask</span></a>
+    </div>
+  </header>
+  <main class="mb-content"><div class="mb-content-inner" id="page"></div></main>
+  <nav class="mb-navbar" aria-label="Pages" id="navbar"></nav>
+</div>
+
+<script>const D = /*__DATA__*/null;</script>
+<!--@@SHARED_JS@@-->
+<script>
+let horizon = null;
+shell(PAGES.strategies, 'Stock strategies', {bar: [NAV[0], NAV[1], NAV[2], NAV[3]]});
+onMarketChange = () => { horizon = null; render(); };
+
+const bestOf = rows => rows.filter(r => r.trades > 0).sort((x, y) => y.net_pnl - x.net_pnl || y.trades - x.trades || x.strategy_id.localeCompare(y.strategy_id))[0] || null;
+const rowsAll = (p, scope) => p[scope].filter(r => r.horizon_days === 'all');
+const luck = (cur, r) => r.luck_test && r.luck_test.low_pct != null ? `luck test: mean return ${sgn(r.luck_test.low_pct)} to ${sgn(r.luck_test.high_pct)} per trade (95%, corrected across ${r.luck_test.m} rows); ${r.luck_test.corrected ? 'excludes zero after correction: an edge may be real' : 'does not exclude zero after correction: no edge claimed'}.` : 'luck test: one trade, no interval yet.';
+
+function kpis(m) {
+  const p = P(m), cur = p.currency, c = p.company, a = (p.agreement[String(horizon)] || [])[0], picks = p.head_to_head.filter(k => k.status === 'picked'), viable = picks.filter(k => k.expected_gain_pct > 0).length;
+  const bestHere = bestOf(rowsAll(p, 'on_company')), bestAll = bestOf(rowsAll(p, 'overall'));
+  const K = el('section', {class:'kpis', 'aria-label':'At a glance'});
+  const card = (ico, kind, label, value, sub, tipText) => el('div', {class:'mb-kpi', 'data-tip': tipText}, avatar(ico, kind), el('div', {}, el('div', {class:'l'}, label), el('div', {class:'v'}, value)), el('div', {class:'s'}, sub));
+  K.append(card('trending_up', 'success', `Agreement at N+${horizon}`, a ? `${a.buy} of ${a.of}` : '—', a ? el('span', {}, 'strategies buy · ', a.avg_prob_up != null ? `avg chance ${pct(a.avg_prob_up)}` : 'no probability') : 'no agreement row', 'How many of the strategies that predict this company at the selected horizon would buy it (decision 30).'));
+  K.append(card('settings', '', 'Best on this company', bestHere ? stratOf(m, bestHere.strategy_id).name : 'None yet', bestHere ? el('span', {}, moneyDelta(cur, bestHere.net_pnl, dec(cur)), ` on ${bestHere.trades} trade${bestHere.trades === 1 ? '' : 's'} `, bestHere.sample_badge === 'too_few_to_rank' ? el('span', {class:'mb-label neutral'}, 'too few to rank') : null) : 'no settled trade on it', bestHere ? `Profit after costs on this company, all horizons pooled. ${luck(cur, bestHere)} Under ${MIN_TRADES_TO_RANK} trades it is mostly noise (SPEC section 6).` : 'No strategy has a settled trade on this company yet.'));
+  K.append(card('query_stats', 'info', 'Best overall', bestAll ? stratOf(m, bestAll.strategy_id).name : 'None yet', bestAll ? el('span', {}, moneyDelta(cur, bestAll.net_pnl, dec(cur)), ` on ${bestAll.trades} trades, all companies `, bestAll.sample_badge === 'too_few_to_rank' ? el('span', {class:'mb-label neutral'}, 'too few to rank') : null) : 'no settled trade', bestAll ? `The market's best strategy by profit after costs across all companies, shown beside the per-company best as the luck guard of SPEC section 6. ${luck(cur, bestAll)}` : ''));
+  K.append(card('layers', 'paper', 'Head-to-head today', `${picks.length} trade${picks.length === 1 ? '' : 's'}`, picks.length ? el('span', {}, el('span', {class:'mb-label ' + (viable ? 'success' : 'danger')}, icon(viable ? 'ms-check' : 'ms-close'), viable ? `${viable} clear costs` : 'none clears costs'), ' Paper') : 'no candidate today', 'Up to four paper trades on this company today: the strongest rule strategy and the strongest AI trader × two pick rules (decisions 41-42).'));
+  return K;
+}
+
+/* grouped stacked bars: buyers per horizon by family; the selected horizon full, the others dimmed */
+function agreementChart(m) {
+  const p = P(m), W = 520, H = 200, L = 30, R = 10, T = 22, B = 28, rows = p.horizons.map(k => (p.agreement[String(k)] || [])[0] || null);
+  const max = Math.max(1, ...rows.map(a => a ? a.of : 0));
+  const s = svgEl('svg', {viewBox:`0 0 ${W} ${H}`, role:'img', 'aria-label':'Buyers per horizon by family'});
+  const grid = svgEl('g', {class:'grid'}), axis = svgEl('g', {class:'axis'});
+  const Y = v => T + (max - v) / max * (H - T - B);
+  for (const v of [0, Math.round(max / 2), max]) { grid.append(svgEl('line', {x1: L, x2: W - R, y1: Y(v), y2: Y(v)})); const t = svgEl('text', {x: L - 6, y: Y(v) + 4, 'text-anchor':'end'}); t.textContent = v; axis.append(t); }
+  const slot = (W - L - R) / p.horizons.length, bw = Math.min(56, slot * 0.5);
+  rows.forEach((a, i) => {
+    const x = L + slot * i + (slot - bw) / 2, on = p.horizons[i] === horizon;
+    const t = svgEl('text', {class: 'tick' + (on ? ' on' : ''), x: x + bw / 2, y: H - 8, 'text-anchor':'middle'}); t.textContent = `N+${p.horizons[i]}`; axis.append(t);
+    if (!a) return;
+    let y = Y(0);
+    for (const f of ['rule','baseline','ai']) { const n = a.by_family[f].buy; if (!n) continue; const h = (Y(0) - Y(n)); s.append(svgEl('rect', {class: FAMILY[f][2] + (on ? '' : ' dim'), x, y: y - h, width: bw, height: h, rx: 2})); y -= h; }
+    const tot = svgEl('text', {class:'tot', x: x + bw / 2, y: Y(a.buy) - 6, 'text-anchor':'middle'}); tot.textContent = `${a.buy}/${a.of}`; s.append(tot);
+    const hit = svgEl('rect', {class:'hit', x: L + slot * i, y: T, width: slot, height: H - T - B, tabindex: 0, 'data-tip': `N+${p.horizons[i]}: ${a.buy} of ${a.of} buy · rule ${a.by_family.rule.buy}/${a.by_family.rule.of}, baselines ${a.by_family.baseline.buy}/${a.by_family.baseline.of}, AI ${a.by_family.ai.buy}/${a.by_family.ai.of}${a.avg_prob_up != null ? ` · avg chance ${pct(a.avg_prob_up)}` : ''}. Click to select.`});
+    hit.addEventListener('click', () => { horizon = p.horizons[i]; render(); }); hit.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { horizon = p.horizons[i]; render(); e.preventDefault(); } }); s.append(hit);
+  });
+  s.append(grid, axis);
+  return el('div', {class:'agc'}, s);
+}
+
+function agreementCard(m) {
+  const p = P(m), c = p.company, a = (p.agreement[String(horizon)] || [])[0];
+  const card = el('section', {class:'card', 'aria-label':'Who agrees, by horizon'});
+  card.append(el('div', {class:'head'}, el('h2', {}, 'Who agrees, by horizon'), help('For each horizon N+1..N+5: how many strategies would buy this company (a call counts when it is "up" and at or above the strategy’s own bar), stacked by family. Rule strategies and baselines predict every horizon; AI traders predict N+1, N+3 and N+5 (decision 38). Click a horizon or use the tabs.'), el('div', {class:'end'}, horizonTabs(p.horizons, horizon, k => { horizon = k; render(); }))));
+  card.append(el('div', {class:'sub2'}, `N+${horizon} = ${horizonWords(horizon)} · as of the ${fmtD(p.as_of, false)} close · Paper`));
+  card.append(agreementChart(m));
+  const list = el('div', {class:'agl'});
+  if (a) for (const f of ['rule','baseline','ai']) { const x = a.by_family[f]; const r = el('div', {class:'r'}); r.append(el('span', {class:'l'}, el('i', {class:'sw ' + FAMILY[f][2]}), FAMILY_SHORT[f]), el('div', {class:'bar', role:'img', 'aria-label': `${FAMILY[f][0]} ${x.buy} of ${x.of}`}, el('i', {class:'ser-' + FAMILY[f][2], style:`width:${x.of ? (100 * x.buy / x.of).toFixed(1) : 0}%`})), el('b', {}, x.of ? `${x.buy} of ${x.of}` : 'no prediction')); list.append(r); }
+  card.append(list);
+  card.append(el('p', {class:'note'}, a ? `${a.label}${a.avg_prob_up != null ? `; the buyers’ average chance of a rise is ${pct(a.avg_prob_up)}` : ''}. A majority says the strategies lean the same way; it does not say they are right (see the track record).` : 'No agreement row for this horizon.'));
+  return card;
+}
+
+function headToHead(m) {
+  const p = P(m), cur = p.currency, c = p.company, ks = p.head_to_head;
+  const card = el('section', {class:'card', 'aria-label':'Today’s head-to-head picks'});
+  card.append(el('div', {class:'head'}, el('h2', {}, 'Today’s head-to-head picks'), el('span', {class:'mb-tag paper'}, 'paper'), help('Decisions 41-42: the strongest rule strategy and the strongest AI trader each choose one horizon under two pick rules: best expected gain (the horizon with the highest p × move − (1 − p) × loss − costs) and highest probability. "Strongest" = the family’s best profit after costs on this company once it has 20 settled trades on it, else across all companies. A pick clears costs when its expected gain after costs is above zero.'), el('div', {class:'end'}, el('a', {class:'go', href: PAGES.compare}, 'Rule vs AI', icon('ms-chevron_right')))));
+  if (!ks.length) { card.append(el('div', {class:'quiet'}, 'No head-to-head picks stored for today’s session.')); return card; }
+  const picked = ks.filter(k => k.status === 'picked'), viable = picked.filter(k => k.expected_gain_pct > 0);
+  card.append(el('div', {class:'sumline'}, avatar(viable.length ? 'check' : 'info', viable.length ? 'success' : 'neutral', 'sm'), el('span', {}, picked.length ? el('span', {}, `${picked.length} paper trade${picked.length === 1 ? '' : 's'} of ${money(cur, ks[0].amount)} each · `, el('b', {}, viable.length ? `${viable.length} clear costs` : 'No pick clears costs today')) : el('b', {}, 'No candidate today'))));
+  if (ks.every(k => k.status !== 'picked')) { card.append(el('div', {class:'quiet'}, `No rule strategy and no AI trader buys ${c.name} at any horizon today, so no head-to-head trade.`)); return card; }
+  const fams = el('div', {class:'fams'});
+  for (const f of ['rule','ai']) {
+    const fk = ks.filter(k => k.family === f), fb = el('div', {class:'fam-box'});
+    const any = fk.find(k => k.status === 'picked'), st = any ? stratOf(m, any.strategy_id) : null;
+    fb.append(el('div', {class:'fh'}, avatar(FAMILY[f][1], f === 'ai' ? 'info' : '', 'sm'), el('b', {}, FAMILY_SHORT[f]), st ? el('small', {'data-tip': `${st.name} (${any.strategy_id}) is the family’s strongest strategy with a buyable horizon today, ranked on ${any.strongest_basis === 'per_company' ? 'this company (20+ settled trades on it)' : 'all companies (fewer than 20 settled trades on this one)'}. Ranking: ${any.ranking.map(x => `${x.rank}. ${stratOf(m, x.strategy_id).name} ${money(cur, x.net_pnl, dec(cur), true)} on ${x.settled_trades}`).join(' · ')}.`}, `· ${st.name} · ranked on ${any.strongest_basis === 'per_company' ? 'this company' : 'all companies'}`) : el('small', {}, '· no candidate')));
+    for (const k of fk) {
+      const row = el('div', {class:'pk'}); row.append(el('span', {class:'rule'}, PICK[k.pick_rule]));
+      if (k.status !== 'picked') { row.append(el('span', {class:'line muted'}, 'no candidate')); fb.append(row); continue; }
+      row.append(el('span', {class:'line'}, el('span', {class:'h-lab'}, `N+${k.horizon_days}`), odds(k.prob_up, `${pct(k.prob_up, 1)} chance of a rise from the open to the N+${k.horizon_days} close (prediction ${k.prediction_id}).`),
+        el('span', {class:'gain'}, moneyDelta(cur, k.expected_gain_pct * k.amount / 100, dec(cur)), el('span', {class:'mb-label ' + (k.expected_gain_pct > 0 ? 'success' : 'danger'), 'data-tip': `Expected gain after costs ${sgn(k.expected_gain_pct)} of ${money(cur, k.amount)}: ${pct(k.prob_up,1)} × ${sgn(k.move_pct)} − ${pct(1-k.prob_up,1)} × ${k.loss_pct}% − ${k.costs_pct}%.`}, icon(k.expected_gain_pct > 0 ? 'ms-check' : 'ms-close'), `${sgn(k.expected_gain_pct)} · ${k.expected_gain_pct > 0 ? 'clears costs' : 'below costs'}`))));
+      row.append(el('span', {class:'det'}, `to target ${sgn(k.move_pct)} · downside ${sgn(-k.loss_pct)} · costs ${k.costs_pct}%`));
+      fb.append(row);
+    }
+    if (any && any.candidates) {
+      const det = el('details', {class:'cand'}, el('summary', {}, `Why these horizons: ${any.candidates.length} buyable horizons`));
+      const tb = el('table', {class:'md-table'}, el('thead', {}, el('tr', {}, el('th', {}, 'Horizon'), el('th', {class:'num'}, 'Chance'), el('th', {class:'num'}, 'To target'), el('th', {class:'num'}, 'Downside'), el('th', {class:'num'}, 'Costs'), el('th', {class:'num'}, 'Expected'))));
+      const tbody = el('tbody');
+      for (const cd of any.candidates) tbody.append(el('tr', {}, el('td', {}, `N+${cd.horizon_days}`), el('td', {class:'num'}, pct(cd.prob_up, 1)), el('td', {class:'num'}, sgn(cd.move_pct)), el('td', {class:'num'}, sgn(-cd.loss_pct)), el('td', {class:'num'}, `${cd.costs_pct}%`), el('td', {class:'num'}, delta(cd.expected_gain_pct))));
+      tb.append(tbody); det.append(el('div', {class:'md-table-wrap'}, tb)); fb.append(det);
+    }
+    fams.append(fb);
+  }
+  card.append(fams);
+  card.append(el('p', {class:'note'}, 'Expected gain is in percent of the trade amount, from the latest close. Every trade is Paper: a record, never an order.'));
+  return card;
+}
+
+function ranked(m) {
+  const p = P(m), cur = p.currency, c = p.company, rows = rowsAll(p, 'on_company'), byId = {}; for (const r of rows) byId[r.strategy_id] = r;
+  const overall = {}; for (const r of rowsAll(p, 'overall')) overall[r.strategy_id] = r;
+  const preds = {}; for (const r of p.predictions) if (r.horizon_days === horizon) preds[r.strategy_id] = r;
+  const ids = Object.keys(p.strategies).sort((x, y) => { const a = byId[x], b = byId[y]; if (a && b) return b.net_pnl - a.net_pnl || b.trades - a.trades || x.localeCompare(y); if (a) return -1; if (b) return 1; return x.localeCompare(y); });
+  const best = bestOf(rows);
+  const card = el('section', {class:'card', 'aria-label':'Every strategy on this company'});
+  card.append(el('div', {class:'head'}, el('h2', {}, `Every strategy on ${c.name}`), help('All 15 strategies, baselines included, ranked by profit after costs on this company (accuracy view, all horizons pooled). Fewer than 20 settled trades on it is "too few to rank" and greyed: a handful of trades is mostly luck (SPEC section 6). Beside each profit: the trades it rests on and the luck test’s interval in the tooltip. "Today" is the strategy’s prediction for the selected horizon: its chance of a rise, target and range, and whether it would trade.'), el('div', {class:'end'}, `today at N+${horizon}`, horizonTabs(p.horizons, horizon, k => { horizon = k; render(); }))));
+  const tb = el('table', {class:'md-table tbl rk'});
+  tb.append(el('thead', {}, el('tr', {}, el('th', {class:'cm'}, '#'), el('th', {}, 'Strategy'), el('th', {class:'num'}, 'Profit after costs'), el('th', {class:'num cm'}, 'Trades'), el('th', {class:'num cw'}, 'Win rate'), el('th', {class:'num cw'}, 'Target error'), el('th', {class:'c4'}, 'Overall'), el('th', {}, `Today at N+${horizon}`), el('th', {class:'c2'}, 'Range'))));
+  const body = el('tbody'); let n = 0;
+  for (const id of ids) {
+    const st = p.strategies[id], r = byId[id], o = overall[id], pr = preds[id]; n++;
+    const tr = el('tr', {class: (r ? (r.sample_badge === 'too_few_to_rank' ? 'few' : '') : 'none') + (best && r === best ? ' best' : '')});
+    tr.append(el('td', {class:'rank cm'}, r ? String(n) : '—'));
+    tr.append(el('td', {}, el('span', {class:'nm'}, el('b', {}, el('a', {class:'tk', href: `${PAGES.lab}#${m}/${id}`, 'data-tip': `${st.description} Open it in the Strategy lab.`}, st.name), ' ', famLabel(st.family, FAMILY_SHORT[st.family])), el('small', {}, st.differs_in ? `differs from the reference in ${st.differs_in.replace(/_/g, ' ')}` : st.family === 'baseline' ? 'yardstick, not a contender' : st.family === 'ai' ? (st.parameters.sees_model_score ? 'sees the model score' : 'blind to the model score') : 'the reference rule strategy'))));
+    tr.append(el('td', {class:'num pn'}, r ? el('span', {'data-tip': luck(cur, r)}, el('b', {}, moneyDelta(cur, r.net_pnl, dec(cur))), el('small', {}, r.sample_badge === 'too_few_to_rank' ? el('span', {}, 'too few to rank', el('span', {class:'sep'}, ' · '), `${sgn(r.mean_return_pct)}/trade`) : `${sgn(r.mean_return_pct)}/trade`)) : el('span', {class:'muted', 'data-tip':'No settled paper trade on this company yet.'}, 'no trades yet')));
+    tr.append(el('td', {class:'num cm'}, r ? String(r.trades) : '0'));
+    tr.append(el('td', {class:'num cw'}, r ? pct(r.win_rate) : '—'));
+    tr.append(el('td', {class:'num cw'}, r ? el('span', {'data-tip':'Average distance of the exit close from the predicted target, in percent.'}, sgn(r.avg_target_error_pct)) : '—'));
+    tr.append(el('td', {class:'c4 ov'}, o ? el('span', {'data-tip': `All companies, all horizons: ${o.trades} trades, ${pct(o.win_rate)} won. ${luck(cur, o)}`}, el('b', {}, moneyDelta(cur, o.net_pnl, dec(cur))), el('small', {}, `${o.trades} trades, all companies`)) : el('span', {class:'muted'}, '—')));
+    const call = el('td', {});
+    if (pr) {
+      const lab = pr.qualifies ? el('span', {class:'mb-label success', 'data-tip': `Up call at or above the strategy’s bar${pr.threshold != null ? ` (${pct(pr.threshold)})` : ''}: it would buy ${c.name} at the open for N+${horizon}. Paper.`}, icon('ms-check'), 'would buy') : el('span', {class:'mb-label neutral', 'data-tip': pr.direction === 'down' ? 'A down call: scored as a prediction, never traded (decision 3).' : `Up call below the strategy’s bar${pr.threshold != null ? ` (${pct(pr.threshold)})` : ''}, or filtered out by its regime rule: no trade.`}, pr.direction === 'down' ? 'down, no trade' : 'no trade');
+      call.append(el('span', {class:'call'}, pr.prob_up != null ? odds(pr.prob_up, `${pct(pr.prob_up, 1)} chance of a rise from the open to the N+${horizon} close${pr.model_prob != null ? ` (model ${pct(pr.model_prob, 1)}, adjustment ${sgn(pr.agent_adjustment * 100, 1)}: ${pr.adjustment_reason || 'none'})` : ''}.${pr.reason ? ' ' + pr.reason : ''}`) : el('span', {class:'muted', 'data-tip':'Always-buy and follow-yesterday give a direction, not a probability.'}, pr.direction === 'up' ? 'up, no probability' : 'down'), lab, el('span', {class:'muted', style:'font-size:12px', 'data-tip': `Target ${price(cur, pr.target_price)} = the expected exit close; 80% range ${price(cur, pr.lo80)}–${price(cur, pr.hi80)}${pr.range_widen ? ` (widened ${Math.round(pr.range_widen * 100)}% by the trader)` : ''}.`}, `target ${price(cur, pr.target_price)}`)));
+    } else call.append(el('span', {class:'muted', 'data-tip': st.horizons.includes(horizon) ? 'No prediction stored for this horizon.' : `This strategy predicts N+${st.horizons.join(', N+')} only (decision 38).`}, st.horizons.includes(horizon) ? '—' : `not at N+${horizon}`));
+    tr.append(call);
+    tr.append(el('td', {class:'c2'}, pr ? rangeBar(cur, pr, c.last_close, null) : el('span', {class:'muted'}, '—')));
+    body.append(tr);
+  }
+  tb.append(body);
+  card.append(el('div', {class:'md-table-wrap'}, tb));
+  card.append(el('p', {class:'note'}, `Profit after costs on ${c.name}, every horizon pooled, accuracy view (one paper trade per qualifying prediction, ${money(cur, c.amount)} each). The best strategy here is outlined; the best overall is in the card above, so a lucky handful of trades does not pass for skill.`));
+  return card;
+}
+
+function legend() {
+  return el('div', {class:'legend2', 'aria-label':'Legend'}, el('span', {}, 'Legend (sample values): ', el('span', {class:'mb-delta up'}, '+1.2%'), ' up, ', el('span', {class:'mb-delta down'}, '−1.2%'), ' down, always with the sign'),
+    el('span', {}, el('i', {class:'sw r'}), 'rule ', el('i', {class:'sw b'}), 'baselines ', el('i', {class:'sw a'}), 'AI'),
+    el('span', {}, el('span', {class:'mb-label success'}, icon('ms-check'), 'would buy'), ' an up call at or above the strategy’s bar'),
+    el('span', {}, el('span', {class:'mb-label neutral'}, 'too few to rank'), ` under ${MIN_TRADES_TO_RANK} settled trades on this company`),
+    el('span', {}, el('span', {class:'mb-tag paper'}, 'paper'), ' every signal and trade until proven'));
+}
+
+function render() {
+  const p = P(market), c = p.company, cur = p.currency; if (horizon == null) horizon = p.default_horizon;
+  document.title = `Market brief · Stock strategies · ${c.ticker}`; $('#title').textContent = `Stock strategies · ${c.ticker}`;
+  sideFoot(market); marketSeg(() => { horizon = null; render(); });
+  const page = $('#page'); page.innerHTML = '';
+  const head = pageHead(market, `${c.ticker} · ${c.name}`, `${c.sector} · ${p.name} · ${money(cur, c.amount)} per paper trade${c.amount_overridden ? ' (override)' : ''} · data as of the ${fmtD(p.as_of, false)} close · research only`);
+  head.querySelector('h1').after(el('div', {class:'cohead', style:'margin-top:6px'}, el('span', {class:'px'}, price(cur, c.last_close)), delta(c.change_pct), el('span', {class:'muted', style:'font-size:12.5px'}, `last close, ${fmtD(c.last_close_date)}`), el('a', {class:'md-btn text small', href: companyPage(c.ticker)}, 'Company page', icon('ms-chevron_right'))));
+  page.append(head, paperBand(market, p.go_live, Object.keys(p.strategies).length), kpis(market));
+  const grid = el('div', {class:'grid even'}); grid.append(agreementCard(market), headToHead(market)); page.append(grid);
+  page.append(el('div', {style:'margin-top:16px'}, ranked(market)), legend(), footer(market, D.endpoint.replace('{ticker}', c.ticker)));
+  makeFocusable(page);
+}
+render();
+</script>
+</body>
+</html>
