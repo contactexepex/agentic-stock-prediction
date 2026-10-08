@@ -351,7 +351,7 @@ trades).
 | exit_quantity, adjustment_ids | Shares after a split or bonus in the window, and that adjustment | `adjustments` (exists) | shares, ids | `4.36167`, empty |
 | entry_value, exit_value | Quantity × price | engine | ₹ / $ | `1000.00` -> `1042.00` |
 | gross_pnl | Profit before costs | engine | ₹ / $ | `42.00` |
-| costs, cost_lines | Round-trip charges with their parts, the **market-cost view** that strategies are ranked on (F1.6; rates in `config/costs.yaml`, marked verify). India: brokerage (0.75 %, at least ₹50 per order), STT, exchange, SEBI, stamp duty, GST. US: BUX order fee converted to $, SEC fee. The owner's own extra charges are in the [Cost view](#cost-view) | B2's engine | ₹ / $ | `2.34` = order fee `2.32` + SEC fee `0.02`; India RELIANCE N+1 `1966.41` |
+| costs, cost_lines | Round-trip charges with their parts, the **market-cost view** that strategies are ranked on (F1.6; rates in `config/costs.yaml`: the statutory ones marked verify, the `broker:` charges owner-confirmed 2026-10-08). India: brokerage (0.75 %, at least ₹50 per order), STT, exchange, SEBI, stamp duty, GST. US: BUX order fee converted to $, SEC fee. The owner's own extra charges are in the [Cost view](#cost-view) | B2's engine | ₹ / $ | `2.34` = order fee `2.32` + SEC fee `0.02`; India RELIANCE N+1 `1966.41` |
 | net_pnl | Profit after costs (the headline number) | engine | ₹ / $ | `39.66` |
 | return_pct | Net profit as % of the amount (compares across amounts, decision 44) | engine | % | `3.97` |
 | prob_up, target_price, lo80, hi80 | What was predicted | prediction | 0-1, ₹ / $ | `0.583`, `227.84`, `218.36`-`237.72` |
@@ -793,7 +793,7 @@ and positions **exist**; the € view is **B2**. Example file: `portfolio.json`.
 | positions.quantity, avg_price, last_close | Holding and its marks | FIFO (exists) | shares, ₹ / $ | `3`, `330.80`, `333.63` |
 | positions.cost, value, pnl, pnl_pct | In the trade currency | exists | ₹ / $, % | `992.40`, `1000.89`, `8.49`, `0.86` |
 | eur_view.eurusd_at_buy, eurusd_now, mark_date | EUR/USD on the buy date and now (`EURUSD=X`, added by B2); the date of the mark | Yahoo | rate, date | `1.165`, `1.17`, `2026-10-06` |
-| eur_view.fx_fee_rate | BUX's FX markup on each EUR/USD conversion (`config/costs.yaml`, verify) | config | fraction | `0.0075` |
+| eur_view.fx_fee_rate | BUX's FX markup on each EUR/USD conversion (`config/costs.yaml` broker.us, owner-confirmed 2026-10-08) | config | fraction | `0.0075` |
 | eur_view.cost_usd, value_usd | Dollars paid, including the buy order's cost, and dollars held now | B2 | $ | `993.55`, `1000.89` |
 | eur_view.cost_eur | Euros needed to buy those dollars: `cost_usd / eurusd_at_buy × (1 + fx_fee_rate)` | B2 (`portfolio/eur_view.py`) | € | `859.23` |
 | eur_view.value_eur | Euros back if converted now: `value_usd / eurusd_now × (1 − fx_fee_rate)` | B2 | € | `849.05` |
