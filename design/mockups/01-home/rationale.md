@@ -126,6 +126,12 @@ errors, no horizontal overflow, no external requests, at 1280 and 390 px. Rebuil
   trade_check.json holds rows for 05:43Z only, so the runs timeline shows check 2 done while the alerts card's
   latest check is 11:13 IST.
 
+## Rebuilt 2026-10-08 against W1's updated catalogue
+W1's example edits (418f683 and before) added two head-to-head open trades for RELIANCE, trimmed India's market
+status to the one intraday run whose check rows exist, dropped `currency` from the scoreboard rows (money is in the
+status's currency) and changed the go-live example (294 trades needed, 0.2 months forward). `data.json`, `page.html`
+and the screenshots were rebuilt from the same builder; nothing else changed.
+
 ## Design system change (this version)
 `design/system/tokens.css` and `components.css` moved to scheme v2 (same token and class names, new values and a
 few new classes: `.mb-sidebar`, `.mb-avatar`, `.mb-label`, `.mb-alert`, the KPI card); the style guide was rebuilt

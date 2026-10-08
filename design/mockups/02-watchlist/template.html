@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Market brief · Watchlist</title>
+<meta name="description" content="Watchlist of the personal stock cockpit: the market's active companies with price, move, how many strategies would buy them at the chosen horizon, today's published range and open paper trades; filter by sector, sort, open a company. Research only, every signal Paper.">
+<!--@@SYSTEM_CSS@@-->
+<!--@@SHARED_CSS@@-->
+<style>
+/* Watchlist mockup (design track, SPEC section 6 page 2). Page-local layout only; every colour is a token. */
+.wl td{vertical-align:middle}
+.wl .co{display:flex;align-items:center;gap:10px;min-width:0}
+.wl .co .nm{min-width:0} .wl .co .nm b{display:block;font-size:14px;font-weight:700} .wl .co .nm small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wl .last b{display:block;font-size:14px;font-weight:600} .wl .last .mb-delta{font-size:12.5px}
+.wl .ag b{font-weight:700;font-size:14px} .wl .ag small{color:var(--md-sys-color-on-surface-variant);font-size:12px}
+.wl .ag .bar{height:7px;border-radius:4px;background:var(--md-sys-color-surface-container-highest);margin-top:5px;overflow:hidden;display:flex;width:120px;max-width:100%}
+.wl .ag .bar i{display:block;height:100%}
+.wl .ot b{font-weight:600} .wl .ot small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:12px}
+.wl .open{text-align:right} .wl .open a{display:inline-flex;align-items:center;gap:2px;font-weight:600;font-size:13px;text-decoration:none;white-space:nowrap}
+.wl th .sort{all:unset;cursor:pointer;user-select:none;display:inline-flex;align-items:center;gap:2px;font:inherit;color:inherit;border-radius:4px} .wl th .sort:hover{color:var(--md-sys-color-on-surface)} .wl th .sort:focus-visible{outline:2px solid var(--md-sys-color-primary);outline-offset:2px} .wl th .ms{width:14px;height:14px;vertical-align:-2px}
+.wl th .sep{color:var(--md-sys-color-outline-variant);margin:0 4px}
+.wl tr.row:hover td{background:color-mix(in srgb, var(--md-sys-color-primary) 4%, transparent)}
+.wl tr.row td{cursor:pointer}
+.inactive{display:flex;align-items:center;gap:10px;font-size:13px;margin-top:12px;color:var(--md-sys-color-on-surface-variant)}
+@media (max-width:1439px){ .wl th{padding:8px 8px} .wl td{padding:8px 8px} }
+@media (max-width:1359px){ .wl th.c3,.wl td.c3{display:none} }
+@media (max-width:1279px){ .wl th.c2,.wl td.c2{display:none} }
+@media (max-width:1199px){ .wl th.cw,.wl td.cw{display:none} }
+@media (max-width:760px){ .wl th.cm,.wl td.cm{display:none} .wl .ag .bar{width:72px} .wl .co .nm small{white-space:normal} .wl th{padding:8px 6px;white-space:normal;line-height:1.25} .wl th .sort{display:inline;white-space:normal} .wl td{padding:8px 6px} .wl .co{gap:6px} .wl .co .mb-avatar{display:none} }
+</style>
+</head>
+<body>
+<!--@@ICONS@@-->
+<div id="tip" class="md-tooltip" role="tooltip"></div>
+
+<div class="mb-app">
+  <nav class="mb-sidebar" aria-label="Pages" id="sidebar"></nav>
+  <div class="mb-scrim" id="scrim"></div>
+  <header class="mb-topbar" id="topbar">
+    <button class="md-icon-btn mb-menu-btn" type="button" id="menu-btn" aria-label="Open the menu" aria-controls="sidebar" aria-expanded="false"><svg class="ms"><use href="#ms-menu"/></svg></button>
+    <div class="mb-topbar-title" id="title">Watchlist</div>
+    <div class="mb-topbar-actions">
+      <div class="md-segmented dense light" role="group" aria-label="Market" id="market-seg"></div>
+      <a class="md-btn filled" href="../11-assistant/page.html" data-tip="Ask the assistant (page 11): answers cite ids and as-of times, read-only." aria-label="Ask the assistant"><svg class="ms"><use href="#ms-bolt"/></svg><span class="ask-l">Ask</span></a>
+    </div>
+  </header>
+  <main class="mb-content"><div class="mb-content-inner" id="page"></div></main>
+  <nav class="mb-navbar" aria-label="Pages" id="navbar"></nav>
+</div>
+
+<script>const D = /*__DATA__*/null;</script>
+<!--@@SHARED_JS@@-->
+<script>
+let horizon = null, sector = null, query = '', sortKey = 'agreement', sortDir = -1;
+shell(PAGES.watchlist, 'Watchlist');
+onMarketChange = () => { horizon = null; sector = null; render(); };
+
+const rowsOf = m => {
+  const p = P(m), cur = p.currency, checks = {}, trades = {};
+  for (const c of p.trade_checks) (checks[c.ticker] = checks[c.ticker] || []).push(c);
+  for (const t of p.open_trades) (trades[t.ticker] = trades[t.ticker] || []).push(t);
+  return p.companies.filter(c => c.state === 'active').map(c => {
+    const a = (p.agreement[String(horizon)] || []).find(x => x.ticker === c.ticker) || null;
+    const rg = p.ranges.find(r => r.ticker === c.ticker && r.horizon_days === horizon) || null;
+    const tr = trades[c.ticker] || [], ck = checks[c.ticker] || [], flagged = ck.filter(x => x.flagged);
+    return {c, a, rg, trades: tr, unreal: tr.reduce((s, t) => s + t.unrealised_pnl, 0), checks: ck, flagged};
+  });
+};
+const SORT = {agreement: r => [r.a ? r.a.buy : -1, r.a && r.a.avg_prob_up != null ? r.a.avg_prob_up : 0], change: r => [r.c.change_pct ?? -Infinity], name: r => [r.c.name], open: r => [r.trades.length, r.unreal], last: r => [r.c.last_close ?? -Infinity]};
+const cmp = (x, y) => { for (let i = 0; i < x.length; i++) { if (x[i] < y[i]) return -1; if (x[i] > y[i]) return 1; } return 0; };
+
+function kpis(m, rows) {
+  const p = P(m), cur = p.currency, lead = rows.slice().sort((x, y) => -cmp(SORT.agreement(x), SORT.agreement(y)))[0];
+  const inactive = p.companies.filter(c => c.state !== 'active').length, open = p.open_trades.length, unreal = p.open_trades.reduce((s, t) => s + t.unrealised_pnl, 0), flagged = p.trade_checks.filter(c => c.flagged).length;
+  const K = el('section', {class:'kpis', 'aria-label':'At a glance'});
+  const card = (ico, kind, label, value, sub, tipText) => el('div', {class:'mb-kpi', 'data-tip': tipText}, avatar(ico, kind), el('div', {}, el('div', {class:'l'}, label), el('div', {class:'v'}, value)), el('div', {class:'s'}, sub));
+  K.append(card('apartment', '', 'Companies followed', String(rows.length), inactive ? el('span', {}, `${inactive} inactive on the `, el('a', {href: PAGES.companies}, 'Companies page')) : 'all active', 'Active companies are predicted and traded on paper. Inactive ones are still collected but never predicted (decision 13); they live on the Companies page.'));
+  K.append(card('trending_up', 'success', `Most agreed at N+${horizon}`, lead && lead.a && lead.a.buy ? el('a', {class:'tk', href: strategiesPage(lead.c.ticker)}, lead.c.ticker) : 'None', lead && lead.a && lead.a.buy ? el('span', {}, el('span', {class:'mb-label success'}, `${lead.a.buy} of ${lead.a.of} buy`), lead.a.avg_prob_up != null ? ` avg chance ${pct(lead.a.avg_prob_up)}` : ' no probability') : 'no strategy buys', 'The company most strategies would buy at the selected horizon (decision 30).'));
+  K.append(card('account_balance_wallet', 'paper', 'Open paper trades', String(open), el('span', {}, 'unrealised ', moneyDelta(cur, unreal, dec(cur)), ' before costs'), 'Paper trades entered and not yet exited, every strategy and horizon; unrealised against the latest stored close, before costs.'));
+  K.append(card('warning', flagged ? 'warn' : 'neutral', 'Flagged today', p.trade_checks.length ? `${flagged} of ${p.trade_checks.length}` : 'No check yet', p.trade_checks.length ? `open trades checked at ${fmtLocal(p.trade_checks[0].check_at, m)}` : 'first intraday check pending', 'Open trades flagged by the latest intraday check: outside their range, far from the target, or against the prediction.'));
+  return K;
+}
+
+function toolbar(m, rows) {
+  const sectors = [...new Set(rows.map(r => r.c.sector))].sort();
+  const bar = el('div', {class:'toolbar', role:'search'});
+  const inp = el('input', {type:'search', placeholder:'Filter by symbol or name', 'aria-label':'Filter by symbol or name', value: query, oninput: e => { query = e.target.value; renderTable(); }});
+  bar.append(el('span', {class:'search'}, icon('ms-search'), inp));
+  const chips = [];
+  const chip = (label, val, n) => { const b = el('button', {type:'button', class:'md-chip filter', 'aria-pressed': String(sector === val), onclick: () => { sector = val; for (const x of chips) x.setAttribute('aria-pressed', String(x._val === sector)); renderTable(); }}, label, n != null ? el('span', {class:'muted'}, ` ${n}`) : null); b._val = val; chips.push(b); return b; };
+  bar.append(chip('All sectors', null), ...sectors.map(s => chip(s, s, rows.filter(r => r.c.sector === s).length)));
+  bar.append(el('span', {style:'margin-left:auto;display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap'}, el('span', {class:'muted', style:'font-size:12.5px'}, 'Horizon', help('N+k: buy at the open of the session being predicted, sell at the close of the k-th market session after it. The selector sets the agreement, chance and range columns; it opens on N+1 (decision 39).')), horizonTabs(P(m).horizons, horizon, k => { horizon = k; render(); })));
+  return bar;
+}
+
+function table(m, rows) {
+  const p = P(m), cur = p.currency;
+  const q = query.trim().toLowerCase();
+  let list = rows.filter(r => (!sector || r.c.sector === sector) && (!q || r.c.ticker.toLowerCase().includes(q) || r.c.name.toLowerCase().includes(q)));
+  list.sort((x, y) => sortDir * cmp(SORT[sortKey](x), SORT[sortKey](y)) || x.c.ticker.localeCompare(y.c.ticker));
+  const card = el('section', {class:'card', 'aria-label':'Companies'});
+  card.append(el('div', {class:'head'}, el('h2', {}, `${list.length} of ${rows.length} companies`), help('One row per active company. Agreement = how many of the strategies that predict it at this horizon would buy (rule, baselines and AI count alike), with the buyers’ average chance of a rise. Range = the reference rule strategy’s published range for the horizon (target as the triangle, last close as the dark line). Open = this company’s open paper trades and their unrealised profit. Click a row for the company page.'), el('div', {class:'end'}, `N+${horizon} = ${horizonWords(horizon)} · as of the ${fmtD(p.as_of, false)} close · Paper`)));
+  const sortBtn = (label, key) => { const b = el('button', {type:'button', class:'sort', 'aria-label': `Sort by ${label.toLowerCase()}`, onclick: () => { if (sortKey === key) sortDir = -sortDir; else { sortKey = key; sortDir = key === 'name' ? 1 : -1; } renderTable(); }}, label); if (sortKey === key) b.append(icon(sortDir < 0 ? 'ms-arrow_downward' : 'ms-arrow_upward')); return b; };
+  const th = (label, key, cls='', tipText=null) => el('th', {class: cls, 'data-k': key || null, 'data-tip': tipText, scope:'col', 'aria-sort': key && sortKey === key ? (sortDir < 0 ? 'descending' : 'ascending') : null}, key ? sortBtn(label, key) : label);
+  const tb = el('table', {class:'md-table tbl wl'});
+  tb.append(el('thead', {}, el('tr', {}, th('Company', 'name'), el('th', {class:'num', scope:'col', 'aria-sort': sortKey === 'last' || sortKey === 'change' ? (sortDir < 0 ? 'descending' : 'ascending') : null}, sortBtn('Last', 'last'), el('span', {class:'sep', 'aria-hidden':'true'}, '·'), sortBtn('Move', 'change')), th(`Agreement at N+${horizon}`, 'agreement'), th('Chance', null, 'cw', 'Average probability of a rise given by the buyers that give one; 50% is a coin flip.'), th('Buyers N+1…5', null, 'c2', 'Buyers at each horizon; the selected one is dark.'), th(`Range at N+${horizon}`, null, 'cw', 'The reference rule strategy’s published 50% and 80% ranges for the horizon, drawn around the last close; the triangle is its target.'), th('Open', 'open', 'num cm'), th('', null, 'c3'))));
+  const body = el('tbody');
+  for (const r of list) {
+    const c = r.c, a = r.a;
+    const tr = el('tr', {class:'row', onclick: e => { if (!e.target.closest('a, button')) location.href = companyPage(c.ticker); }});
+    tr.append(el('td', {}, el('span', {class:'co'}, avatar('apartment', 'neutral', 'sm'), el('span', {class:'nm'}, el('a', {class:'tk', href: companyPage(c.ticker), 'data-tip': `${c.name}: open its company page.`}, c.ticker), el('small', {}, `${c.name} · ${c.sector}`)))));
+    tr.append(el('td', {class:'num last'}, el('b', {}, price(cur, c.last_close)), delta(c.change_pct)));
+    const ag = el('td', {class:'ag'});
+    if (a) { ag.append(el('b', {}, `${a.buy} of ${a.of}`), el('small', {}, ' buy')); const bar = el('div', {class:'bar', role:'img', 'aria-label': `${a.buy} of ${a.of}: rule ${a.by_family.rule.buy}, baselines ${a.by_family.baseline.buy}, AI ${a.by_family.ai.buy}`, 'data-tip': `Rule ${a.by_family.rule.buy}/${a.by_family.rule.of} · baselines ${a.by_family.baseline.buy}/${a.by_family.baseline.of} · AI ${a.by_family.ai.buy}/${a.by_family.ai.of} would buy ${c.name} at N+${horizon}.`}); for (const f of ['rule','baseline','ai']) bar.append(el('i', {class:'ser-' + FAMILY[f][2], style:`width:${(100*a.by_family[f].buy/a.of).toFixed(1)}%`})); ag.append(bar); }
+    else ag.append(el('span', {class:'muted', 'data-tip':'No agreement row for this company at this horizon.'}, '—'));
+    tr.append(ag);
+    tr.append(el('td', {class:'cw'}, a ? odds(a.avg_prob_up, a.avg_prob_up == null ? 'Only always-buy and follow-yesterday buy it; neither gives a probability.' : `Average chance of a rise given by the buyers that give one: ${pct(a.avg_prob_up, 1)}. 50% is a coin flip.`) : el('span', {class:'muted'}, '—')));
+    tr.append(el('td', {class:'c2'}, horizonBars(m, c.ticker, horizon)));
+    tr.append(el('td', {class:'cw'}, r.rg ? rangeBar(cur, r.rg, c.last_close, null) : el('span', {class:'muted', 'data-tip':'No published range stored for this company in the example data.'}, '—')));
+    tr.append(el('td', {class:'num cm ot'}, r.trades.length ? el('span', {}, el('b', {}, String(r.trades.length)), el('small', {}, moneyDelta(cur, r.unreal, dec(cur)))) : el('span', {class:'muted'}, '0'), r.flagged.length ? el('span', {class:'mb-label warn', style:'margin-left:6px', 'data-tip': `${r.flagged.length} open trade${r.flagged.length === 1 ? '' : 's'} flagged at the ${fmtLocal(r.flagged[0].check_at, m)} check: ${[...new Set(r.flagged.flatMap(x => x.flags))].map(f => FLAG[f] || f).join(', ')}.`}, icon('ms-warning'), String(r.flagged.length)) : null));
+    tr.append(el('td', {class:'c3 open'}, el('a', {href: companyPage(c.ticker), 'aria-label': `Open ${c.name}`}, 'Open', icon('ms-chevron_right'))));
+    body.append(tr);
+  }
+  if (!list.length) body.append(el('tr', {}, el('td', {colspan: 8}, el('div', {class:'quiet'}, 'No company matches the filter.'))));
+  tb.append(body);
+  card.append(el('div', {class:'md-table-wrap'}, tb));
+  const inactive = p.companies.filter(c => c.state !== 'active');
+  if (inactive.length) card.append(el('div', {class:'inactive'}, icon('ms-info'), el('span', {}, `Not listed: ${inactive.map(c => `${c.name} (${c.ticker}, inactive since ${fmtD(c.state_since, false)})`).join(', ')} · still collected, never predicted · `, el('a', {href: PAGES.companies}, 'manage on the Companies page'))));
+  return card;
+}
+
+function legend() {
+  return el('div', {class:'legend2', 'aria-label':'Legend'}, el('span', {}, 'Legend (sample values): ', el('span', {class:'mb-delta up'}, '+1.2%'), ' up, ', el('span', {class:'mb-delta down'}, '−1.2%'), ' down, always with the sign'),
+    el('span', {}, el('i', {class:'sw r'}), 'rule ', el('i', {class:'sw b'}), 'baselines ', el('i', {class:'sw a'}), 'AI'),
+    el('span', {}, el('span', {class:'mb-tag paper'}, 'paper'), ' every signal and trade until proven'),
+    el('span', {}, el('span', {class:'mb-label warn'}, icon('ms-warning'), '1'), ' flagged open trades at the latest intraday check'),
+    el('span', {}, 'Click a row for the company page; the ticker in the "most agreed" card opens its strategies.'));
+}
+
+let tableHost;
+function renderTable() { const rows = rowsOf(market); tableHost.innerHTML = ''; tableHost.append(table(market, rows)); makeFocusable(tableHost); }
+function render() {
+  const p = P(market); if (horizon == null) horizon = p.default_horizon;
+  document.title = `Market brief · Watchlist · ${LABEL[market]}`; $('#title').textContent = `Watchlist · ${p.name}`;
+  sideFoot(market); marketSeg(() => { horizon = null; sector = null; render(); });
+  const rows = rowsOf(market);
+  const page = $('#page'); page.innerHTML = '';
+  page.append(pageHead(market, 'Watchlist', `${p.name} · ${rows.length} active companies · data as of the ${fmtD(p.as_of, false)} close · research only, nothing here trades`), paperBand(market, p.go_live, Object.keys(p.strategies).length), kpis(market, rows), toolbar(market, rows));
+  tableHost = el('div', {style:'margin-top:16px'}); page.append(tableHost); renderTable();
+  page.append(legend(), footer(market, D.endpoint));
+  makeFocusable(page);
+}
+render();
+</script>
+</body>
+</html>
