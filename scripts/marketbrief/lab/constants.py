@@ -38,7 +38,8 @@ DAYS_PER_MONTH = 30.4375
 
 MSG_NO_HORIZON_SCORES = ("per-horizon model scores or ranges are not available yet ({error}); session B10 builds "
                          "contracts/horizons.py. Nothing written.")
-MSG_NO_CROSS_SCORE = "no cross-market model score for this horizon (needs a cross_market model variant, B10)"
+MSG_NO_CROSS_SCORE = "no cross-market model score for this horizon"
+MSG_NO_CROSS_SCORE_OR_RANGE = "no cross-market model score or range for these horizons"
 MSG_NOT_LOCKED = "made_at or first commit not before the open of D (F1.8): refused"
 MSG_NO_EURUSD = "no stored EUR/USD close by {when}: the BUX order fee cannot be converted"
 REASON_NOTE_SKIPPED = "one share at {price} costs more than the amount {amount}"

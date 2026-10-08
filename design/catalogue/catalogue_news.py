@@ -155,8 +155,9 @@ def market_status() -> list[dict]:
                      "session_open_utc": "2026-10-07T03:45:00+00:00", "session_close_utc": "2026-10-07T10:00:00+00:00",
                      "in_session": False, "late_run": True},
          "regime": "EVENT_HEAVY",
-         "runs": {"pre_open": {"at": "2026-10-07T02:10:00Z", "ok": True}, "intraday": [
-                      {"at": "2026-10-07T05:43:00Z", "ok": True}, {"at": "2026-10-07T08:43:00Z", "ok": True}],
+         # one intraday run: the check whose rows are in trade_check.json
+         "runs": {"pre_open": {"at": "2026-10-07T02:10:00Z", "ok": True},
+                  "intraday": [{"at": "2026-10-07T05:43:00Z", "ok": True}],
                   "post_close": {"at": None, "ok": None, "next_at": "2026-10-07T12:15:00Z"},
                   "news": {"at": "2026-10-07T10:17:00Z", "ok": True, "new_items": 37}},
          "freshness": {"state": "fresh", "built_at": "2026-10-07T10:31:00Z", "age_minutes": 29},

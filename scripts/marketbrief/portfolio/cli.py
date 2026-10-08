@@ -19,6 +19,7 @@ from datetime import date
 
 from marketbrief.core.cli import market_arg, require_market
 from marketbrief.portfolio import api_shapes, inbox_import, paper_follow, service, signals
+from marketbrief.portfolio import constants as text
 from marketbrief.portfolio.tables import render
 
 EXIT_REJECTED = 2
@@ -43,7 +44,8 @@ def parser() -> argparse.ArgumentParser:
     request.add_argument("--name")
     request.add_argument("--reason", required=True)
     for writer in (add, cancel, request):
-        writer.add_argument("--source", required=True, help="claude_code | slack | form")
+        writer.add_argument("--source", required=True,
+                            help="claude_code | slack | form (dashboard and claude_app: the inbox import only)")
         writer.add_argument("--key", help="idempotency key (default: derived from the fields)")
     for writer in (add, cancel):
         writer.add_argument("--note")
@@ -82,9 +84,18 @@ COMMANDS = {
 }
 
 
+def inbox_only_source(args, ctx: service.Context) -> dict | None:
+    """The refusal of a write that claims a source only the inbox import sets (dashboard, claude_app), else None."""
+    source = getattr(args, "source", None)
+    if source not in text.INBOX_ONLY_SOURCES:
+        return None
+    allowed = [s for s in ctx.settings["trades"]["sources"] if s not in text.INBOX_ONLY_SOURCES]
+    return {"ok": False, "errors": [text.ERR_SOURCE_INBOX_ONLY.format(source=source, allowed=", ".join(allowed))]}
+
+
 def run(args, ctx: service.Context) -> dict:
     """The result of one command."""
-    return COMMANDS[args.command](args, ctx)
+    return inbox_only_source(args, ctx) or COMMANDS[args.command](args, ctx)
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -75,7 +75,7 @@ questions) from the dashboard, Slack, Claude Code and the Claude app.
 | 48 | Waves | The wave plan of section 10: each session in its own cloud session, built, judged and merged to main in parallel; sessions merge to main themselves after a PASS (no pull requests); the orchestrator watches and resolves clashes. More automation and autonomy, less owner attention. |
 | 49 | India broker plan | Axis Direct NRI, 0.75% plan, Normal tier, Non-PIS (charges in F1.6; owner-provided from the published schedule, marked verify in `config/costs.yaml` `broker:` until a contract note confirms them). |
 | 50 | Two cost views on every trade | "Market cost" = brokerage + statutory taxes + exchange/regulatory fees (US: the order fee, SEC fee and FINRA TAF, no FX); strategies are ranked on it. "Your cost" = market cost + the owner-specific items: India the ₹200 NRI reporting charge on the buy date and on the sell date and the DP charge; US BUX's FX markup of 0.75% each way and the 0.20% a year portfolio fee pro-rated over the calendar days held. The go-live bar and the owner's money decisions use your cost. |
-| 51 | Cost-viable flag | A prediction or pick is `cost_viable` when its expected gain after your cost is positive: P(up) × move − (1 − P(up)) × loss − your cost > 0, with move and loss the conditional expected rise/shortfall of the pick (lab/gain.py); null without a probability or 80% range. It is still made, traded and scored either way; picks and Slack show the flag. (Owner decision in the B6 session, 2026-10-07, replacing the first wording "predicted move exceeds your cost".) |
+| 51 | Cost-viable flag | A prediction or pick is `cost_viable` when its expected gain after your cost is positive: P(up) × move − (1 − P(up)) × loss − your cost > 0, with move and loss the conditional expected rise/shortfall of the pick (lab/gain.py); null without a probability or 80% range, and when the amount buys no whole share at the reference close (no trade, no costs). It is still made, traded and scored either way; picks and Slack show the flag. (Owner decision in the B6 session, 2026-10-07, replacing the first wording "predicted move exceeds your cost".) |
 | 52 | US broker plan | BUX Basic: €0.99 per order, FX markup 0.75% on each EUR↔USD conversion, 0.20% a year portfolio fee (charges in F1.6; owner-provided, marked verify in `config/costs.yaml` `broker:`). |
 
 Proposals made by the orchestrator that are still open (decision 34 accepted the weekly
@@ -149,7 +149,7 @@ part already does it, the feature says "exists" and what changes.
    | India | NRO Non-PIS reporting charge | ₹200 per trade date: the full ₹200 on a paper trade's buy date and again on its sell date | your | owner-provided; verify with a contract note |
    | India | DP charge per scrip sold | provisional: ₹30 or 0.04% of the sale value, the higher | your | SECONDARY SOURCE, unchanged; verify with a contract note |
    | India | Demat AMC | about ₹885 a year: an account charge, in no trade's cost | none | owner-provided; verify |
-   | US (BUX Basic; decision 52) | Order fee | €0.99 per order, converted at the EUR/USD close on or before that side's session | market | owner-provided; verify with BUX |
+   | US (BUX Basic; decision 52) | Order fee | €0.99 per order, converted at the EUR/USD close on or before that side's session (when none is stored that early, the oldest stored close, i.e. a later rate known by the run's clock: `lab/market_data.py` `MarketData.eurusd_on`) | market | owner-provided; verify with BUX |
    | US | FX markup | 0.75% of the value on each EUR↔USD conversion (on the buy and on the sale) | your | owner-provided; verify with BUX |
    | US | Portfolio fee | 0.20% a year on the entry value, pro-rated over the calendar days from D to the exit session | your | owner-provided; verify with BUX |
    | US | SEC fee, FINRA TAF | as already in `config/costs.yaml` | market | official, as documented there |
@@ -204,8 +204,10 @@ part already does it, the feature says "exists" and what changes.
         (`eligible`) can be picked.
      4. Both picks are recorded even when they name the same horizon, so each pick rule's results stay
         complete; each pick stores the ranking it came from and its expected-gain number.
-     5. **Cost-viable flag** (decision 51). At pick time, every qualifying prediction of D and every pick gets a
-        `cost_views` row (and each pick candidate the same fields): `expected_move_pct` = (target / C − 1) × 100,
+     5. **Cost-viable flag** (decision 51). Every qualifying prediction of D (written at predict time, or at pick
+        time for one without a row yet) and every pick gets a `cost_views` row, and each pick candidate carries
+        `costs_pct` (the market cost of item 3), `expected_move_pct`, `your_cost_pct`, `expected_gain_your_pct`
+        and `cost_viable` (no `market_cost_pct`): `expected_move_pct` = (target / C − 1) × 100,
         the round trip at `C` in both views (`market_cost_pct`, `your_cost_pct`; the US portfolio fee over the
         calendar days from D to the planned exit), `expected_gain_your_pct` = `p x move - (1 - p) x loss -
         your_cost_pct` with the move and loss of item 3, and `cost_viable` = `expected_gain_your_pct > 0` (null
