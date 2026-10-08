@@ -11,7 +11,6 @@
   "design/catalogue/lifecycle_event.json",
   "design/catalogue/command_log.json",
   "design/catalogue/news_item.json",
-  "design/catalogue/open_trade.json",
   "design/catalogue/portfolio.json",
   "design/catalogue/scoreboard_row.json"
  ],
@@ -677,12 +676,12 @@
       "market": "us",
       "symbol": "(deleted company)"
      },
-     "idempotency_key": "add-msft-7Hq2",
+     "idempotency_key": "(masked)",
      "result": "accepted",
      "refusal_code": null,
      "message": "(this company was deleted later; its records are excluded on read)",
      "record_ids": [
-      "we-us-MSFT-add-20261005T140200Z"
+      "(masked)"
      ],
      "budget_left": 19,
      "completed_at": "2026-10-05T14:02:00Z"

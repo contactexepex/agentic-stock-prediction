@@ -10,7 +10,7 @@
 <style>
 /* Companies mockup (design track, SPEC section 6 page 10). Page-local layout only; every colour is a token. */
 .co td{vertical-align:middle}
-.co .nm{display:flex;align-items:center;gap:10px;min-width:0} .co .nm .t{min-width:0} .co .nm b{display:block;font-size:14px} .co .nm small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:12px;overflow-wrap:anywhere} .co .nm small.ph{display:none}
+.co .nm{display:flex;align-items:center;gap:10px;min-width:0} .co .nm .t{min-width:0} .co .nm b{display:block;font-size:14px} .co .nm small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:12px;overflow-wrap:anywhere} .co .nm small.ph,.co .nm small.ph2{display:none}
 .co .last b{display:block;font-weight:600} .co .last .mb-delta{font-size:12.5px}
 .co .amt b{font-weight:600} .co .amt .mb-label{font-size:10.5px;padding:0 5px;margin-left:4px}
 .co .acts{display:inline-flex;gap:4px;flex-wrap:wrap;justify-content:flex-end} .co .acts .md-btn{height:30px;padding:0 10px;font-size:12px} .co .acts .md-btn .ms{width:16px;height:16px;margin-left:-2px}
@@ -38,8 +38,8 @@ dialog .warn{display:flex;gap:8px;align-items:flex-start;padding:10px 12px;borde
 @media (max-width:1359px){ .co .c3{display:none} }
 @media (max-width:1439px){ .co th,.co td{padding:8px 8px} }
 @media (max-width:1199px){ .co .cw{display:none} .co .acts .md-btn span{display:none} .co .acts .md-btn{padding:0 8px} .co .acts .md-btn .ms{margin:0} .co .acts{flex-wrap:nowrap} }
-@media (max-width:900px){ .co .cm{display:none} .co .acts .md-btn.one{display:inline-flex} .co .acts .md-btn.many{display:none} }
-@media (max-width:760px){ .co .cm{display:none} .co th,.co td{padding:8px 6px;white-space:normal} .co .nm .mb-avatar{display:none} .co .acts{justify-content:flex-start} .ev li{grid-template-columns:1fr} .ev .when{width:auto} }
+@media (max-width:900px){ .co .cm{display:none} .co .acts .md-btn.one{display:inline-flex} .co .acts .md-btn.many{display:none} .co .nm small.ph2{display:block} }
+@media (max-width:760px){ .co th,.co td{padding:8px 6px;white-space:normal} .co .nm .mb-avatar{display:none} .co .acts{justify-content:flex-start} .ev li{grid-template-columns:1fr} .ev .when{width:auto} }
 @media (max-width:599px){ dialog .row2{grid-template-columns:1fr} .co .cp{display:none} .co .nm small.ph{display:block} .co th,.co td{padding:8px 4px} }
 </style>
 </head>
@@ -72,7 +72,7 @@ onMarketChange = () => render();
 const CHANNEL = {dashboard: 'the dashboard', slack: 'Slack', cli: 'the command line', claude_app: 'the Claude app', claude_code: 'Claude Code', seed: 'the seed (config)'};
 const EVENT_WORDS = {add: 'added', deactivate: 'deactivated', reactivate: 'reactivated', delete: 'deleted', set_amount: 'amount set'};
 const RESULT = {accepted: ['accepted', 'success'], pending: ['pending', 'warn'], refused: ['refused', 'danger'], duplicate: ['duplicate', 'neutral'], failed: ['failed', 'danger']};
-const TOOL = {add_company: 'add a company', deactivate_company: 'deactivate', reactivate_company: 'reactivate', set_amount: 'set the amount', delete_company: 'delete'};
+const TOOL = {add_company: 'add a company', deactivate_company: 'deactivate', reactivate_company: 'reactivate', set_paper_amount: 'set the paper amount', delete_company: 'delete'};
 const pendingOf = () => pending[market] || [];
 
 function kpis(p) {
@@ -118,7 +118,7 @@ function inactiveCard(p) {
   const body = el('tbody');
   for (const c of rows) {
     const ev = p.lifecycle.find(e => e.ticker === c.ticker && e.event === 'deactivate'), news = p.news_inactive.filter(n => n.tickers.includes(c.ticker));
-    body.append(el('tr', {}, el('td', {}, el('span', {class:'nm'}, avatar('apartment', 'neutral', 'sm'), el('span', {class:'t'}, el('b', {}, el('a', {class:'tk', href: companyPage(c.ticker)}, c.ticker)), el('small', {}, `${c.name} · ${c.sector} · ${c.exchange}`)))),
+    body.append(el('tr', {}, el('td', {}, el('span', {class:'nm'}, avatar('apartment', 'neutral', 'sm'), el('span', {class:'t'}, el('b', {}, el('a', {class:'tk', href: companyPage(c.ticker)}, c.ticker)), el('small', {}, `${c.name} · ${c.sector} · ${c.exchange}`), el('small', {class:'ph2'}, `news since: ${news.length ? `${news.length} stor${news.length === 1 ? 'y' : 'ies'}` : 'none stored'} · open trades ${c.open_trades}`)))),
       el('td', {}, el('span', {'data-tip': ev ? `Deactivated via ${CHANNEL[ev.channel] || ev.channel} by ${ev.requested_by}, recorded ${fmtLocal(ev.recorded_at, market, true)}, effective ${fmtLocal(ev.effective_from, market, true)}.` : 'The deactivation event is not in the example data.'}, fmtDY(c.state_since)), ev && ev.reason ? el('small', {class:'muted', style:'display:block;font-size:11.5px'}, `“${ev.reason}”`) : null),
       el('td', {class:'num last'}, el('b', {}, price(cur, c.last_close)), delta(c.change_pct)),
       el('td', {class:'cm'}, news.length ? el('span', {'data-tip': news.map(n => `${n.title} (${(STATUS[n.status] || [n.status])[0]}, ${fmtD(n.first_seen_at, false)})`).join(' · ')}, `${news.length} stor${news.length === 1 ? 'y' : 'ies'}`) : el('span', {class:'muted'}, 'none stored')),
@@ -148,7 +148,7 @@ function history(p) {
   card.append(el('div', {class:'head'}, el('h2', {}, 'Lifecycle history'), help('The watchlist is data (F8): every add, deactivate, reactivate and amount change is an append-only event with who asked, the channel, when it was recorded and when it counts (the next pre-open run; seeded adds count from the start of stored history). Events of a deleted company are excluded on read (decision 12).'), el('div', {class:'end'}, `${p.lifecycle.length} events${p.deleted_count ? ` · ${p.deleted_count} deleted compan${p.deleted_count === 1 ? 'y' : 'ies'} excluded` : ''}`)));
   if (!p.lifecycle.length) { card.append(el('div', {class:'quiet'}, 'No event stored.')); return card; }
   const ul = el('ul', {class:'ev'});
-  for (const e of p.lifecycle) ul.append(el('li', {}, el('span', {class:'when'}, fmtLocal(e.recorded_at, market, true)), el('span', {class:'what'}, el('span', {class:'mb-label ' + ({add: 'success', reactivate: 'success', deactivate: 'neutral', set_amount: 'info', delete: 'danger'}[e.event] || 'neutral')}, EVENT_WORDS[e.event] || e.event), ' ', el('a', {class:'tk', href: companyPage(e.ticker)}, e.ticker), e.event === 'set_amount' && e.amount != null ? ` to ${money(cur, e.amount)}` : '', e.reason ? ` · “${e.reason}”` : '', el('small', {}, `via ${CHANNEL[e.channel] || e.channel} · ${e.requested_by} · counts from ${fmtLocal(e.effective_from, market, true)}${e.onboarding && e.channel !== 'seed' ? ` · onboarding: ${Object.entries(e.onboarding).map(([k, v]) => `${k.replace(/_/g, ' ')} ${v}`).join(', ')}` : ''}`))));
+  for (const e of p.lifecycle) ul.append(el('li', {}, el('span', {class:'when'}, fmtLocal(e.recorded_at, market, true)), el('span', {class:'what'}, el('span', {class:'mb-label ' + ({add: 'success', reactivate: 'success', deactivate: 'neutral', set_amount: 'info', delete: 'danger'}[e.event] || 'neutral')}, EVENT_WORDS[e.event] || e.event), ' ', el('a', {class:'tk', href: companyPage(e.ticker)}, e.ticker), e.event === 'set_amount' && e.amount != null ? ` to ${money(cur, e.amount)}` : '', e.reason ? ` · “${e.reason}”` : '', el('small', {}, `via ${CHANNEL[e.channel] || e.channel} · ${e.requested_by} · counts from ${e.channel === 'seed' ? `the start of stored history (${fmtDY(e.effective_from)})` : fmtDY(e.effective_from)}${e.onboarding && e.channel !== 'seed' ? ` · onboarding: ${Object.entries(e.onboarding).map(([k, v]) => `${k.replace(/_/g, ' ')} ${v}`).join(', ')}` : ''}`))));
   card.append(ul);
   return card;
 }
@@ -158,8 +158,8 @@ const recordPending = text => { (pending[market] = pending[market] || []).push(t
 const dbox = (title, ...kids) => { const dlg = $('#dlg'); dlg.innerHTML = ''; const body = el('div', {class:'dbody'}, el('h3', {id:'dlg-title'}, title), ...kids.filter(Boolean)); dlg.setAttribute('aria-labelledby', 'dlg-title'); dlg.append(body); return dlg; };
 function addDialog(p) {
   const cur = p.currency, dlg = $('#dlg');
-  const sym = el('input', {type:'text', placeholder: market === 'india' ? 'NSE symbol, e.g. TCS' : 'NYSE or Nasdaq ticker, e.g. MSFT', 'aria-label':'Exchange symbol'}), nm = el('input', {type:'text', placeholder:'optional', 'aria-label':'Name'}), amt = el('input', {type:'number', min:'1', step:'1', placeholder: String(p.default_amount), 'aria-label':'Amount'});
-  dbox('Add a company', el('div', {}, `Takes the exchange symbol, an optional name and an optional amount (F8.3). The onboarding checks the identifiers (${market === 'india' ? 'NSE and Yahoo symbols' : 'ticker, Yahoo symbol and SEC CIK'}), refuses ETFs, ${market === 'india' ? 'BSE-only' : 'unlisted'} and unknown symbols, sets the sector, backfills prices, news and filings, runs the collect gate, and only then appends the add event. The company is predicted from the next pre-open run.`), el('label', {}, 'Exchange symbol', sym), el('div', {class:'row2'}, el('label', {}, 'Name (optional)', nm), el('label', {}, `Amount per paper trade (${cur}, optional)`, amt)), el('div', {class:'muted', style:'font-size:12.5px'}, 'Next: the identifiers are checked and a summary (name, exchange, sector, Yahoo symbol, CIK, amount) is shown with Confirm and Cancel; only Confirm starts the onboarding (F8.7).'));
+  const sym = el('input', {type:'text', placeholder: market === 'india' ? 'NSE symbol, e.g. TCS' : 'NYSE or Nasdaq ticker, e.g. AMZN', 'aria-label':'Exchange symbol'}), nm = el('input', {type:'text', placeholder:'optional', 'aria-label':'Name'}), amt = el('input', {type:'number', min:'1', step:'1', placeholder: String(p.default_amount), 'aria-label':'Amount'});
+  dbox('Add a company', el('div', {}, `Takes the exchange symbol, an optional name and an optional amount (F8.3). The onboarding checks the identifiers (${market === 'india' ? 'NSE and Yahoo symbols' : 'ticker, Yahoo symbol and SEC CIK'}), refuses ETFs, ${market === 'india' ? 'BSE-only and unknown' : 'unknown'} symbols, sets the sector, backfills prices, news and filings, runs the collect gate, and only then appends the add event. The company is predicted from the next pre-open run.`), el('label', {}, 'Exchange symbol', sym), el('div', {class:'row2'}, el('label', {}, 'Name (optional)', nm), el('label', {}, `Amount per paper trade (${cur}, optional)`, amt)), el('div', {class:'muted', style:'font-size:12.5px'}, 'Next: the identifiers are checked and a summary (name, exchange, sector, Yahoo symbol, CIK, amount) is shown with Confirm and Cancel; only Confirm starts the onboarding (F8.7).'));
   dlg.append(el('div', {class:'dact'}, el('button', {class:'md-btn text', type:'button', onclick: () => dlg.close()}, 'Cancel'), el('button', {class:'md-btn filled', type:'button', onclick: () => { const s = sym.value.trim().toUpperCase(); if (!s) { sym.focus(); return; } summaryStep(p, s, nm.value.trim(), amt.value ? +amt.value : null); }}, 'Check the symbol')));
   dlg.showModal(); sym.focus();
 }
@@ -175,9 +175,9 @@ function amountDialog(p, c) {
   dlg.showModal();
 }
 function stateDialog(p, c, kind) {
-  const dlg = $('#dlg');
-  dbox(kind === 'deactivate' ? `Deactivate ${c.name}?` : `Reactivate ${c.name}?`, el('div', {}, kind === 'deactivate' ? 'It stays collected (prices, news, filings) but gets no new prediction or paper trade; its open paper trades still settle. Takes effect at the next pre-open run (F8.4).' : 'Predictions and paper trades resume from the next pre-open run (F8.4).'), el('div', {class:'muted', style:'font-size:12.5px'}, 'Recorded with your sign-in and an idempotency key; pending until the next run imports it.'));
-  dlg.append(el('div', {class:'dact'}, el('button', {class:'md-btn text', type:'button', onclick: () => dlg.close()}, 'Cancel'), el('button', {class:'md-btn filled', type:'button', onclick: () => recordPending(`${kind} ${c.ticker}`)}, kind === 'deactivate' ? 'Record deactivation' : 'Record reactivation')));
+  const dlg = $('#dlg'), reason = el('input', {type:'text', maxlength:'200', placeholder:'optional, in your words (at most 200 characters)', 'aria-label':'Reason'});
+  dbox(kind === 'deactivate' ? `Deactivate ${c.name}?` : `Reactivate ${c.name}?`, el('div', {}, kind === 'deactivate' ? 'It stays collected (prices, news, filings) but gets no new prediction or paper trade; its open paper trades still settle. Takes effect at the next pre-open run (F8.4).' : 'Predictions and paper trades resume from the next pre-open run (F8.4).'), el('label', {}, 'Reason', reason), el('div', {class:'muted', style:'font-size:12.5px'}, 'Recorded with your sign-in and an idempotency key; pending until the next run imports it. The reason is kept on the event, in your words.'));
+  dlg.append(el('div', {class:'dact'}, el('button', {class:'md-btn text', type:'button', onclick: () => dlg.close()}, 'Cancel'), el('button', {class:'md-btn filled', type:'button', onclick: () => recordPending(`${kind} ${c.ticker}${reason.value.trim() ? ` (“${reason.value.trim().slice(0, 200)}”)` : ''}`)}, kind === 'deactivate' ? 'Record deactivation' : 'Record reactivation')));
   dlg.showModal();
 }
 function deleteDialog(p, c) {

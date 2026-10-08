@@ -25,7 +25,8 @@ imported by the next run, never an immediate change. The page carries no signal 
    counts from the start of stored history), identifiers (Yahoo, NSE or CIK), and the actions **Amount**,
    **Deactivate**, **Delete**. Columns by width: identifiers from 1360 px, buyers and open trades from 1200 px, the
    list date from 901 px; below 1200 px the action buttons are icons with accessible names, below 901 px a single
-   **Manage** button opens the actions, and below 600 px the amount moves under the company name.
+   **Manage** button opens the actions and the inactive rows' news count and open trades move under the name, and
+   below 600 px the amount moves under the company name.
 3. **Inactive companies** (decision 13: shown here only): since when, with the deactivation reason in the requester's
    words, last close, news stored since (titles in the tooltip; the example data holds none), open paper trades
    (they still settle), and **Reactivate** and **Delete**.
@@ -33,13 +34,15 @@ imported by the next run, never an immediate change. The page carries no signal 
    any channel with who asked (from the channel's sign-in), the result (accepted, pending, refused, duplicate,
    failed), the message and the refusal reason; a company deleted later is masked (decision 12).
 5. **Lifecycle history** (F8): every add, deactivate, reactivate and amount event of the shown companies, newest
-   first, with the channel, the requester, when it counts (the next pre-open run; the seed from the start of stored
-   history) and the onboarding checks of a real add; the count of excluded delete tombstones in the head.
+   first, with the channel, the requester, when it counts (the date of the next pre-open run; a seed event counts
+   from the start of stored history, 3 Jan 2011) and the onboarding checks of a real add; the count of excluded
+   delete tombstones in the head.
 6. **Dialogs**: **Add** asks for the exchange symbol, an optional name and amount (F8.3), then a **summary step**
    with Confirm and Cancel (F8.7; the real page fills the summary from the identifier check: name, exchange, sector,
    Yahoo symbol, CIK, amount); **Amount** shows the current value and the India one-share rule; **Deactivate /
-   Reactivate** say what stays collected and when it takes effect (F8.4); **Delete** carries a warning, requires the
-   ticker typed exactly (the button stays disabled until then), says it is dashboard-only and what a tombstone does
+   Reactivate** say what stays collected and when it takes effect (F8.4) and take an optional reason in the owner's
+   words (at most 200 characters, kept on the event); **Delete** carries a warning, requires the ticker typed (any
+   case; the button stays disabled until it matches), says it is dashboard-only and what a tombstone does
    (F8.5). Confirming records a pending request on the page; nothing is sent (mockup).
 7. **Legend** and **footer**.
 
@@ -49,7 +52,8 @@ imported by the next run, never an immediate change. The page carries no signal 
 - No look-ahead: lifecycle events by `recorded_at`, commands by `received_at`, news by `first_seen_at`, all at or
   before the cut-off.
 - Decision 12 on read: the catalogue's company list holds no deleted company; its lifecycle events are excluded and
-  counted, and its symbol and name are masked in the command log's echo. No new data request.
+  counted, and in the command log every echo of it (symbol, message, idempotency key, record ids) is masked, so
+  neither data.json nor page.html contains the deleted company's ticker or name. No new data request.
 
 ## Design rules kept
 Design system v2 only; light theme; phone and desktop (both tables fit their wrapper at every width 390-1700 px in
@@ -63,8 +67,14 @@ head chips and the legend ("every trade is a paper record"); research only.
 widths, both markets): no clipped, overflowing or overlapping text. A sweep of 390-1700 px in steps of 10, both
 markets: neither table wider than its wrapper. A script ran the add flow (symbol -> summary -> confirm), the delete
 dialog (the button is disabled until the ticker is typed, case-insensitive) and a reactivation; the pending list and
-the KPI count them; no script error; every tooltip element focusable; neither market's page names the deleted
-company. Rebuild is byte-identical.
+the KPI count them; no script error; every tooltip element focusable; neither page.html nor data.json contains the
+deleted company's ticker or name (grep of the raw files). Rebuild is byte-identical.
+
+Judge round 1 (2026-10-08) found six blockers, all fixed before round 2: the deleted company's ticker survived in a
+command's idempotency key and record ids and in the add dialog's placeholder; notes.md did not list the onboarding
+and arguments sub-keys; the seed events' "counts from" lacked the year and used today's clock offset; the amount
+tool was named `set_amount` instead of `set_paper_amount`; the deactivate dialog had no reason field; the inactive
+rows' news count was hidden on phones.
 
 ## Decisions taken for the owner (reported to the orchestrator)
 - Active and inactive companies are two tables rather than one with a state filter, because the spec gives the
