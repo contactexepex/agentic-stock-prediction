@@ -55,18 +55,40 @@ export class FakeConversationStore implements ConversationStore {
       });
   }
 
+  async owns(id: string, actor: string, market: string) {
+    if (this.down) throw new Error("log down");
+    return this.questions.some((q) => q.id === id && q.actor === actor && q.market === market);
+  }
+
+  async latestConversation(actor: string, market: string, since: string) {
+    if (this.down) throw new Error("log down");
+    const mine = this.questions.filter((q) => q.actor === actor && q.market === market && q.asked_at >= since)
+      .sort((a, b) => (a.asked_at < b.asked_at ? 1 : -1));
+    return mine[0]?.conversation_id ?? null;
+  }
+
+  async history(conversationId: string, actor: string, market: string, limit: number) {
+    if (this.down) throw new Error("log down");
+    return this.questions
+      .filter((q) => q.conversation_id === conversationId && q.actor === actor && q.market === market)
+      .map((q) => ({ q, a: this.answers.find((a) => a.id === q.id) }))
+      .filter(({ a }) => a && ["answered", "not_in_data", "declined"].includes(a.status))
+      .sort((x, y) => (x.q.asked_at < y.q.asked_at ? 1 : -1)).slice(0, limit).reverse()
+      .map(({ q, a }) => ({ id: q.id, asked_at: q.asked_at, question: q.question, text: a?.text ?? "" }));
+  }
+
   async purge(before: string) {
     this.purged.push(before);
   }
 }
 
-type Script = Partial<Anthropic.Message> & { content: Anthropic.ContentBlock[] };
+type Script = Partial<Anthropic.Beta.BetaMessage> & { content: Anthropic.Beta.BetaContentBlock[] };
 
 export class FakeModel implements ModelClient {
-  calls: Anthropic.MessageCreateParamsNonStreaming[] = [];
+  calls: Anthropic.Beta.Messages.MessageCreateParamsNonStreaming[] = [];
   script: (Script | Error)[] = [];
 
-  async create(params: Anthropic.MessageCreateParamsNonStreaming): Promise<Anthropic.Message> {
+  async create(params: Anthropic.Beta.Messages.MessageCreateParamsNonStreaming): Promise<Anthropic.Beta.BetaMessage> {
     this.calls.push(structuredClone(params));
     const next = this.script.shift();
     if (!next) throw new Error("no scripted response");
@@ -74,22 +96,22 @@ export class FakeModel implements ModelClient {
     return {
       id: `msg_${this.calls.length}`, type: "message", role: "assistant", model: "claude-sonnet-5-5", stop_sequence: null,
       stop_reason: "end_turn", usage: usage(1000, 200), ...next,
-    } as Anthropic.Message;
+    } as Anthropic.Beta.BetaMessage;
   }
 }
 
-export function usage(input: number, output: number, cacheWrite = 0, cacheRead = 0): Anthropic.Usage {
+export function usage(input: number, output: number, cacheWrite = 0, cacheRead = 0, iterations: unknown[] | null = null): Anthropic.Beta.BetaUsage {
   return { input_tokens: input, output_tokens: output, cache_creation_input_tokens: cacheWrite,
-    cache_read_input_tokens: cacheRead } as Anthropic.Usage;
+    cache_read_input_tokens: cacheRead, iterations } as unknown as Anthropic.Beta.BetaUsage;
 }
 
 export function toolUse(name: string, input: Record<string, unknown>, id = `toolu_${name}`): Script {
-  return { stop_reason: "tool_use", content: [{ type: "tool_use", id, name, input } as Anthropic.ToolUseBlock] };
+  return { stop_reason: "tool_use", content: [{ type: "tool_use", id, name, input } as Anthropic.Beta.BetaToolUseBlock] };
 }
 
 export function finalAnswer(answer: { text: string; cited?: { id: string; kind: string }[]; not_in_data?: boolean; declined?: string }): Script {
   const body = { cited: [], not_in_data: false, declined: "none", ...answer };
-  return { stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify(body), citations: null } as Anthropic.TextBlock] };
+  return { stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify(body), citations: null } as Anthropic.Beta.BetaTextBlock] };
 }
 
 export const ASSISTANT = dashboardContext("assistant");
@@ -103,7 +125,7 @@ export function assistantRig(opts: { withModel?: boolean } = {}) {
   const explainer = new AssistantExplainer({
     store, model: opts.withModel === false ? null : model, clock: () => tools.now.value,
     secrets: ["sk-ant-api03-SECRETSECRETSECRET", "md-inbox-SECRET-0987654321"],
-    newId: () => `t${String(++counter).padStart(4, "0")}`,
+    newId: () => String(++counter).padStart(10, "0"),
   });
   const readAs = (ctx: CallContext) => (tool: string, args: ToolArgs) => tools.layer.execute(ctx, tool, args);
   const read = readAs(ASSISTANT);

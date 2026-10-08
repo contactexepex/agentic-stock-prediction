@@ -2,7 +2,7 @@
 // function (pool size 1, statement timeout 5 s, TLS verified). Errors never carry driver text out.
 import { AGENT } from "./constants.ts";
 import { APP_SQL as SQL } from "./sql.ts";
-import type { AnswerRecord, AnswerRow, AnswerStatus, ConversationStore, QuestionRow } from "./types.ts";
+import type { AnswerRecord, AnswerRow, AnswerStatus, ConversationStore, HistoryTurn, QuestionRow } from "./types.ts";
 
 export type Query = (text: string, values: unknown[]) => Promise<{ rows: Record<string, unknown>[] }>;
 
@@ -34,6 +34,7 @@ export function recordFrom(row: Record<string, unknown>): AnswerRecord {
     asked_at: askedAt, question: String(row.question), text: row.text === null || row.text === undefined ? "" : String(row.text),
     cited_ids: cited.map((item) => item.id), cited, as_of: askedAt, not_in_data: truthy(row.not_in_data), declined, status,
     sources: list(row.sources) as AnswerRecord["sources"], cost_usd: Number(row.cost_usd ?? 0),
+    conversation_id: row.conversation_id ? String(row.conversation_id) : String(row.id), history_turns: 0,
   };
 }
 
@@ -46,7 +47,8 @@ export class MotherDuckConversationStore implements ConversationStore {
 
   async reserve(row: QuestionRow, caps: { dayStart: string; monthStart: string; dayUsd: number; monthUsd: number }): Promise<boolean> {
     const { rows } = await this.query(SQL.reserve, [row.id, row.market, row.channel, row.actor, row.agent, row.question,
-      row.ticker, row.strategy_id, row.asked_at, row.reserved_usd, caps.dayStart, caps.monthStart, caps.dayUsd, caps.monthUsd]);
+      row.ticker, row.strategy_id, row.asked_at, row.reserved_usd, caps.dayStart, caps.monthStart, caps.dayUsd, caps.monthUsd,
+      row.conversation_id]);
     return rows.length > 0;
   }
 
@@ -65,6 +67,22 @@ export class MotherDuckConversationStore implements ConversationStore {
     const { rows } = await this.query(SQL.enabled, [AGENT]);
     const value = rows[0]?.enabled;
     return value === null || value === undefined ? null : truthy(value);
+  }
+
+  async owns(id: string, actor: string, market: string): Promise<boolean> {
+    const { rows } = await this.query(SQL.owns, [id, actor, market]);
+    return Number(rows[0]?.n ?? 0) > 0;
+  }
+
+  async latestConversation(actor: string, market: string, since: string): Promise<string | null> {
+    const { rows } = await this.query(SQL.latestConversation, [actor, market, since]);
+    return rows[0] ? String(rows[0].conversation_id) : null;
+  }
+
+  async history(conversationId: string, actor: string, market: string, limit: number): Promise<HistoryTurn[]> {
+    const { rows } = await this.query(SQL.history, [conversationId, actor, market, limit]);
+    return rows.map((row) => ({ id: String(row.id), asked_at: iso(row.asked_at), question: String(row.question),
+      text: String(row.text ?? "") })).reverse();
   }
 
   async list(market: string, since: string, limit: number): Promise<AnswerRecord[]> {

@@ -13,5 +13,5 @@ export function anthropicModel(apiKey: string, fetcher: FetchLike): ModelClient 
     timeout: CALL_TIMEOUT_MS,
     fetch: (input, init) => fetcher(typeof input === "string" ? input : input instanceof URL ? input.href : input.url, init),
   });
-  return { create: (params) => client.messages.create(params) };
+  return { create: (params) => client.beta.messages.create(params) };
 }

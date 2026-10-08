@@ -30,11 +30,11 @@ def database() -> duckdb.DuckDBPyConnection:
 
 
 def reserve(con, question_id: str, at: str, reserved: float = 0.1, day_usd: float = 0.65, month_usd: float = 20.0,
-            market: str = "us") -> list:
+            market: str = "us", conversation: str | None = None, actor: str = "dashboard:owner") -> list:
     """The reserve statement with store.ts's parameter order."""
-    return con.execute(statements()["reserve"], [question_id, market, "dashboard", "dashboard:owner", "assistant",
-                                                 "Why?", None, None, at, reserved, DAY, MONTH, day_usd,
-                                                 month_usd]).fetchall()
+    return con.execute(statements()["reserve"], [question_id, market, "dashboard", actor, "assistant",
+                                                 f"Why {question_id}?", None, None, at, reserved, DAY, MONTH, day_usd,
+                                                 month_usd, conversation or question_id]).fetchall()
 
 
 def answer(con, question_id: str, cost: float, status: str = "answered") -> None:
@@ -44,7 +44,8 @@ def answer(con, question_id: str, cost: float, status: str = "answered") -> None
 
 
 def test_every_statement_is_listed():
-    assert sorted(statements()) == ["answer", "enabled", "list", "purgeAnswers", "purgeQuestions", "reserve", "spend"]
+    assert sorted(statements()) == ["answer", "enabled", "history", "latestConversation", "list", "owns", "purgeAnswers",
+                                    "purgeQuestions", "reserve", "spend"]
 
 
 def test_app_sql_is_idempotent():
@@ -76,7 +77,8 @@ def test_reservation_enforces_the_day_cap_and_counts_real_costs():
 
 def test_reservation_enforces_the_month_cap():
     con = database()
-    con.execute("INSERT INTO app.assistant_questions VALUES ('old', 'us', 'slack', 'slack:U1', 'assistant', 'q', NULL, "
+    con.execute("INSERT INTO app.assistant_questions (id, market, channel, actor, agent, question, ticker, strategy_id, "
+                "asked_at, reserved_usd) VALUES ('old', 'us', 'slack', 'slack:U1', 'assistant', 'q', NULL, "
                 "NULL, '2026-10-03T10:00:00Z', 0.1)")
     answer(con, "old", 19.95)
     assert reserve(con, "new", "2026-10-07T10:00:00Z") == []
@@ -92,10 +94,12 @@ def test_list_joins_answers_and_purge_keeps_90_days():
     rows = con.execute(sql["list"], ["us", "2026-07-09T10:00:00Z", 100]).fetchall()
     assert [row[0] for row in rows] == ["b", "a"]
     b, a = rows
-    assert b[5] is None and b[11] == 0.1  # no answer yet: status null, cost = the reservation
-    assert a[5] == "answered" and a[9] is False and a[11] == 0.02
-    assert a[7] == '[{"id": "x-1", "kind": "news"}]'
-    con.execute("INSERT INTO app.assistant_questions VALUES ('gone', 'us', 'slack', 'slack:U1', 'assistant', 'q', NULL, "
+    assert b[5] == "b"  # conversation_id
+    assert b[6] is None and b[12] == 0.1  # no answer yet: status null, cost = the reservation
+    assert a[6] == "answered" and a[10] is False and a[12] == 0.02
+    assert a[8] == '[{"id": "x-1", "kind": "news"}]'
+    con.execute("INSERT INTO app.assistant_questions (id, market, channel, actor, agent, question, ticker, strategy_id, "
+                "asked_at, reserved_usd) VALUES ('gone', 'us', 'slack', 'slack:U1', 'assistant', 'q', NULL, "
                 "NULL, '2026-07-01T10:00:00Z', 0.1)")
     answer(con, "gone", 0.01)
     con.execute(sql["purgeAnswers"], ["2026-07-09T10:00:00Z"])
@@ -113,3 +117,37 @@ def test_kill_switch_reads_the_newest_controls_row():
     assert con.execute(sql["enabled"], ["assistant"]).fetchall() == [(True,)]
     con.execute("INSERT INTO inbox.controls VALUES ('*', false, 'all off', '2026-10-07T09:40:00Z')")
     assert con.execute(sql["enabled"], ["assistant"]).fetchall() == [(False,)]
+
+
+def test_conversation_statements():
+    con, sql = database(), statements()
+    reserve(con, "c1", "2026-10-07T09:00:00Z", reserved=0.0)
+    for n, at in ((2, "09:05"), (3, "09:10"), (4, "09:15"), (5, "09:20"), (6, "09:25")):
+        reserve(con, f"c{n}", f"2026-10-07T{at}:00Z", reserved=0.0, conversation="c1")
+    reserve(con, "x1", "2026-10-07T09:30:00Z", reserved=0.0, actor="slack:U1")
+    for n in range(1, 6):
+        answer(con, f"c{n}", 0.0, status="not_in_data" if n == 2 else "answered")
+    answer(con, "c6", 0.0, status="failed")
+    assert con.execute(sql["owns"], ["c1", "dashboard:owner", "us"]).fetchall() == [(1,)]
+    assert con.execute(sql["owns"], ["c1", "slack:U1", "us"]).fetchall() == [(0,)]
+    assert con.execute(sql["owns"], ["c1", "dashboard:owner", "india"]).fetchall() == [(0,)]
+    # the newest 4 finished turns (the failed c6 is left out), newest first; the store reverses them
+    rows = con.execute(sql["history"], ["c1", "dashboard:owner", "us", 4]).fetchall()
+    assert [row[0] for row in rows] == ["c5", "c4", "c3", "c2"]
+    assert rows[0][2] == "Why c5?" and rows[0][3] == "Text."
+    assert con.execute(sql["history"], ["c1", "slack:U1", "us", 4]).fetchall() == []
+    latest = con.execute(sql["latestConversation"], ["dashboard:owner", "us", "2026-10-07T09:20:00Z"]).fetchall()
+    assert latest == [("c1",)]
+    assert con.execute(sql["latestConversation"], ["dashboard:owner", "us", "2026-10-07T09:26:00Z"]).fetchall() == []
+    assert con.execute(sql["latestConversation"], ["slack:U1", "us", "2026-10-07T09:00:00Z"]).fetchall() == [("x1",)]
+
+
+def test_app_sql_adds_the_conversation_column_to_an_older_table():
+    con = duckdb.connect()
+    con.execute(INBOX_SQL.read_text(encoding="utf-8"))
+    con.execute("CREATE SCHEMA app; CREATE TABLE app.assistant_questions (id VARCHAR PRIMARY KEY, market VARCHAR NOT NULL, "
+                "channel VARCHAR NOT NULL, actor VARCHAR NOT NULL, agent VARCHAR NOT NULL, question VARCHAR NOT NULL, "
+                "ticker VARCHAR, strategy_id VARCHAR, asked_at TIMESTAMPTZ NOT NULL, reserved_usd DOUBLE NOT NULL)")
+    con.execute(APP_SQL.read_text(encoding="utf-8"))
+    columns = [row[0] for row in con.execute("DESCRIBE app.assistant_questions").fetchall()]
+    assert columns[-1] == "conversation_id"

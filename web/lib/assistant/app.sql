@@ -21,8 +21,12 @@ CREATE TABLE IF NOT EXISTS app.assistant_questions (
     ticker VARCHAR,
     strategy_id VARCHAR,
     asked_at TIMESTAMPTZ NOT NULL,
-    reserved_usd DOUBLE NOT NULL
+    reserved_usd DOUBLE NOT NULL,
+    conversation_id VARCHAR          -- the id of the conversation's first question (its own id for a new one)
 );
+
+-- Added for multi-turn (owner decision 2026-10-08), for a table created before the column existed.
+ALTER TABLE app.assistant_questions ADD COLUMN IF NOT EXISTS conversation_id VARCHAR;
 
 -- One row per finished question (answered, not in the data, declined, stopped or failed) with its real cost.
 CREATE TABLE IF NOT EXISTS app.assistant_answers (

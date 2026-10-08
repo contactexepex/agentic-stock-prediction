@@ -5,24 +5,27 @@
 // without a model call -> the question's cost (QUESTION_USD) is reserved against the day's and the month's caps in
 // one statement (over budget: refused, nothing called) -> at most MAX_ROUNDS model calls, each made only when its
 // cost ceiling fits in what is left of the reservation -> citations verified, advice replaced by the decline -> the
-// answer and its real cost logged. Research only: no tool here writes anything outside the conversation log.
+// answer and its real cost logged. A refusal is retried server-side on FALLBACK_MODEL (owner decision 2026-10-08); each
+// attempt is charged at its own model's price. A question may continue a conversation: its last HISTORY_TURNS
+// questions and answers go before it as plain text. Research only: no tool here writes anything outside the conversation log.
 import Anthropic from "@anthropic-ai/sdk";
 import type { CallContext, ToolArgs, ToolOutcome } from "../tools/types.ts";
 import type { ReadData } from "../tools/reads.ts";
 import { redact } from "../tools/text.ts";
 import {
-  DAILY_USD, DEADLINE_MS, MAX_ROUNDS, MAX_TOKENS, MAX_TOOL_CALLS, MODEL, MONTHLY_USD, QUESTION_USD, RETENTION_DAYS,
-  READ_TOOLS, TOOL_RESULT_MAX_CHARS,
+  CONVERSATION_PATTERN, DAILY_USD, DEADLINE_MS, FALLBACK_BETA, FALLBACK_MODEL, HISTORY_ANSWER_CHARS, HISTORY_TURNS,
+  MAX_ROUNDS, MAX_TOKENS, MAX_TOOL_CALLS, MODEL, MONTHLY_USD, QUESTION_USD, READ_TOOLS, RETENTION_DAYS,
+  SLACK_CONVERSATION_MINUTES, TOOL_RESULT_MAX_CHARS,
 } from "./constants.ts";
 import {
-  NO_TOKENS, type TokenUse, addTokens, budgetLine, budgetState, callCeilingUsd, costUsd, tokensOf, utcDayStart,
+  NO_TOKENS, type TokenUse, addTokens, budgetLine, budgetState, callCeilingUsd, responseCostUsd, tokensOf, utcDayStart,
   utcMonthStart,
 } from "./budget.ts";
-import { ANSWER_SCHEMA, SYSTEM_PROMPT, readToolDefinitions, userTurn } from "./prompt.ts";
+import { ANSWER_SCHEMA, SYSTEM_PROMPT, historyTurns, readToolDefinitions, userTurn } from "./prompt.ts";
 import { ADVICE_DECLINE, type ReadText, asksForAdvice, quotedQuestion, readsAsAdvice, verifyCitations } from "./guard.ts";
 import type {
   AnswerRecord, AnswerRow, AnswerSource, AnswerStatus, BudgetState, ConversationStore, ExplainAnswer, Explainer,
-  ModelClient, ReadTool,
+  HistoryTurn, ModelClient, ReadTool,
 } from "./types.ts";
 
 export interface ExplainerDeps {
@@ -55,6 +58,10 @@ interface Outcome {
 interface Run {
   outcome: Outcome;
   tokens: TokenUse;
+  /** Each attempt at its own model's price (budget.ts responseCostUsd). */
+  cost: number;
+  /** The model that produced the last response (MODEL, or the fallback model). */
+  model: string;
   calls: number;
   toolCalls: number;
   sources: AnswerSource[];
@@ -69,8 +76,8 @@ function cut(text: string): string {
   return text.length <= TOOL_RESULT_MAX_CHARS ? text : `${text.slice(0, TOOL_RESULT_MAX_CHARS)} [cut]`;
 }
 
-function textOf(message: Anthropic.Message): string {
-  return message.content.filter((block): block is Anthropic.TextBlock => block.type === "text").map((block) => block.text).join("");
+function textOf(message: Anthropic.Beta.BetaMessage): string {
+  return message.content.filter((block): block is Anthropic.Beta.BetaTextBlock => block.type === "text").map((block) => block.text).join("");
 }
 
 function parseAnswer(raw: string): { text: string; cited: { id: string; kind: string }[]; not_in_data: boolean; declined: string } | null {
@@ -138,10 +145,14 @@ export class AssistantExplainer implements Explainer {
     const ticker = typeof args.ticker === "string" ? args.ticker : null;
     const strategyId = typeof args.strategy_id === "string" ? args.strategy_id.slice(0, 80) : null;
     let admitted: boolean;
+    let conversationId = id;
+    let history: HistoryTurn[] = [];
     try {
+      conversationId = await this.conversation(ctx, market, args.conversation_id, now) ?? id;
+      if (conversationId !== id) history = await store.history(conversationId, ctx.actor, market, HISTORY_TURNS);
       admitted = await store.reserve({
         id, market, channel: ctx.channel, actor: ctx.actor, agent: ctx.agent, question, ticker, strategy_id: strategyId,
-        asked_at: askedAt, reserved_usd: reserved,
+        asked_at: askedAt, reserved_usd: reserved, conversation_id: conversationId,
       }, { dayStart, monthStart, dayUsd: DAILY_USD, monthUsd: MONTHLY_USD });
     } catch {
       return { result: "failed", refusal_code: null, message: LOG_DOWN, data: null };
@@ -155,15 +166,15 @@ export class AssistantExplainer implements Explainer {
 
     const run: Run = advice
       ? { outcome: { status: "declined", text: ADVICE_DECLINE, cited: [], not_in_data: false, declined: "advice" },
-        tokens: NO_TOKENS, calls: 0, toolCalls: 0, sources: [], error: null, uncertain: false }
-      : await this.run(model, read, market as "india" | "us", askedAt, question, ticker, strategyId);
+        tokens: NO_TOKENS, cost: 0, model: MODEL, calls: 0, toolCalls: 0, sources: [], error: null, uncertain: false }
+      : await this.run(model, read, market as "india" | "us", askedAt, question, ticker, strategyId, history);
     // A call that ended without an API answer may still be billed (a timeout the API finished), so such a failure
     // keeps at least the reservation counted.
-    const cost = run.uncertain ? Math.max(costUsd(run.tokens), reserved) : costUsd(run.tokens);
+    const cost = run.uncertain ? Math.max(run.cost, reserved) : run.cost;
     const text = redact(run.outcome.text, secrets).slice(0, 4000);
     const row: AnswerRow = {
       id, status: run.outcome.status, text, cited: run.outcome.cited, sources: run.sources,
-      not_in_data: run.outcome.not_in_data, declined: run.outcome.declined, model: MODEL, ...run.tokens,
+      not_in_data: run.outcome.not_in_data, declined: run.outcome.declined, model: run.model, ...run.tokens,
       model_calls: run.calls, tool_calls: run.toolCalls, cost_usd: cost, completed_at: clock().toISOString(),
     };
     // A failed log write keeps the reservation counted (the safe side of the budget); the answer is still returned.
@@ -173,11 +184,24 @@ export class AssistantExplainer implements Explainer {
       id, market: market as "india" | "us", channel: ctx.channel, asked_at: askedAt, question, text,
       cited_ids: run.outcome.cited.map((item) => item.id), cited: run.outcome.cited, as_of: askedAt,
       not_in_data: run.outcome.not_in_data, declined: run.outcome.declined, status: run.outcome.status,
-      sources: run.sources, cost_usd: cost,
+      sources: run.sources, cost_usd: cost, conversation_id: conversationId, history_turns: history.length,
     };
     const data = { answer, budget, logged };
     if (run.outcome.status === "failed") return { result: "failed", refusal_code: null, message: run.error ?? text, data };
     return { result: "accepted", refusal_code: null, message: run.outcome.status.replace(/_/g, " "), data };
+  }
+
+  /** The conversation a question continues, or null for a new one. An explicit id continues only a conversation of
+   * the same asker and market (anything else starts a new one). Without one, Slack /ask continues the asker's latest
+   * conversation in the market when its last question is under SLACK_CONVERSATION_MINUTES old (Slack has no way to
+   * pass an id); the dashboard panel always sends one to continue. */
+  private async conversation(ctx: CallContext, market: string, requested: unknown, now: Date): Promise<string | null> {
+    if (typeof requested === "string" && CONVERSATION_PATTERN.test(requested)) {
+      return (await this.deps.store.owns(requested, ctx.actor, market)) ? requested : null;
+    }
+    if (ctx.channel !== "slack") return null;
+    const since = new Date(now.getTime() - SLACK_CONVERSATION_MINUTES * 60000).toISOString();
+    return this.deps.store.latestConversation(ctx.actor, market, since);
   }
 
   /** The budget state now, or null when the log cannot be read. */
@@ -190,23 +214,27 @@ export class AssistantExplainer implements Explainer {
   }
 
   private async run(model: ModelClient, read: ReadTool, market: "india" | "us", askedAt: string, question: string,
-    ticker: string | null, strategyId: string | null): Promise<Run> {
+    ticker: string | null, strategyId: string | null, history: HistoryTurn[]): Promise<Run> {
     const started = this.deps.clock().getTime();
     const tools = readToolDefinitions();
-    const messages: Anthropic.MessageParam[] = [
+    const messages: Anthropic.Beta.BetaMessageParam[] = [
+      ...historyTurns(history, HISTORY_ANSWER_CHARS),
       { role: "user", content: userTurn({ market, askedAt, question, ticker, strategyId }) },
     ];
     const reads: ReadText[] = [];
     const sources: AnswerSource[] = [];
     let tokens = NO_TOKENS;
+    let cost = 0;
+    let served: string = MODEL;
     let calls = 0;
     let toolCalls = 0;
     let uncertain = false;
-    const result = (outcome: Outcome, error: string | null = null): Run => ({ outcome, tokens, calls, toolCalls, sources, error, uncertain });
+    const result = (outcome: Outcome, error: string | null = null): Run => ({ outcome, tokens, cost, model: served, calls,
+      toolCalls, sources, error, uncertain });
     const failed = (text: string) => result({ status: "failed", text, cited: [], not_in_data: false, declined: null }, text);
     for (let round = 1; round <= MAX_ROUNDS; round += 1) {
       const last = round === MAX_ROUNDS || toolCalls >= MAX_TOOL_CALLS;
-      const params: Anthropic.MessageCreateParamsNonStreaming = {
+      const params: Anthropic.Beta.Messages.MessageCreateParamsNonStreaming = {
         model: MODEL,
         max_tokens: MAX_TOKENS,
         system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
@@ -214,11 +242,13 @@ export class AssistantExplainer implements Explainer {
         tool_choice: last ? { type: "none" } : { type: "auto" },
         messages,
         output_config: { effort: "low", format: { type: "json_schema", schema: ANSWER_SCHEMA as unknown as Record<string, unknown> } },
+        betas: [FALLBACK_BETA],
+        fallbacks: [{ model: FALLBACK_MODEL }],
       };
-      if (costUsd(tokens) + callCeilingUsd(params) > QUESTION_USD || this.deps.clock().getTime() - started > DEADLINE_MS) {
+      if (cost + callCeilingUsd(params) > QUESTION_USD || this.deps.clock().getTime() - started > DEADLINE_MS) {
         return result({ status: "stopped", text: STOPPED, cited: [], not_in_data: true, declined: null });
       }
-      let response: Anthropic.Message;
+      let response: Anthropic.Beta.BetaMessage;
       try {
         response = await model.create(params);
       } catch (error) {
@@ -226,18 +256,24 @@ export class AssistantExplainer implements Explainer {
         return failed(modelError(error));
       }
       calls += 1;
-      tokens = addTokens(tokens, tokensOf(response.usage));
+      served = typeof response.model === "string" ? response.model : MODEL;
+      tokens = addTokens(tokens, tokensOf(response.usage, served));
+      cost += responseCostUsd(response.usage, served);
       if (response.stop_reason === "refusal") {
         return result({ status: "declined", text: MODEL_DECLINED, cited: [], not_in_data: false, declined: "refused" });
       }
-      const uses = response.content.filter((block): block is Anthropic.ToolUseBlock => block.type === "tool_use");
+      const uses = response.content.filter((block): block is Anthropic.Beta.BetaToolUseBlock => block.type === "tool_use");
       if (response.stop_reason === "tool_use" && uses.length && !last) {
         messages.push({ role: "assistant", content: response.content });
-        const results: Anthropic.ToolResultBlockParam[] = [];
+        const results: Anthropic.Beta.BetaToolResultBlockParam[] = [];
         for (const use of uses) {
           if (toolCalls >= MAX_TOOL_CALLS) {
             results.push({ type: "tool_result", tool_use_id: use.id, is_error: true,
               content: "Not read: this question has used its tool calls; answer from what was read." });
+            continue;
+          }
+          if (this.deps.clock().getTime() - started > DEADLINE_MS) {
+            results.push({ type: "tool_result", tool_use_id: use.id, is_error: true, content: "Not read: out of time." });
             continue;
           }
           if (!(READ_TOOLS as readonly string[]).includes(use.name)) {

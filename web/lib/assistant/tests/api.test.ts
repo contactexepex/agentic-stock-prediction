@@ -59,7 +59,7 @@ test("POST maps refusals to HTTP statuses and refuses other origins, other types
 test("GET returns the market's conversation oldest first, within 90 days, with the budget state", async () => {
   const r = apiRig();
   const q = (id: string, market: string, at: string, reserved = 0.1) => ({ id, market, channel: "slack", actor: "slack:U1",
-    agent: "assistant", question: id, ticker: null, strategy_id: null, asked_at: at, reserved_usd: reserved });
+    agent: "assistant", question: id, ticker: null, strategy_id: null, asked_at: at, reserved_usd: reserved, conversation_id: id });
   r.store.questions.push(q("old", "us", "2026-06-01T00:00:00Z"), q("a", "us", "2026-10-07T09:00:00Z"),
     q("b", "us", "2026-10-07T09:30:00Z"), q("in", "india", "2026-10-07T09:00:00Z"));
   r.store.answers.push({ id: "a", status: "answered", text: "A.", cited: [], sources: [], not_in_data: false, declined: null,
@@ -79,9 +79,9 @@ test("GET returns the market's conversation oldest first, within 90 days, with t
 
 test("the budget state says over budget when less than one question's reservation is left", () => {
   const at = new Date("2026-10-31T12:00:00Z");
-  assert.equal(budgetState({ day: 0.5, month: 3 }, at, null).over_budget, false);
-  assert.equal(budgetState({ day: 0.56, month: 3 }, at, null).over_budget, true);
-  assert.equal(budgetState({ day: 0, month: 19.95 }, at, true).over_budget, true);
+  assert.equal(budgetState({ day: 0.45, month: 3 }, at, null).over_budget, false);
+  assert.equal(budgetState({ day: 0.46, month: 3 }, at, null).over_budget, true);
+  assert.equal(budgetState({ day: 0, month: 19.85 }, at, true).over_budget, true);
   const state = budgetState({ day: 0.1, month: 1 }, at, true);
   assert.equal(state.month.starts_at, "2026-10-01T00:00:00Z");
   assert.equal(state.day.starts_at, "2026-10-31T00:00:00Z");

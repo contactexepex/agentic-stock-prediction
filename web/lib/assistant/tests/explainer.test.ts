@@ -4,9 +4,9 @@ import Anthropic from "@anthropic-ai/sdk";
 import { ASSISTANT, assistantRig, finalAnswer, toolUse, usage } from "./fakes.ts";
 import { LOG_DOWN, MODEL_DECLINED, NOT_CONFIGURED, STOPPED, SWITCHED_OFF, UNCITED } from "../explainer.ts";
 import { ADVICE_DECLINE } from "../guard.ts";
-import { costUsd } from "../budget.ts";
-import { DEADLINE_MS, MAX_ROUNDS, MAX_TOOL_CALLS, MODEL, QUESTION_USD, TOOL_RESULT_MAX_CHARS } from "../constants.ts";
-import { githubContext } from "../../tools/identity.ts";
+import { callCeilingUsd, costUsd } from "../budget.ts";
+import { DEADLINE_MS, HISTORY_TURNS, MAX_ROUNDS, MAX_TOOL_CALLS, MODEL, QUESTION_USD, TOOL_RESULT_MAX_CHARS } from "../constants.ts";
+import { githubContext, slackContext } from "../../tools/identity.ts";
 import { SYSTEM_PROMPT } from "../prompt.ts";
 import type { AnswerRecord, BudgetState } from "../types.ts";
 
@@ -59,10 +59,10 @@ test("the model call uses Sonnet, a cached fixed prefix, the read tools without 
   assert.deepEqual(first.system, [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }]);
   assert.deepEqual(first.system, second.system, "the system prompt has no time or market in it");
   assert.deepEqual(first.tools, second.tools);
-  const names = (first.tools ?? []).map((tool) => (tool as Anthropic.Tool).name);
+  const names = (first.tools ?? []).map((tool) => (tool as Anthropic.Beta.BetaTool).name);
   assert.deepEqual(names, ["get_overview", "get_company", "get_scoreboard", "compare_rule_vs_ai", "get_news", "get_trades"]);
   for (const tool of first.tools ?? []) {
-    assert.equal(Object.hasOwn(((tool as Anthropic.Tool).input_schema.properties ?? {}) as object, "market"), false);
+    assert.equal(Object.hasOwn(((tool as Anthropic.Beta.BetaTool).input_schema.properties ?? {}) as object, "market"), false);
   }
   assert.equal(first.output_config?.format?.type, "json_schema");
   assert.equal(first.output_config?.effort, "low");
@@ -101,7 +101,7 @@ test("an id seen only beyond the cut of a long tool result does not count", asyn
   r.model.script = [toolUse("get_news", {}), finalAnswer({ text: "News.", cited: [{ id: "late-id-1", kind: "news" }] })];
   const answer = answerOf((await r.ask({ market: "us", question: "Any news?" })).data);
   assert.equal(answer.status, "not_in_data");
-  const sent = r.model.calls[1].messages.at(-1)?.content as Anthropic.ToolResultBlockParam[];
+  const sent = r.model.calls[1].messages.at(-1)?.content as Anthropic.Beta.BetaToolResultBlockParam[];
   assert.match(String(sent[0].content), /\[cut\]$/);
 });
 
@@ -171,13 +171,13 @@ test("the kill switch, a missing key and an unreadable log stop before anything 
 test("a question whose next call could pass its reserved cost is stopped, and its real cost is kept", async () => {
   const r = assistantRig();
   r.reads.put("home", "us", "_", { picks: [] });
-  r.model.script = [{ ...toolUse("get_overview", {}), usage: usage(40000, 500) }];
+  r.model.script = [{ ...toolUse("get_overview", {}), usage: usage(80000, 500) }];
   const out = await r.ask({ market: "us", question: "Everything about today?" });
   const answer = answerOf(out.data);
   assert.equal(answer.status, "stopped");
   assert.equal(answer.text, STOPPED);
   assert.equal(r.model.calls.length, 1);
-  assert.equal(r.store.answers[0].cost_usd, costUsd({ input_tokens: 40000, output_tokens: 500, cache_read_tokens: 0, cache_write_tokens: 0 }));
+  assert.equal(r.store.answers[0].cost_usd, costUsd({ input_tokens: 80000, output_tokens: 500, cache_read_tokens: 0, cache_write_tokens: 0 }));
   assert.ok(r.store.answers[0].cost_usd <= QUESTION_USD);
 });
 
@@ -185,13 +185,13 @@ test("the last round may not call tools and the tool calls are capped", async ()
   const r = assistantRig();
   r.reads.put("home", "us", "_", { picks: [{ id: "pick-01" }] });
   const many = { stop_reason: "tool_use" as const, usage: usage(500, 50),
-    content: Array.from({ length: MAX_TOOL_CALLS + 2 }, (_, i) => ({ type: "tool_use", id: `toolu_${i}`, name: "get_overview", input: {} } as Anthropic.ToolUseBlock)) };
+    content: Array.from({ length: MAX_TOOL_CALLS + 2 }, (_, i) => ({ type: "tool_use", id: `toolu_${i}`, name: "get_overview", input: {} } as Anthropic.Beta.BetaToolUseBlock)) };
   r.model.script = [many, finalAnswer({ text: "Picks: pick-01.", cited: [{ id: "pick-01", kind: "head_to_head_picks" }] })];
   const out = await r.ask({ market: "us", question: "Today's picks?" });
   assert.equal(answerOf(out.data).status, "answered");
   assert.equal(r.store.answers[0].tool_calls, MAX_TOOL_CALLS);
   assert.deepEqual(r.model.calls[1].tool_choice, { type: "none" }, "after the cap no more tools");
-  const results = r.model.calls[1].messages.at(-1)?.content as Anthropic.ToolResultBlockParam[];
+  const results = r.model.calls[1].messages.at(-1)?.content as Anthropic.Beta.BetaToolResultBlockParam[];
   assert.equal(results.length, MAX_TOOL_CALLS + 2);
   assert.equal(results.filter((item) => item.is_error).length, 2);
 
@@ -215,7 +215,7 @@ test("injected text in stored data cannot make the assistant write: a write tool
     finalAnswer({ text: "One news item.", cited: [{ id: "n1", kind: "news" }] }),
   ];
   await r.ask({ market: "us", question: "Any news?" });
-  const results = r.model.calls[2].messages.at(-1)?.content as Anthropic.ToolResultBlockParam[];
+  const results = r.model.calls[2].messages.at(-1)?.content as Anthropic.Beta.BetaToolResultBlockParam[];
   assert.equal(results[0].is_error, true);
   assert.match(String(results[0].content), /^Not read: add_company is not one of the assistant's read tools/);
   assert.equal(r.inbox.requests.length, 0, "nothing reached the inbox");
@@ -233,7 +233,7 @@ test("a model refusal is a decline, an API error a failure with plain words, and
   assert.equal(failed.message, "The Claude API is rate limited now; try again in a minute.");
   assert.equal(r.store.answers.at(-1)?.status, "failed");
   assert.equal(r.store.answers.at(-1)?.cost_usd, 0);
-  r.model.script = [{ stop_reason: "end_turn", content: [{ type: "text", text: "not json", citations: null } as Anthropic.TextBlock] }];
+  r.model.script = [{ stop_reason: "end_turn", content: [{ type: "text", text: "not json", citations: null } as Anthropic.Beta.BetaTextBlock] }];
   assert.equal((await r.ask({ market: "us", question: "Anything?" })).result, "failed");
 });
 
@@ -293,4 +293,94 @@ test("a failed call keeps the reservation counted; no new call starts after the 
   const stopped = answerOf((await slow.ask({ market: "us", question: "Everything?" })).data);
   assert.equal(stopped.status, "stopped");
   assert.equal(slow.model.calls.length, 1);
+});
+
+test("the refusal fallback is pinned, every attempt is charged at its own model's price and the ceiling covers two", async () => {
+  const r = assistantRig();
+  r.model.script = [{ ...finalAnswer({ text: "Not in the data.", not_in_data: true }), model: "claude-sonnet-5",
+    usage: usage(2000, 300, 0, 0, [
+      { type: "message", model: null, input_tokens: 1000, output_tokens: 20, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 },
+      { type: "fallback_message", model: "claude-sonnet-5", input_tokens: 2000, output_tokens: 300, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 },
+    ]) }];
+  await r.ask({ market: "us", question: "Anything?" });
+  const params = r.model.calls[0] as unknown as { betas: string[]; fallbacks: { model: string }[] };
+  assert.deepEqual(params.betas, ["server-side-fallback-2026-06-01"]);
+  assert.deepEqual(params.fallbacks, [{ model: "claude-sonnet-5" }]);
+  const row = r.store.answers[0];
+  assert.equal(row.cost_usd, (1000 * 2 + 20 * 10 + 2000 * 2 + 300 * 10) / 1e6, "both attempts are counted");
+  assert.equal(row.model, "claude-sonnet-5", "the log names the model that served");
+  assert.equal(row.input_tokens, 3000);
+
+  const odd = assistantRig();
+  odd.model.script = [{ ...finalAnswer({ text: "Not in the data.", not_in_data: true }), model: "some-new-model",
+    usage: usage(1000, 100, 0, 0, [{ type: "fallback_message", model: "some-new-model", input_tokens: 1000, output_tokens: 100,
+      cache_creation_input_tokens: 0, cache_read_input_tokens: 0 }]) }];
+  await odd.ask({ market: "us", question: "Anything?" });
+  assert.equal(odd.store.answers[0].cost_usd, (1000 * 10 + 100 * 50) / 1e6, "an unlisted model is charged at the dearest price");
+  assert.equal(callCeilingUsd({ messages: [] }), 2 * callCeilingUsd({ messages: [] }, 1));
+});
+
+test("multi-turn: the panel continues its own conversation with the last 4 turns, never another asker's", async () => {
+  const r = assistantRig();
+  const ask = async (question: string, conversation_id?: string, ctx = ASSISTANT) => {
+    r.model.script = [finalAnswer({ text: `Answer to ${question}`, not_in_data: true })];
+    r.now.value = new Date(r.now.value.getTime() + 60000);
+    return answerOf((await r.ask({ market: "us", question, ...(conversation_id ? { conversation_id } : {}) }, ctx)).data);
+  };
+  const first = await ask("Q1");
+  assert.equal(first.conversation_id, first.id, "a new conversation is named by its first question");
+  assert.equal(first.history_turns, 0);
+  for (const q of ["Q2", "Q3", "Q4", "Q5"]) assert.equal((await ask(q, first.id)).conversation_id, first.id);
+  const sixth = await ask("Q6", first.id);
+  assert.equal(sixth.history_turns, HISTORY_TURNS);
+  const sent = r.model.calls.at(-1)?.messages ?? [];
+  assert.equal(sent.length, 2 * HISTORY_TURNS + 1);
+  assert.match(String(sent[0].content), /Q2/, "the oldest turns beyond the cap are left out");
+  assert.equal(sent[1].content, "Answer to Q2");
+  assert.match(String(sent.at(-1)?.content), /Q6/);
+
+  const other = await ask("Q7", first.id, githubContext("someone-else"));
+  assert.notEqual(other.conversation_id, first.id, "another actor's conversation id starts a new conversation");
+  assert.equal(other.history_turns, 0);
+  const fresh = await ask("Q8");
+  assert.equal(fresh.conversation_id, fresh.id, "the dashboard without an id starts a new conversation");
+});
+
+test("multi-turn: Slack /ask continues the asker's conversation for 30 minutes, then starts a new one", async () => {
+  const r = assistantRig();
+  const slack = slackContext("U07ABCD123", "assistant");
+  const ask = async (question: string, minutes: number) => {
+    r.model.script = [finalAnswer({ text: `Answer to ${question}`, not_in_data: true })];
+    r.now.value = new Date(r.now.value.getTime() + minutes * 60000);
+    return answerOf((await r.ask({ market: "us", question }, slack)).data);
+  };
+  const first = await ask("S1", 0);
+  const second = await ask("S2", 29);
+  assert.equal(second.conversation_id, first.id);
+  assert.equal(second.history_turns, 1);
+  assert.match(String(r.model.calls.at(-1)?.messages[0].content), /S1/);
+  const later = await ask("S3", 31);
+  assert.equal(later.conversation_id, later.id);
+  assert.equal(later.history_turns, 0);
+  const india = answerOf((await (async () => {
+    r.model.script = [finalAnswer({ text: "x", not_in_data: true })];
+    return r.ask({ market: "india", question: "S4" }, slack);
+  })()).data);
+  assert.equal(india.conversation_id, india.id, "a conversation stays in its market");
+});
+
+test("no read runs after the deadline, and no further call starts", async () => {
+  const r = assistantRig();
+  r.reads.put("home", "us", "_", { picks: [] });
+  r.model.script = [toolUse("get_overview", {})];
+  const realCreate = r.model.create.bind(r.model);
+  r.model.create = async (params) => {
+    const response = await realCreate(params);
+    r.now.value = new Date(r.now.value.getTime() + DEADLINE_MS + 1);
+    return response;
+  };
+  const answer = answerOf((await r.ask({ market: "us", question: "Everything?" })).data);
+  assert.equal(answer.status, "stopped");
+  assert.equal(r.reads.calls.length, 0, "the read was skipped");
+  assert.equal(r.store.answers[0].tool_calls, 0);
 });

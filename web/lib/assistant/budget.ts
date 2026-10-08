@@ -1,6 +1,6 @@
 // Cost of model calls and the day / month windows of the budget (F11). Every figure is in USD.
 import type Anthropic from "@anthropic-ai/sdk";
-import { DAILY_USD, MAX_TOKENS, MONTHLY_USD, PRICE_PER_MTOK, QUESTION_USD } from "./constants.ts";
+import { DAILY_USD, MAX_TOKENS, MODEL, MONTHLY_USD, PRICES, PRICE_PER_MTOK, type Price, QUESTION_USD, UNKNOWN_MODEL_PRICE } from "./constants.ts";
 import type { BudgetState } from "./types.ts";
 
 export interface TokenUse {
@@ -12,13 +12,37 @@ export interface TokenUse {
 
 export const NO_TOKENS: TokenUse = { input_tokens: 0, cache_write_tokens: 0, cache_read_tokens: 0, output_tokens: 0 };
 
-export function tokensOf(usage: Anthropic.Usage | null | undefined): TokenUse {
+type Usage = Anthropic.Beta.BetaUsage | Anthropic.Usage | null | undefined;
+
+function tokensOfEntry(usage: { input_tokens?: number | null; cache_creation_input_tokens?: number | null;
+  cache_read_input_tokens?: number | null; output_tokens?: number | null } | null | undefined): TokenUse {
   return {
     input_tokens: usage?.input_tokens ?? 0,
     cache_write_tokens: usage?.cache_creation_input_tokens ?? 0,
     cache_read_tokens: usage?.cache_read_input_tokens ?? 0,
     output_tokens: usage?.output_tokens ?? 0,
   };
+}
+
+/** Every attempt of one response with the model that ran it: `usage.iterations` when present (a fallback reports the
+ * declined attempt and the serving one apart; top-level usage covers only the latter; an entry without a model is the
+ * requested MODEL's), else the top-level usage, run by `served` (the response's model). */
+export function attemptsOf(usage: Usage, served: string): { model: string; tokens: TokenUse }[] {
+  const iterations = usage && "iterations" in usage && Array.isArray(usage.iterations) ? usage.iterations : null;
+  if (!iterations || iterations.length === 0) return [{ model: served, tokens: tokensOfEntry(usage) }];
+  return iterations.map((entry) => ({
+    model: "model" in entry && typeof entry.model === "string" ? entry.model : MODEL,
+    tokens: tokensOfEntry(entry as Parameters<typeof tokensOfEntry>[0]),
+  }));
+}
+
+export function tokensOf(usage: Usage, served: string = MODEL): TokenUse {
+  return attemptsOf(usage, served).reduce((sum, attempt) => addTokens(sum, attempt.tokens), NO_TOKENS);
+}
+
+/** The cost of one response: each attempt at its own model's price, an unlisted model at the dearest price. */
+export function responseCostUsd(usage: Usage, served: string = MODEL): number {
+  return attemptsOf(usage, served).reduce((sum, attempt) => sum + costUsd(attempt.tokens, PRICES[attempt.model] ?? UNKNOWN_MODEL_PRICE), 0);
 }
 
 export function addTokens(a: TokenUse, b: TokenUse): TokenUse {
@@ -30,18 +54,20 @@ export function addTokens(a: TokenUse, b: TokenUse): TokenUse {
   };
 }
 
-export function costUsd(use: TokenUse): number {
-  return (use.input_tokens * PRICE_PER_MTOK.input + use.cache_write_tokens * PRICE_PER_MTOK.cache_write +
-    use.cache_read_tokens * PRICE_PER_MTOK.cache_read + use.output_tokens * PRICE_PER_MTOK.output) / 1e6;
+export function costUsd(use: TokenUse, price: Price = PRICES[MODEL]): number {
+  return (use.input_tokens * price.input + use.cache_write_tokens * price.cache_write +
+    use.cache_read_tokens * price.cache_read + use.output_tokens * price.output) / 1e6;
 }
 
 /** An upper bound of one call's cost before it is made: every input byte counted as half a token (JSON and English
  * run at three or more bytes per token), all of it priced as a cache write (the dearest input), plus a fixed
- * allowance for the output schema the API adds, and the full MAX_TOKENS of output. */
-export function callCeilingUsd(params: Anthropic.MessageCreateParamsNonStreaming): number {
-  const { max_tokens: _max, ...request } = params;
+ * allowance for the output schema the API adds, and the full MAX_TOKENS of output; `attempts` times, because with the
+ * refusal fallback a declined attempt and the fallback's attempt can both be billed (each at the dearer of the two
+ * models' prices). */
+export function callCeilingUsd(params: object, attempts = 2): number {
+  const { max_tokens: _max, ...request } = params as { max_tokens?: number };
   const inputTokens = Math.ceil(new TextEncoder().encode(JSON.stringify(request)).length / 2) + 1000;
-  return (inputTokens * PRICE_PER_MTOK.cache_write + MAX_TOKENS * PRICE_PER_MTOK.output) / 1e6;
+  return attempts * (inputTokens * PRICE_PER_MTOK.cache_write + MAX_TOKENS * PRICE_PER_MTOK.output) / 1e6;
 }
 
 export function utcDayStart(at: Date): string {

@@ -40,6 +40,17 @@ export interface AnswerRecord {
   status: AnswerStatus;
   sources: AnswerSource[];
   cost_usd: number;
+  /** The conversation (the id of its first question) and how many earlier turns this answer was given. */
+  conversation_id: string;
+  history_turns: number;
+}
+
+/** One earlier question and answer of a conversation, sent before a new question (multi-turn). */
+export interface HistoryTurn {
+  id: string;
+  asked_at: string;
+  question: string;
+  text: string;
 }
 
 export type AnswerStatus = "answered" | "not_in_data" | "declined" | "stopped" | "failed" | "pending";
@@ -72,6 +83,7 @@ export interface QuestionRow {
   strategy_id: string | null;
   asked_at: string;
   reserved_usd: number;
+  conversation_id: string;
 }
 
 export interface AnswerRow {
@@ -101,6 +113,12 @@ export interface ConversationStore {
   spend(dayStart: string, monthStart: string): Promise<{ day: number; month: number }>;
   /** The kill switch of the assistant agent in inbox.controls (newest row of `assistant` and of `*`). */
   enabled(): Promise<boolean | null>;
+  /** Whether conversation `id` exists and was asked by this actor in this market. */
+  owns(id: string, actor: string, market: string): Promise<boolean>;
+  /** The conversation of the actor's newest question in the market asked at or after `since`, or null. */
+  latestConversation(actor: string, market: string, since: string): Promise<string | null>;
+  /** The last `limit` finished turns of a conversation by this actor and market, oldest first. */
+  history(conversationId: string, actor: string, market: string, limit: number): Promise<HistoryTurn[]>;
   /** The market's answers asked since `since`, newest first, at most `limit`. */
   list(market: string, since: string, limit: number): Promise<AnswerRecord[]>;
   /** Deletes questions and answers asked before `before` (the 90-day retention). */
@@ -109,7 +127,7 @@ export interface ConversationStore {
 
 /** The part of the Anthropic client the assistant uses; tests pass a mock. */
 export interface ModelClient {
-  create(params: Anthropic.MessageCreateParamsNonStreaming): Promise<Anthropic.Message>;
+  create(params: Anthropic.Beta.Messages.MessageCreateParamsNonStreaming): Promise<Anthropic.Beta.BetaMessage>;
 }
 
 /** The explain hook of B5's tool layer (ToolDeps.explainer) and its answer, defined in web/lib/tools/types.ts. */
