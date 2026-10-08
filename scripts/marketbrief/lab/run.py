@@ -1,7 +1,9 @@
 """The lab's daily steps on stored data (scripts/lab.py): predict (pre-open: rule strategies and baselines, with
 the cost-viable rows of their new predictions), pick (pre-open, after every family has predicted: the head-to-head
 picks and the cost-viable rows of every prediction and pick not flagged yet, e.g. B3's AI predictions); settle is in
-settle_run.py. Each appends only new ids (append-only, CLAUDE.md data rules) and returns a summary."""
+settle_run.py. Predict runs whatever the go-live switch (a rehearsal before a strategy's live_from); pick lets only
+strategies live on D contend (registry.is_live). Each appends only new ids (append-only, CLAUDE.md data rules)
+and returns a summary."""
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
@@ -11,7 +13,7 @@ from marketbrief.constants.kinds import (KIND_COST_VIEWS, KIND_HEAD_TO_HEAD_PICK
 from marketbrief.core.calendar import session_open_utc
 from marketbrief.core.storage import append_jsonl, day_file
 from marketbrief.lab import picks as lab_picks
-from marketbrief.lab import reads, registry
+from marketbrief.lab import reads, registry, scoreboard
 from marketbrief.lab.constants import LAB_VERSION, MSG_NO_EURUSD, MSG_PICK_TOO_LATE
 from marketbrief.lab.cost_views import KIND_PICK, KIND_PREDICTION, viability_row
 from marketbrief.lab.settle import as_date
@@ -32,26 +34,35 @@ def append_new(market: str, kind: str, rows: list[dict], time_column: str, known
 
 def pick_day(con, cfg: dict, now: datetime, specs: list[dict], session_date: str) -> dict:
     """Write the head-to-head picks of every company predicted for `session_date` (D), and the cost-viable rows
-    (decision 51) of every prediction that would trade and every pick. Refused at or after D's open (F1.8: a
-    later pick could rank strategies on settlements stored after the open)."""
+    (decision 51) of every qualifying prediction (also before go-live, as predict writes them: a flag, never a
+    trade) and every pick. Only strategies live on D (registry.is_live) contend: the ranking (decision 41) holds
+    the live strategies of the family and their live settlements; a family with no live strategy gets no row, so
+    with nothing live no pick is written (`live_strategies` 0). Refused at or after D's open (F1.8: a later pick
+    could rank strategies on settlements stored after the open)."""
     if now >= session_open_utc(cfg, as_date(session_date)):
         return {"ok": False, "message": MSG_PICK_TOO_LATE.format(session=session_date, now=now.isoformat())}
     preds = [p for p in reads.predictions(con, now) if str(p["session_date"]) == session_date]
-    trades = reads.settlements(con, now)
+    live = [s for s in specs if registry.is_live(s, session_date)]
+    live_ids = {s["id"] for s in live}
+    contenders = [p for p in preds if p["strategy_id"] in live_ids]
+    trades = scoreboard.live_settlements(reads.settlements(con, now))
     data = reads.market_data(con, cfg, now, [], as_date(session_date) - timedelta(days=10))
     eurusd = data.eurusd_on(as_date(session_date))
     if data.rates.get("order_fee_eur") and eurusd is None:
         return {"ok": False, "message": MSG_NO_EURUSD.format(when=now.isoformat())}
     rows = []
-    for ticker in sorted({p["ticker"] for p in preds}):
-        sample = min((p for p in preds if p["ticker"] == ticker), key=lambda p: p["id"])
+    for ticker in sorted({p["ticker"] for p in contenders}):
+        sample = min((p for p in contenders if p["ticker"] == ticker), key=lambda p: p["id"])
         for family in registry.head_to_head_families():
+            family_ids = [s["id"] for s in live if s["family"] == family]
+            if not family_ids:
+                continue
             context = {"market": cfg["market"], "rate": data.rates, "eurusd": eurusd,
-                       "family_ids": [s["id"] for s in specs if s["family"] == family], "made_at": now.isoformat(),
+                       "family_ids": family_ids, "made_at": now.isoformat(),
                        "as_of_date": sample["as_of_date"], "session_date": session_date,
                        "base_close": sample["base_close"], "amount": sample["amount"], "currency": sample["currency"],
                        "method_version": LAB_VERSION}
-            rows += lab_picks.pick_rows(ticker, family, context, preds, trades)
+            rows += lab_picks.pick_rows(ticker, family, context, contenders, trades)
     known = {p["id"] for p in reads.picks(con, now)}
     written = append_new(cfg["market"], KIND_HEAD_TO_HEAD_PICKS, rows, "made_at", known)
     by_id = {p["id"]: p for p in preds}
@@ -59,7 +70,7 @@ def pick_day(con, cfg: dict, now: datetime, specs: list[dict], session_date: str
     views += [viability_row(KIND_PICK, r["id"], by_id[r["prediction_id"]], data.rates, eurusd, now)
               for r in rows if r["status"] == "picked"]
     known_views = {r["id"] for r in reads.stored(con, KIND_COST_VIEWS, "computed_at", now)}
-    return {"session_date": session_date, "picks": len(rows), "written": written,
+    return {"session_date": session_date, "live_strategies": len(live), "picks": len(rows), "written": written,
             "no_candidate": sum(r["status"] == "no_candidate" for r in rows),
             "cost_views": append_new(cfg["market"], KIND_COST_VIEWS, views, "computed_at", known_views),
             "cost_viable": sum(bool(v["cost_viable"]) for v in views if v["record_kind"] == KIND_PREDICTION)}

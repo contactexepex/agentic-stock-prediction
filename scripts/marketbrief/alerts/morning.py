@@ -16,6 +16,7 @@ from marketbrief.alerts.constants import (
     MSG_NONE_VIABLE,
     MSG_NO_PICKS,
     MSG_NO_PREDICTIONS,
+    MSG_NO_PROB,
     MSG_NO_STRONG,
     PAPER,
     PICK_HORIZON,
@@ -98,17 +99,21 @@ def head_to_head_lines(pick_rows: list[dict], preds_by_id: dict, names: dict) ->
     return lines
 
 
+def average_prob(row: dict) -> str:
+    """'average P(up) 0.569', or that the buyers give none (only always-up or momentum buy)."""
+    return MSG_NO_PROB if row["avg_prob_up"] is None else f"average P(up) {fmt.prob(row['avg_prob_up'])}"
+
+
 def pick_lines(row: dict, other: dict | None, company: str) -> list[str]:
     """The pick's own lines: agreement, family split, probability, target, amount, strongest other horizon."""
     cur = row["currency"]
     target = (f"average target {fmt.money(cur, row['avg_target'])}" if row["avg_target"] is not None
               else "no target")
     other_text = ("no other horizon has a buyer" if other is None else
-                  f"{fmt.horizon(other['horizon_days'])} ({other['buy']} of {other['of']},"
-                  f" average P(up) {fmt.prob(other['avg_prob_up'])})")
+                  f"{fmt.horizon(other['horizon_days'])} ({other['buy']} of {other['of']}, {average_prob(other)})")
     return [
         f"{row['rank']}. *{company} ({row['ticker']})* {PAPER} — {row['buy']} of {row['of']} strategies buy at"
-        f" N+1 ({family_split(row)}); average P(up) {fmt.prob(row['avg_prob_up'])}; {target}"
+        f" N+1 ({family_split(row)}); {average_prob(row)}; {target}"
         f" (last close {fmt.money(cur, row['base_close'])}); {fmt.money(cur, row['amount'])} per trade."
         f"{costs.pick_cost_text(row)}",
         f"   Strongest other horizon: {other_text}.",
@@ -117,8 +122,8 @@ def pick_lines(row: dict, other: dict | None, company: str) -> list[str]:
 
 def build_morning(market: str, session_date: str, preds: list[dict], h2h: list[dict], horizons: list[int],
                   names: dict | None = None) -> str:
-    """The morning message. `preds` and `h2h` are the session's strategy_predictions and head_to_head_picks
-    as of the run; `names` maps tickers and strategy ids to display names."""
+    """The morning message. `preds` and `h2h` are the session's live strategy_predictions and head_to_head_picks
+    as of the run (reads.live_only); `names` maps tickers and strategy ids to display names."""
     names = names or {}
     lines = [f"*{fmt.market_label(market)} — morning paper picks for {fmt.day_label(session_date)} (N+1)*",
              f"{LABEL_PAPER_ONLY} {MSG_NO_STRONG}"]
