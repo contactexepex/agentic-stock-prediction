@@ -490,16 +490,18 @@ since the previous session's close, published by the check, and of a materiality
 `intraday_alerts`; session **B9** writes it (contract: docs/ws/b9.md, "The alerts feed"). The view
 `intraday_alerts_feed` adds the deviation explainer's note on the check row (`explanation_id`, `attribution`,
 `explanation`, `cited_ids`, `explained_at`); `python scripts/intraday_check.py alerts [--check ID]` prints one check's
-alerts. B6's Slack alerts and the Home page's alerts read it. Example file: `intraday_alert.json`, built with B9's
+alerts. B6's Slack alerts read it (the Home page's alerts card shows flagged [trade checks](#trade-check), read model
+`rm.home`). Example file: `intraday_alert.json`, built with B9's
 code from the example [trade checks](#trade-check) and the news stored by each check's time (both checks are the first
-of their session, so no example is a repeat).
+of their session, so no example is a repeat). Like the trade checks, the US rows run to that check's time
+(16:27Z), past the file's 12:00Z `as_of`.
 
 | Field | Meaning | Source | Unit | Example |
 |---|---|---|---|---|
 | id | `<check_id>-<ticker>-trades` (trade alert) or `<check_id>-<ticker>-news-<news_id>` (news alert) | B9 | id | `ic-us-2026-10-07T16:27Z-NVDA-trades` |
 | check_id, check_at, session_date, market, ticker | The check and the company | intraday run | id, time, date, text | `ic-us-2026-10-07T16:27Z`, `2026-10-07T16:27:00Z`, `2026-10-07`, `us`, `NVDA` |
 | alert_type | Which alert | B9 | `open_trade_flagged`, `material_news_open_trade` | `open_trade_flagged` |
-| check_row_id | The company's intraday check row (its explainer note joins on it); empty for a company not on the watchlist | `intraday_checks` | id | `ic-us-2026-10-07T16:27Z-NVDA` |
+| check_row_id | The company's intraday check row (its explainer note joins on it); null for a company not on the watchlist | `intraday_checks` | id | `ic-us-2026-10-07T16:27Z-NVDA` |
 | trade_ids | The flagged trades (trade alert), or every open trade of the company (news alert) | trade checks | ids | `acc:rule.model_news.v1:2026-09-29-NVDA-5d`, `acc:base.always_up.v1:2026-09-29-NVDA-5d` |
 | trades | Trade alert only: each flagged trade's `trade_id`, `strategy_id`, `view`, `horizon_days`, `flags`, `band`, `ret_since_entry_pct`, `to_target_pct`, `target_reached`; empty for news | [trade checks](#trade-check) | list | rule.model_news.v1 N+5: `above80`, `5.1599`, `-5.421`, `true` |
 | flags | The trades' flags together (trade alert); empty for news | trade checks | `outside_range`, `far_from_target`, `against_prediction` | `["outside_range"]` |
@@ -843,7 +845,7 @@ The default amounts are ₹1,00,000 and $1,000; every number is labelled Paper.
   - today's [head-to-head picks](#head-to-head-pick);
   - rule vs AI today, from the [EOD analysis](#eod-analysis) `results`, and to date, from the
     [Scoreboard](#scoreboard-row);
-  - [open trades](#open-trade) and [intraday alerts](#intraday-alert) (flagged [trade checks](#trade-check) and material news);
+  - [open trades](#open-trade) and alerts (flagged [trade checks](#trade-check));
   - [market status](#market-status) with the benchmark and volatility index;
   - the coming week of [calendar events](#calendar-event).
 - **Stock strategies (decision 30).** For one ticker:
