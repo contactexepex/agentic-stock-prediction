@@ -18,6 +18,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+import pandas as pd
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
@@ -28,6 +29,7 @@ from marketbrief.analytics import scoring  # noqa: E402
 from marketbrief.constants.dashboard import MSG_PAPER_ONLY, MSG_SKILL_SHOWN  # noqa: E402
 from marketbrief.core import database  # noqa: E402
 from marketbrief.core.market_config import load_market  # noqa: E402
+from marketbrief.core.schemas import SCHEMAS  # noqa: E402
 from marketbrief.pipeline.evidence_status import EvidenceStatuses  # noqa: E402
 from marketbrief.presentation.dashboard import cli as dash_cli  # noqa: E402
 from marketbrief.presentation.dashboard import model_info, page  # noqa: E402
@@ -313,21 +315,56 @@ def later_rows(root: Path) -> None:
     append(root, "events", "2026-10-14", [next_quarter])
 
 
-# The stored data the checks were written against: day files named after this date are left out, so a later
-# routine commit to data/us never changes what the fixture sees (every stored file is named <YYYY-MM-DD>.<ext>)
+# The stored data the checks were written against: day files named after DATA_SNAPSHOT_DAY are left out, and so are
+# rows recorded after DATA_SNAPSHOT_TIME. Some kinds are filed by trading date (prices) or ex-date (adjustments), so a
+# later routine run can append rows to an older day file; the row cut keeps those out. Every stored file is named
+# <YYYY-MM-DD>.<ext>; the newest row kept today was recorded at 2026-10-08T12:03:44Z (a range of as-of 2026-10-07).
 DATA_SNAPSHOT_DAY = "2026-10-07"
+DATA_SNAPSHOT_TIME = pd.Timestamp("2026-10-08T12:10:00+00:00")
+DAY_FILE = re.compile(r"\d{4}-\d{2}-\d{2}\.[a-z]+")
+# the column that records when a row was stored, first match per kind
+RECORDED_COLUMNS = ("collected_at", "detected_at", "first_seen_at", "computed_at", "made_at", "analyzed_at",
+                    "scored_at", "recorded_at", "written_at", "ran_at", "fitted_at", "added_at", "fetched_at",
+                    "checked_at", "settled_at", "seen_at")
+
+
+def recorded_column(kind: str) -> str | None:
+    columns = SCHEMAS.get(kind, (None, {}))[1]
+    return next((column for column in RECORDED_COLUMNS if column in columns), None)
+
+
+def rows_after_snapshot(path: Path, column: str) -> tuple[list[str], bool]:
+    """(the file's lines recorded by DATA_SNAPSHOT_TIME, whether any line was recorded later). CSV keeps its header."""
+    lines = path.read_bytes().decode("utf-8").splitlines()
+    if path.suffix == ".csv":
+        header, body = lines[:1], lines[1:]
+        position = header[0].split(",").index(column) if header else -1
+        recorded = [line.split(",")[position] if position >= 0 else "" for line in body]
+    else:
+        header, body = [], [line for line in lines if line.strip()]
+        recorded = [json.loads(line).get(column) or "" for line in body]
+    kept = [line for line, at in zip(body, recorded, strict=True) if not at or pd.Timestamp(at) <= DATA_SNAPSHOT_TIME]
+    return header + kept, len(kept) < len(body)
 
 
 def data_tree(root: Path) -> None:
-    """root/data/us with every stored day file up to DATA_SNAPSHOT_DAY linked to the repo's file, read only; a kind's
-    files are copied the first time the fixture writes to it (own_kind). Issue #48: the fixture copied all of
-    data/us, about 12 MB, at every run."""
+    """root/data/us as stored up to the snapshot: every day file up to DATA_SNAPSHOT_DAY is linked to the repo's file
+    (read only), or copied without its rows recorded after DATA_SNAPSHOT_TIME when it has any; a kind's links are
+    copied the first time the fixture writes to it (own_kind). Issue #48: the fixture copied all of data/us, about
+    12 MB, at every run."""
     source = REPO / "data" / "us"
     for path in sorted(source.rglob("*")):
-        if path.is_file() and path.stem <= DATA_SNAPSHOT_DAY:
-            link = root / "data" / "us" / path.relative_to(source)
-            link.parent.mkdir(parents=True, exist_ok=True)
-            link.symlink_to(path)
+        if not (path.is_file() and DAY_FILE.fullmatch(path.name) and path.name[:10] <= DATA_SNAPSHOT_DAY):
+            continue
+        target = root / "data" / "us" / path.relative_to(source)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        column = recorded_column(path.relative_to(source).parts[0])
+        kept, cut = rows_after_snapshot(path, column) if column else ([], False)
+        if cut:
+            ending = "\r\n" if path.suffix == ".csv" else "\n"
+            target.write_bytes("".join(line + ending for line in kept).encode("utf-8"))
+        else:
+            target.symlink_to(path)
 
 
 def repo_data_status() -> str:
