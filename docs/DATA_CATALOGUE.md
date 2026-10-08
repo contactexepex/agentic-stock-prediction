@@ -548,16 +548,18 @@ the your-cost view, which the go-live bar uses.
 | as_of | The newest close the rows are computed to | settlement | date | `2026-10-06` |
 
 **Back-test rows** (F2.3; `basis` `backtest`, never pooled with `forward`). Example file:
-`scoreboard_backtest_row.json` (24 rows), the output of B2's `lab.py backtest` code (`lab/reports.run_backtest`) on
+`scoreboard_backtest_row.json` (36 rows), the output of B2's `lab.py backtest` code (`lab/reports.run_backtest`) on
 the bars stored up to 6 Oct 2026, without the 15-year history cache (it is not in the repository; `history` false):
-the strategies that need no news (`base.always_up.v1`, `base.momentum.v1`; model-only needs walk-forward
-probabilities and is not run), scope `strategy`, view `accuracy`, every horizon and `all`. Same fields as above,
+the strategies that need no news (`base.always_up.v1`, `base.momentum.v1`, and `base.model_only.v1` on B10's
+walk-forward probabilities, whose rows start in June 2025), scope `strategy`, view `accuracy`, every horizon and
+`all`. Same fields as above,
 except: no `go_live`, no `as_of`; `target_reached_rate`, `median_reached_session`, `avg_target_error_pct` and
 `range_hit_rate` are empty (a back-test has no published targets or ranges); `your_cost` holds net_pnl and
 mean_return_pct only. The file's `runs` block gives, per market, the bars' first and last date and the EUR/USD
 used: the US has no stored EURUSD closes, so the BUX order fee is converted at an ASSUMED constant 1.17, as the
 engine labels it. Example: India `base.always_up.v1`, all horizons: 49100 trades, mean return `-2.0639` % a trade
-(the owner-provided brokerage of 0.75 % a side plus taxes); US: 49700 trades, `+0.0933` %.
+(the owner-provided brokerage of 0.75 % a side plus taxes); US: 49700 trades, `+0.0933` %. B2 stores real runs
+as the kind `lab_backtests` (`lab.py backtest --store`).
 
 Heatmaps (F2.8) use the same numbers by strategy × horizon, × company and × reason code, each week: see
 [Heatmap cell](#heatmap-cell) and [Cumulative line](#cumulative-line). The scoreboard has no weekly or per-reason
@@ -621,17 +623,21 @@ cut-off: a page reading as of 7 Oct must not show them (`written_at` is the time
 <a id="track-record"></a>
 ## Track record
 
-How well the forecaster's calls and the published ranges did (SPEC page 8). Status: **exists** as the dashboard's
-read model `rm.track_record` (`presentation/dashboard/track.py`, `model_info.py`; contract `TrackRecord` in
-`api/openapi.yaml`). Example file: `track_record.json`, one payload per market as of `2026-10-07T12:00:00Z`.
-Everything in it is the stored data at that time except `calls` (listed in `example_parts`): no call is scored in
-the stored data yet, so `calls` is computed by the same code (`track.calls_by_basis`) from the example calls of
-`ai.combined.opus.v1` (the forecaster's trader id), each scored close-to-close as `score_predictions` scores it (the
-as-of close to the close h sessions later, scored at the next pre-open run), because `config/settings.yaml` `call_scoring.from` (2026-10-08) puts every call made before then on that basis. An
-open-to-close block has the same shape with `basis` `open_to_close`; the two are never pooled.
+How well the forecaster's calls and the published ranges did (SPEC page 8). Status: **exists** as the read model
+`rm.track_record` (contract 2.0, `TrackRecordPage` in `api/schemas/track-record.yaml`, B13: the shared page header,
+`status` and `go_live`, plus `track` and `weekly`). Example file: `track_record.json`, per market the `track` block
+(`presentation/dashboard/track.py`, `model_info.py`; `as_of` = the data's as-of date, `2026-10-06`) with the
+`weekly` series beside it (`warehouse/rm_track_record.weekly_series`). Everything is the stored data at
+`2026-10-07T12:00:00Z` except `calls` and `weekly` (listed in `example_parts`): no call is scored in the stored data
+yet, so both are computed by the same code from the example calls of `ai.combined.opus.v1` (the forecaster's
+trader id), each scored close-to-close as `score_predictions` scores it (the as-of close to the close h sessions
+later, scored at the next pre-open run), because `config/settings.yaml` `call_scoring.from` (2026-10-08) puts every
+call made before then on that basis. An open-to-close block has the same shape with `basis` `open_to_close`; the two
+are never pooled.
 
 | Field | Meaning | Source | Unit | Example |
 |---|---|---|---|---|
+| as_of, market | The data's as-of date and the market | read model | date | `2026-10-06` |
 | skill | Whether the signal model has shown skill (`state` `paper`/`shown`, `label`, `why`, `rule`, the review it comes from) | weekly review | text | `paper`, "Paper only — no proven edge yet" |
 | calls[].basis, key, label | The scoring basis (`close_to_close`, `open_to_close`; old D+4 5-day calls are their own key) and its label | `outcomes` | text | `close_to_close`, "close→close" |
 | calls[].all, calls[].by_horizon | The block for all horizons and per horizon key (`1d legacy_cc` = 1 session, old close-to-close window; `3d` = N+3) | `outcomes` | | US: 6 calls, 4 hits |
@@ -644,8 +650,8 @@ open-to-close block has the same shape with `basis` `open_to_close`; the two are
 | backtest | The signal model's walk-forward back-test the dashboard shows | weekly review | mixed | weekly review `2026-W40`, computed 7 Oct |
 | min_sample | Below this many calls the page says "not enough history yet" | `view_data.MIN_SAMPLE` | count | `10` |
 
-A weekly series of hit rate and Brier is not in the read model; the weekly heatmap cells cover paper trades. A
-weekly call series for this page would be a request to the read model's owner (B4).
+| weekly[].basis, key, label | One series per scoring basis key (the same keys as `calls`, never pooled) | `rm_track_record.weekly_series` | text | `close_to_close` |
+| weekly[].weeks[] | Oldest first, one per ISO week of the calls' target date: `week`, `n`, `hits`, `share`, `wilson_lo`, `wilson_hi`, `brier`, `log_loss`, over the calls scored by the cut-off | same | count, 0-1 | India `2026-W40`: 2 calls, 1 hit, Brier `0.2542` |
 
 <a id="assistant-answer"></a>
 ## Assistant answer

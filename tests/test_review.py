@@ -645,6 +645,8 @@ def test_inputs_until_keeps_what_was_known_by_the_end():
     assert list(got["bars"]["AAPL"]["close"]) == [1.0, 2.0]
     assert list(got["events"]["date"].dt.strftime("%Y-%m-%d")) == ["2026-10-20"]       # known by 09-04
     assert list(got["shorts"]["short_pct"]) == [0.1] and got["other"].equals(inputs["other"])
+    late = {**inputs, "bars": {**inputs["bars"], "NEW": pd.DataFrame({"close": [9.0]}, index=days[2:])}}
+    assert set(inputs_until(late, date(2026, 9, 4))["bars"]) == {"AAPL"}     # no bar by the end: left out (#146)
 
 
 def test_model_check_reruns_the_backtest_into_work(tmp_path, monkeypatch):
