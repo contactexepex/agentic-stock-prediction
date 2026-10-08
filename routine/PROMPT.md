@@ -252,7 +252,8 @@ Warnings never block: list them in `data_quality`.
     an identical one is refused as already stored (issue #50).
 
 9b. AI traders (docs/SPEC.md F4; never blocks the brief; needs session B10's per-horizon ranges and scores).
-    Export `PYTHONPATH=scripts`.
+    Start 9b only after step 9 (the forecaster, its gate and `ranges.py`) and 9a are done, never in parallel with
+    them: `prepare` reads the ranges that step 9's `ranges.py` publishes. Export `PYTHONPATH=scripts`.
     1. `python -m marketbrief.traders check > work/steps/traders_check.json`. On exit 1, skip the traders and list
        the problems in `data_quality`.
     2. For each of the four traders: `python -m marketbrief.traders prepare --strategy <id> >
