@@ -20,7 +20,8 @@ every figure carries Paper until a strategy is proven.
 ## Layout (desktop: controls, KPIs, scoreboard, detail beside the lines, heatmaps; phone: one column)
 1. **Page head** (count of strategies by family, as-of, chips) and the **Paper band**.
 2. **Controls** in one row, each with a help icon: **View** (accuracy / head-to-head), **Basis** (forward /
-   back-test: never pooled, F2.3; back-test is an empty state until W1 stores rows), **Costs** (market cost = the
+   back-test: never pooled, F2.3; the back-test rows of W1's `scoreboard_backtest_row.json` show with the run's
+   facts, the strategies it did not run read "not run"), **Costs** (market cost = the
    ranking view; your cost = the go-live view, decision 50; the ranking never changes with the switch, the numbers
    do) and **Horizon** (all pooled, or N+1..N+5).
 3. **KPIs**: the leader after market cost (with the trade count and "too few to rank"), the best baseline as the
@@ -48,7 +49,8 @@ every figure carries Paper until a strategy is proven.
    per strategy by exit date, the selected one thick, the selected and the three highest coloured and named at the
    line end (names cut at 22 characters, the legend has them in full; colours follow the registry order), the rest
    grey; the zero line dotted; hover or arrow keys list every line's value at a date. On the Back-test basis the
-   chart and the reason map show an empty state: the settled trades are forward trades and are never pooled.
+   chart, the reason map and the regime and company splits show an empty state: the settled trades are forward
+   trades and are never pooled, and the back-test stores no split by regime or company.
 7. **Where each strategy wins and loses** (F2.8, decision 42): four heatmaps for the selected view, by horizon, by
    company, by market regime and by the reason the price moved (the settled trades' automatic reason code), with a
    Profit / Win rate switch. Green for profit (or a win rate above half), red for loss, darker for larger, and the
@@ -62,8 +64,13 @@ every figure carries Paper until a strategy is proven.
   reason map, the companies' names and the market status. Selection and ordering only.
 - No look-ahead: settled trades by `settled_at` at or before the cut-off; the scoreboard rows are computed to the
   as-of close.
-- Two data requests to W1 (in `data.json` `_data_requests`): back-test rows (basis `backtest`) and weekly rows plus a
-  per-reason-code scope for the heatmaps over time.
+- Two data requests to W1 (in `data.json` `_data_requests`), both answered on 2026-10-08: back-test rows (basis
+  `backtest`), answered with `scoreboard_backtest_row.json` (always-up and momentum on the stored bars, without the
+  15-year history cache; model-only and the rule strategies not run; the US order fee at an assumed EUR/USD), now
+  read into the same `rows` list with their basis and shown on the Back-test basis with the run's facts (`backtest_run`);
+  weekly rows plus a per-reason-code scope for the heatmaps over time, answered with `heatmap_cell.json` and
+  `cumulative_line.json`, not read yet (the heatmaps and lines still come from the settled trades of the one stored
+  week; reading the cells is a follow-up).
 
 ## Design rules kept
 Design system v2 only (every colour a token; the heatmap scale mixes the up/down tokens into the surface); light
@@ -84,6 +91,8 @@ views: no line-chart label clipped by the card or overlapping another. A script 
 cost, horizon, metric), selected a strategy from the keyboard (the detail card and the hash follow) and read the line
 chart with the arrow keys; no script error; every tooltip element is focusable. Rebuild is byte-identical.
 
+After W1's back-test rows (2026-10-08): the same checks rerun clean, and a render of the Back-test basis in both markets at 1280 and 390 px shows the run's facts above the table, the two back-tested baselines ranked with their market-cost and your-cost profit, every other strategy as "not run", the detail card's per-horizon figures for a back-tested strategy, and "not stored" for the luck test on the your-cost view (the back-test stores it for market cost only); no table wider than its wrapper, no page error.
+
 Judge round 1 (2026-10-08) found eight blockers, all fixed before round 2: the Back-test basis still drew forward
 lines and the forward reason map; the line chart's heading followed the cost switch while plotting market cost;
 line-chart labels overflowed and overlapped; the pick-rule table and the your-cost scoreboard overflowed at some
@@ -100,5 +109,6 @@ for the threshold strategy.
   the go-live checklist with ticks and crosses, rather than a paragraph.
 - Four heatmaps with the numbers in the cells and a Profit / Win rate switch, rather than win rate and profit maps
   side by side (eight maps); the weekly dimension waits for weekly rows from W1.
-- Back-test is a switch with an honest empty state, not a hidden mode: forward and back-test are never shown on the
-  same table.
+- Back-test is a switch, not a hidden mode: forward and back-test are never shown on the same table; on the Back-test
+  basis the run's facts (bars covered, no history cache, which strategies were not run, the assumed EUR/USD) sit
+  above the table, and a strategy without a row reads "not run" rather than "no trades yet".

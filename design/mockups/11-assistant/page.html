@@ -864,7 +864,7 @@ function chatCard(m) {
   send.addEventListener('click', submit); ta.addEventListener('keydown', e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { submit(); e.preventDefault(); } });
   card.append(el('div', {class:'composer'}, el('div', {}, ta, cnt), send));
   /* the questions already asked, or, with none yet, generic starters (page copy: no company, date or number) */
-  const sugg = el('div', {class:'sugg', 'aria-label':'Example questions'});
+  const sugg = el('div', {class:'sugg', 'aria-label': p.answers.length ? 'Questions asked so far' : 'Ways to start'});
   const starters = p.answers.length ? p.answers.map(a => a.question) : ['Why did a paper trade end as it did?', 'Rule or AI: who did better on the last settled day?', 'Which strategies agree on a company today, and why?'];
   for (const q of starters) { const b = el('button', {class:'md-chip assist', type:'button'}, q); b.addEventListener('click', () => { ta.value = q; ta.dispatchEvent(new Event('input')); ta.focus(); }); sugg.append(b); }
   card.append(el('div', {class:'note', style:'margin-top:10px'}, p.answers.length ? 'Questions asked so far (click to fill):' : 'Ways to start (click to fill):'), sugg);

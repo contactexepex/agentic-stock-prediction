@@ -7,7 +7,8 @@ catalogue's own records). Status: **built on the owner's delegated authority** (
 your recommendation, notify the orchestrator"); judged and landed by the track; the owner reviews it in the morning.
 
 Files: `build.py` (catalogue -> `data.json` -> `template.html` -> `page.html` through `design/mockups/_shared/mockup.py`),
-`data.json` (the example conversation per market as the `explain` tool answers it), `page.html`, `notes.md`,
+`data.json` (the conversation per market as the `explain` tool answers it; empty in the example until W1 supplies
+answers asked before the cut-off), `page.html`, `notes.md`,
 screenshots `shot-1280-full.png`, `shot-390-full.png`, `shot-390-viewport.png`.
 
 ## Who reads it and how
@@ -26,7 +27,8 @@ the head, in the rules and in the declined answer itself.
    the cited records as chips (kind in words, the id, a tooltip with the stored time, a link to the page where the
    kind lives). The **composer**: a question box limited to the tool's 500 characters with a counter, an Ask button
    (Ctrl/Cmd+Enter too); in the mockup a question is recorded as pending ("mockup: not sent") and nothing is called.
-   **Example questions** as chips that fill the box.
+   Chips that fill the box: "Questions asked so far" when the conversation has answers, else "Ways to start" with
+   three generic starters written for the page (no company, date or number).
 3. **How it answers**: six rules in plain words (stored data only, citations and as-of times, "not in the data",
    never advice, the same tool on every page and in Slack, kept 90 days).
 4. **Records cited**: the distinct records of the conversation with kind, id and stored time, each with an Open link.

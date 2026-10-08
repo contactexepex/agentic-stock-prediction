@@ -16,7 +16,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(HERE), "_shared"))
 from mockup import HORIZONS, MARKETS, envelope, load, pick, run  # noqa: E402
 
-NAMES = ("market_status", "strategy", "scoreboard_row", "paper_trade", "company")
+NAMES = ("market_status", "strategy", "scoreboard_row", "scoreboard_backtest_row", "paper_trade", "company")
 STRATEGY_FIELDS = ("id", "family", "name", "description", "compared_to", "differs_in", "parameters", "threshold",
                    "horizons", "live_from", "live", "settled_trades")
 LUCK_FIELDS = ("method", "n", "m", "low_pct", "high_pct", "excludes_zero", "corrected_low_pct", "corrected_high_pct",
@@ -35,11 +35,22 @@ COMPANY_FIELDS = ("market", "ticker", "name", "sector", "state")
 REFERENCE_STRATEGY = "rule.model_news.v1"
 
 
+# A back-test row (scope strategy only) has no as_of, go_live, pick_rule, ticker or regime; its your_cost holds net_pnl
+# and mean_return_pct only. The three scope keys are set to null so the page's filters treat the row like any other.
+BACKTEST_ROW_FIELDS = tuple(f for f in ROW_FIELDS if f not in ("as_of", "pick_rule", "ticker", "regime"))
+BACKTEST_YOUR_FIELDS = ("net_pnl", "mean_return_pct")
+BACKTEST_RUN_FIELDS = ("history", "first_date", "last_date", "eurusd", "note")
+
+
 def row(r: dict) -> dict:
-    out = pick(r, ROW_FIELDS)
+    backtest = r["basis"] == "backtest"
+    out = pick(r, BACKTEST_ROW_FIELDS if backtest else ROW_FIELDS)
+    if backtest:
+        out.update({"pick_rule": None, "ticker": None, "regime": None})
     out["luck_test"] = pick(r["luck_test"], LUCK_FIELDS) if r["luck_test"] else None
     yc = r.get("your_cost")
-    out["your_cost"] = ({**pick(yc, YOUR_FIELDS), "luck_test": pick(yc["luck_test"], LUCK_FIELDS) if yc.get("luck_test") else None}
+    out["your_cost"] = ({**pick(yc, BACKTEST_YOUR_FIELDS if backtest else YOUR_FIELDS),
+                         "luck_test": pick(yc["luck_test"], LUCK_FIELDS) if yc.get("luck_test") else None}
                         if yc else None)
     if r.get("go_live"):
         out["go_live"] = pick(r["go_live"], GO_LIVE_FIELDS)
@@ -48,9 +59,13 @@ def row(r: dict) -> dict:
 
 def market_payload(market: str, files: dict, cutoff: str) -> dict:
     status = next(r for r in files["market_status"]["records"] if r["market"] == market)
-    rows = sorted((row(r) for r in files["scoreboard_row"]["records"] if r["market"] == market),
+    # forward rows (the scoreboard) and the back-test rows (basis `backtest`, F2.3, W1's answer to the track's data
+    # request): the same fields, never pooled (every row carries its basis; the page filters on it)
+    rows = sorted((row(r) for name in ("scoreboard_row", "scoreboard_backtest_row")
+                   for r in files[name]["records"] if r["market"] == market),
                   key=lambda r: (r["scope"], r["view"], r["basis"], str(r["strategy_id"]), str(r["pick_rule"]),
                                  str(r["ticker"]), str(r["regime"]), str(r["horizon_days"])))
+    backtest_run = pick(files["scoreboard_backtest_row"]["runs"][market], BACKTEST_RUN_FIELDS)
     trades = sorted((pick(r, TRADE_FIELDS) for r in files["paper_trade"]["records"]
                      if r["market"] == market and r["status"] == "settled" and r["settled_at"] <= cutoff),
                     key=lambda r: (r["exit_date_actual"] or r["exit_date"], r["entry_date"], r["trade_id"]))
@@ -67,6 +82,7 @@ def market_payload(market: str, files: dict, cutoff: str) -> dict:
         "strategies": strategies, "companies": sorted(companies, key=lambda c: c["ticker"]),
         "rows": rows, "trades": trades,
         "bases": sorted({r["basis"] for r in rows}),
+        "backtest_run": backtest_run,
     }
 
 
@@ -76,10 +92,13 @@ def compose() -> dict:
     data = envelope("strategy-lab", "docs/SPEC.md section 6, page 5; F2, F2.8, F7; decisions 42, 50",
                     "GET /api/v1/markets/{market}/strategies", "rm.strategies", NAMES, cutoff, markets)
     data["_data_requests"] = [
-        "scoreboard rows with basis `backtest` (F2.3: the strategies that need no news, on the 15-year history; "
-        "never pooled with forward) so the Back-test switch shows numbers instead of its empty state",
-        "weekly scoreboard rows (per iso_week) and a per-reason-code scope for the F2.8 heatmaps over time; the "
-        "mockup derives the reason-code heatmap and the cumulative lines from the settled trades of the one stored week",
+        "scoreboard rows with basis `backtest` (F2.3, never pooled with forward): answered by W1 with "
+        "scoreboard_backtest_row.json (always-up and momentum on the stored bars, without the 15-year history cache; "
+        "model-only and the rule strategies are not run; the US BUX fee at an ASSUMED EUR/USD), shown on the Back-test "
+        "basis with the run's facts; a run on the history cache and the model-only rows stay open",
+        "weekly scoreboard rows (per iso_week) and a per-reason-code scope for the F2.8 heatmaps over time: answered by "
+        "W1 with heatmap_cell.json and cumulative_line.json (per week, per company, per reason code); the mockup still "
+        "derives its heatmaps and lines from the settled trades of the one stored week; reading the cells is a follow-up",
     ]
     return data
 
