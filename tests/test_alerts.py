@@ -35,8 +35,8 @@ from marketbrief.alerts.onboarding import onboarding_text, post_onboarding_confi
 from marketbrief.alerts.publish import Message, NotConfiguredError, Publisher, post_brief, publisher  # noqa: E402
 from marketbrief.alerts.weekly import build_weekly  # noqa: E402
 from marketbrief.core import paths  # noqa: E402
-from marketbrief.lab import registry as lab_registry  # noqa: E402
 from marketbrief.core.database import connect  # noqa: E402
+from marketbrief.lab import registry as lab_registry  # noqa: E402
 
 CATALOGUE = REPO / "design" / "catalogue"
 TOKEN = "xoxb-test-0000-SECRET-never-printed"
@@ -811,7 +811,7 @@ def test_rehearsal_predictions_are_not_shown_before_go_live(scratch, monkeypatch
         set_live_from(paths.CONFIG, live_from)
         run(["--market", "us", "--dry-run", "morning", "--date", "2026-10-07"], capsys)
         sent = json.loads((scratch / "work/alerts_dryrun/us/messages.jsonl").read_text().splitlines()[0])["text"]
-        assert (MSG_NOT_LIVE not in sent and "[Paper]" in sent) is shown, live_from
+        assert (MSG_NOT_LIVE not in sent) is shown and ("[Paper]" in sent) is shown, live_from
 
 
 def test_only_live_strategies_count_and_their_picks_show(monkeypatch):
@@ -827,8 +827,8 @@ def test_only_live_strategies_count_and_their_picks_show(monkeypatch):
     row = agreement(kept, 1)[0]
     assert row["of"] == sum(1 for p in kept if p["horizon_days"] == 1)   # agreement counts live strategies only
     msg = build_morning("us", "2026-10-07", kept, picks_kept, HORIZONS)
-    shown = {p["strategy_id"] for p in picks_kept if p.get("status") == "picked" and p["ticker"] in msg}
-    assert shown and all(sid in msg for sid in shown)                     # the live picks are in the message
+    shown = {p["strategy_id"] for p in picks_kept if p.get("status") == "picked"}
+    assert shown and all(sid in msg for sid in shown)                     # every live pick is in the message
     assert not any(p["strategy_id"] in msg for p in picks if p["strategy_id"] not in live)
 
 
