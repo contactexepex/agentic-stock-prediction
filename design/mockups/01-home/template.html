@@ -119,8 +119,6 @@ body{font-size:14px;line-height:1.5;font-variant-numeric:tabular-nums}
 
 /* open trades: every column from 1200 px; Entry, Last, To target and the dates only there (.cw); the range bar from 761 px (.cm) */
 .ot{font-size:13px} .ot th{padding:9px 10px} .ot td{padding:8px 10px}
-@media (max-width:1199px){ .ot th.cw,.ot td.cw,.ot .cw{display:none} .ot th{padding:8px 6px} .ot td{padding:8px 6px} .ot .st{white-space:normal;align-items:start} .ot tr.grp td small{display:block;margin-left:0} }
-@media (max-width:760px){ .ot th.cm,.ot td.cm{display:none} .ot td.num{white-space:normal} }
 .ot td.num,.ot th.num{text-align:right;white-space:nowrap}
 .ot tr.grp td{background:var(--md-sys-color-surface-container-low);font-weight:600;padding:8px 12px;font-size:13px}
 .ot tr.grp td small{font-weight:500;color:var(--md-sys-color-on-surface-variant);margin-left:8px}
@@ -129,6 +127,8 @@ body{font-size:14px;line-height:1.5;font-variant-numeric:tabular-nums}
 .ot .st{display:inline-flex;align-items:center;gap:4px;white-space:nowrap} .ot .st .ms{width:14px;height:14px}
 .ot .st.flag{color:var(--mb-color-on-warn-container);font-weight:600} .ot .st.ok{color:var(--mb-color-up)}
 .rng{display:inline-flex;align-items:center;gap:8px} .rng svg{width:100px;height:18px;display:block} .rng small{color:var(--md-sys-color-on-surface-variant);font-size:11px;white-space:nowrap}
+@media (max-width:1199px){ .ot th.cw,.ot td.cw,.ot .cw{display:none} .ot th{padding:8px 6px} .ot td{padding:8px 6px} .ot .st{white-space:normal;align-items:start} .ot tr.grp td small{display:block;margin-left:0} }
+@media (max-width:760px){ .ot th.cm,.ot td.cm{display:none} .ot td.num{white-space:normal} }
 
 /* alerts */
 .al{list-style:none;margin:0;padding:0;display:grid;gap:8px}
