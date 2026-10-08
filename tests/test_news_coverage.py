@@ -384,7 +384,8 @@ def test_pending_lists_watchlist_items_first(weekend):
                                                             category="macro")])
     rows = news_pending.pending_rows(connect(MARKET), NOW_MONDAY)[1]
     assert [(row["id"], row["priority"]) for row in rows] == [
-        ("f2", "watchlist"), ("s1", "watchlist"), ("m1", "watchlist"), ("nse-ann-1", "watchlist"), ("bg1", "background")]
+        ("f2", "watchlist"), ("s1", "watchlist"), ("m1", "watchlist"), ("nse-ann-1", "watchlist"),
+        ("bg1", "background")]
 
 
 def test_news_gate_warns_on_templated_watchlist_summaries(weekend, monkeypatch):
@@ -394,11 +395,13 @@ def test_news_gate_warns_on_templated_watchlist_summaries(weekend, monkeypatch):
     write_rows(weekend, "news", date(2026, 10, 4), [news_row(i, "2026-10-04T08:00:00+00:00") for i in ids])
     write_rows(weekend, "news", date(2026, 10, 4), [news_row(f"b{index}", "2026-10-04T08:00:00+00:00", tickers=[])
                                                     for index in range(30)])
-    background = [{**enriched(f"b{index}", stamp), "summary": "Market news, no watchlist impact."} for index in range(30)]
+    background = [{**enriched(f"b{index}", stamp), "summary": "Market news, no watchlist impact."}
+                  for index in range(30)]
     own = [{**enriched(i, stamp), "summary": f"HDFC Bank item {i} in its own words."} for i in ids]
     out = validate_news(weekend, monkeypatch, own + background)          # background may share a summary
     assert "ENRICH_TEMPLATED" not in {w["code"] for w in out["warnings"]}
-    templated = [{**row, "summary": "Bank stock news;  low impact."} if index < 8 else row for index, row in enumerate(own)]
+    templated = [{**row, "summary": "Bank stock news;  low impact."} if index < 8 else row
+                 for index, row in enumerate(own)]
     out = validate_news(weekend, monkeypatch, templated + background)    # 8 of 24 = 33% > 30%
     warning = next(w for w in out["warnings"] if w["code"] == "ENRICH_TEMPLATED")
     assert warning["detail"].startswith("8 of 24 watchlist records")

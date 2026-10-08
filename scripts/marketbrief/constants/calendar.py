@@ -33,3 +33,6 @@ MSG_UNKNOWN_EVENT_RULE = "unknown event rule {kind!r}"
 MSG_SESSION_OFFSET_RANGE = "session_offset must be between {low} and {high}, got {offset}"
 MSG_NO_EXCHANGE_CALENDARS = ("exchange_calendars cannot be imported ({error}): trading days and closed-day bar "
                              "exclusion need it; install requirements.txt")
+MSG_BAD_SPECIAL_SESSION_HOURS = (
+    "special_session_hours {day}: {hours!r} is not \"HH:MM-HH:MM\" with the open before the close (market config)"
+)

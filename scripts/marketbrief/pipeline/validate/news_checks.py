@@ -209,7 +209,8 @@ def summary_key(row: dict) -> str:
 def check_templated_summaries(res, rows: list[dict], priorities: dict[str, str], validate_config: dict) -> None:
     """ENRICH_TEMPLATED warning (issue #46): too many watchlist records whose summary another record of the file
     repeats word for word, the mark of a keyword-rule pass (measured on the stored runs: India 2026-10-07, the
-    flagged run, 0.67; the US runs of 2026-10-07 0.09 and 0.12). Background items may be scored in groups."""
+    flagged run, 0.67; the US runs of 2026-10-07 0.09 and 0.12). Background items may be scored in groups. Empty
+    summaries (allowed by ENRICH_RULE) count as one shared summary: they show no reading either."""
     rules = validate_config["news_templated"]
     counts: dict[str, int] = {}
     for row in rows:

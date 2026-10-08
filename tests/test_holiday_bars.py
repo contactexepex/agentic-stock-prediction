@@ -203,6 +203,9 @@ def test_special_sessions_use_their_own_hours():
     # the Muhurat bar is final 120 min (BAR_SETTLE_MINUTES) after its own 14:45 close, before the regular one
     assert last_complete_session(cfg, datetime(2025, 10, 21, 11, 30, tzinfo=utc)) == date(2025, 10, 21)
     assert last_complete_session(regular, datetime(2025, 10, 21, 11, 30, tzinfo=utc)) == date(2025, 10, 20)
+    for bad in ("13:45", "14:45-13:45", "1:45 pm-2:45 pm"):                # a malformed entry names itself
+        with pytest.raises(ValueError, match="special_session_hours 2025-10-21"):
+            session_open_utc({**cfg, "special_session_hours": {"2025-10-21": bad}}, date(2025, 10, 21))
 
 
 @pytest.mark.usefixtures("env")

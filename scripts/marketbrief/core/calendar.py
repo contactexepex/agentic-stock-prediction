@@ -4,8 +4,8 @@
   library's covered range we fall back to Monday-Friday and say so. Dates listed under the
   market config's `holidays` are always closed (exchange circulars the library lacks); dates under
   `special_sessions` always trade (NSE's Diwali Muhurat sessions on a holiday; their open and close are the
-  `special_session_hours` of the config, else the regular hours). Without the exchange_calendars package nothing falls back
-  silently: CalendarUnavailableError is raised.
+  `special_session_hours` of the config, else the regular hours). Without the exchange_calendars package
+  nothing falls back silently: CalendarUnavailableError is raised.
 - Market events come from config/events.yaml (rules + fixed dates) plus company earnings and
   ex-dividend dates collected into data/<market>/events/ by the events collector.
 """
@@ -35,6 +35,7 @@ from marketbrief.constants.calendar import (
     MAJOR_WINDOW_DAYS,
     MAX_SESSION_OFFSET,
     MIN_SESSION_OFFSET,
+    MSG_BAD_SPECIAL_SESSION_HOURS,
     MSG_NO_EXCHANGE_CALENDARS,
     MSG_SESSION_OFFSET_RANGE,
     MSG_UNKNOWN_EVENT_RULE,
@@ -95,8 +96,14 @@ def special_session_hours(cfg: dict, day: date) -> tuple[time, time] | None:
     for listed, hours in (cfg.get(CFG_SPECIAL_SESSION_HOURS) or {}).items():
         listed_day = listed if isinstance(listed, date) else date.fromisoformat(str(listed))
         if listed_day == day:
-            open_text, close_text = str(hours).split("-")
-            return time.fromisoformat(open_text.strip()), time.fromisoformat(close_text.strip())
+            try:
+                open_text, close_text = str(hours).split("-")
+                opens, closes = time.fromisoformat(open_text.strip()), time.fromisoformat(close_text.strip())
+            except ValueError as error:
+                raise ValueError(MSG_BAD_SPECIAL_SESSION_HOURS.format(day=listed_day, hours=hours)) from error
+            if opens >= closes:
+                raise ValueError(MSG_BAD_SPECIAL_SESSION_HOURS.format(day=listed_day, hours=hours))
+            return opens, closes
     return None
 
 
