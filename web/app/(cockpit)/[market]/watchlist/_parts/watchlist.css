@@ -1,0 +1,22 @@
+/* Watchlist page (design/mockups/02-watchlist/template.html page CSS, unchanged rules; tokens only). Scoped under .mb-watchlist: page CSS is global in Next. */
+.mb-watchlist .wl td{vertical-align:middle}
+.mb-watchlist .wl .co{display:flex;align-items:center;gap:10px;min-width:0}
+.mb-watchlist .wl .co .nm{min-width:0} .mb-watchlist .wl .co .nm b{display:block;font-size:14px;font-weight:700} .mb-watchlist .wl .co .nm small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mb-watchlist .wl .last b{display:block;font-size:14px;font-weight:600} .mb-watchlist .wl .last .mb-delta{font-size:12.5px}
+.mb-watchlist .wl .ag b{font-weight:700;font-size:14px} .mb-watchlist .wl .ag small{color:var(--md-sys-color-on-surface-variant);font-size:12px}
+.mb-watchlist .wl .ag .bar{height:7px;border-radius:4px;background:var(--md-sys-color-surface-container-highest);margin-top:5px;overflow:hidden;display:flex;width:120px;max-width:100%}
+.mb-watchlist .wl .ag .bar i{display:block;height:100%}
+.mb-watchlist .wl .ot b{font-weight:600} .mb-watchlist .wl .ot small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:12px}
+.mb-watchlist .wl .open{text-align:right} .mb-watchlist .wl .open a{display:inline-flex;align-items:center;gap:2px;font-weight:600;font-size:13px;text-decoration:none;white-space:nowrap}
+.mb-watchlist .wl th .sort{all:unset;cursor:pointer;user-select:none;display:inline-flex;align-items:center;gap:2px;font:inherit;color:inherit;border-radius:4px} .mb-watchlist .wl th .sort:hover{color:var(--md-sys-color-on-surface)} .mb-watchlist .wl th .sort:focus-visible{outline:2px solid var(--md-sys-color-primary);outline-offset:2px} .mb-watchlist .wl th .ms{width:14px;height:14px;vertical-align:-2px}
+.mb-watchlist .wl th .sep{color:var(--md-sys-color-outline-variant);margin:0 4px}
+.mb-watchlist .wl tr.row:hover td{background:color-mix(in srgb, var(--md-sys-color-primary) 4%, transparent)}
+.mb-watchlist .wl tr.row td{cursor:pointer}
+.mb-watchlist .inactive{display:flex;align-items:center;gap:10px;font-size:13px;margin-top:12px;color:var(--md-sys-color-on-surface-variant)}
+@media (max-width:1439px){ .mb-watchlist .wl th{padding:8px 8px} .mb-watchlist .wl td{padding:8px 8px} }
+@media (max-width:1359px){ .mb-watchlist .wl th.c3,.mb-watchlist .wl td.c3{display:none} }
+@media (max-width:1279px){ .mb-watchlist .wl th.c2,.mb-watchlist .wl td.c2{display:none} }
+@media (max-width:1199px){ .mb-watchlist .wl th.cw,.mb-watchlist .wl td.cw{display:none} }
+@media (max-width:760px){ .mb-watchlist .wl th.cm,.mb-watchlist .wl td.cm{display:none} .mb-watchlist .wl .ag .bar{width:72px} .mb-watchlist .wl .co .nm small{white-space:normal} .mb-watchlist .wl th{padding:8px 6px;white-space:normal;line-height:1.25} .mb-watchlist .wl th .sort{display:inline;white-space:normal} .mb-watchlist .wl td{padding:8px 6px} .mb-watchlist .wl .co{gap:6px} .mb-watchlist .wl .co .mb-avatar{display:none} }
+/* the shell's company cell (styles/app.css .co .nm) is a column; the mockup's name cell is a block */
+.mb-watchlist .wl .co .nm{display:block}

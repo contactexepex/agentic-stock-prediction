@@ -1,11 +1,10 @@
 // The Home page's own computations (design/mockups/01-home/notes.md "Shown but computed by the page"): the KPI counts
 // and sums, the head-to-head grouping and cost lines, the cumulative profit per family, the alerts and the runs
 // count. Presentation only.
+import { INTRADAY_CHECKS_PER_SESSION } from "../ui/constants.ts";
+import { viableLine, yourViable, type Pick as CostPick } from "../ui/costs.ts";
 
-/** Spec constant: two intraday checks per session (docs/SPEC.md section 7; shell.js INTRADAY_CHECKS_PER_SESSION). */
-export const INTRADAY_CHECKS_PER_SESSION = 2;
-/** Spec constant: the go-live bar's two months of forward paper trading (SPEC F7.2; shell.js GO_LIVE_MONTHS). */
-export const GO_LIVE_MONTHS = 2;
+export { INTRADAY_CHECKS_PER_SESSION };
 
 export type Family = "rule" | "baseline" | "ai";
 export const FAMILIES: Family[] = ["rule", "baseline", "ai"];
@@ -36,32 +35,24 @@ export interface HeadToHeadPick {
   candidates: Candidate[] | null;
 }
 
-/** The candidate of the picked horizon, whose your-cost fields decide decision 51's flag. */
-export const pickCandidate = (k: HeadToHeadPick): Candidate | null =>
-  (k.candidates ?? []).find((c) => c.horizon_days === k.horizon_days) ?? null;
-/** true / false = viable or not at the owner's cost; null = not stored. */
-export const yourViable = (k: HeadToHeadPick): boolean | null => pickCandidate(k)?.cost_viable ?? null;
+/** A picked pick (status "picked") has every number of B7's cost view (lib/ui/costs.ts Pick). */
+export const isPicked = (k: HeadToHeadPick): boolean => k.status === "picked";
+const asPick = (k: HeadToHeadPick) => k as unknown as CostPick;
+/** true / false = viable or not at the owner's cost; null = not stored (B7's yourViable). */
+export const yourViableOf = (k: HeadToHeadPick): boolean | null => yourViable(asPick(k));
 export const clearsMarketCosts = (k: HeadToHeadPick): boolean => (k.expected_gain_pct ?? 0) > 0;
 /** The expected gain in money: expected_gain_pct x amount / 100 (notes.md). */
 export const expectedGainMoney = (k: HeadToHeadPick): number | null =>
   k.expected_gain_pct == null || k.amount == null ? null : (k.expected_gain_pct * k.amount) / 100;
 
-export interface PickSummary { picked: number; clearMarket: number; viableYours: number; yourKnown: number }
+export interface PickSummary { picked: number; clearMarket: number; viableYours: number }
+/** The KPI counts of the session's picks; the sum line's words are B7's viableLine. */
 export function pickSummary(picks: readonly HeadToHeadPick[]): PickSummary {
-  const picked = picks.filter((k) => k.status === "picked");
-  return {
-    picked: picked.length,
-    clearMarket: picked.filter(clearsMarketCosts).length,
-    viableYours: picked.filter((k) => yourViable(k) === true).length,
-    yourKnown: picked.filter((k) => yourViable(k) != null).length,
-  };
+  const picked = picks.filter(isPicked);
+  return { picked: picked.length, clearMarket: picked.filter(clearsMarketCosts).length, viableYours: picked.filter((k) => yourViableOf(k) === true).length };
 }
-/** "n clears market costs · m viable at your cost" (the mockup's sum line). */
-export function viableLine(s: PickSummary): string {
-  const market = s.clearMarket ? `${s.clearMarket} clear${s.clearMarket === 1 ? "s" : ""} market costs` : "none clears market costs";
-  const yours = s.yourKnown ? (s.viableYours ? `${s.viableYours} viable at your cost` : "none viable at your cost") : "your-cost view not stored";
-  return `${market} · ${yours}`;
-}
+/** "n clears market costs · m viable at your cost" of the picked picks (B7's viableLine). */
+export const viableLineOf = (picks: readonly HeadToHeadPick[]): string => viableLine(picks.filter(isPicked).map(asPick));
 
 /** Picks grouped by company in payload order. */
 export function groupBy<T, K extends string>(rows: readonly T[], key: (row: T) => K): [K, T[]][] {
@@ -95,15 +86,6 @@ export function cumulativeProfit(trades: readonly SettledTrade[], families: read
     };
   });
   return { days, series, trades: rows.length };
-}
-
-/** A nice axis step for about four intervals over a span (1, 2, 5 or 10 times a power of ten). */
-export function niceStep(span: number): number {
-  if (!(span > 0)) return 1;
-  const raw = span / 4;
-  const mag = 10 ** Math.floor(Math.log10(raw));
-  const r = raw / mag;
-  return (r <= 1 ? 1 : r <= 2 ? 2 : r <= 5 ? 5 : 10) * mag;
 }
 
 export interface EodFamily { trades: number; wins: number; net_pnl: number | null }
