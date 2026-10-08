@@ -53,7 +53,7 @@ export interface ScoreboardRow {
   regime?: string | null;
   horizon_days: number | "all";
   trades: number;
-  net_pnl: number;
+  net_pnl: number | null;
   mean_return_pct: number | null;
   win_rate: number | null;
   target_reached_rate: number | null;
@@ -142,5 +142,11 @@ export function rowsOf(rows: readonly ScoreboardRow[], scope: string, horizon: n
 export const REGIME_WORDS: Readonly<Record<string, string>> = {
   CALM: "calm", TRENDING: "trending", EVENT_HEAVY: "event-heavy", UNSTABLE: "unstable",
 };
+
+/** A row's market-cost profit as a sort key: a missing profit sorts after every number. */
+export const netKey = (row: ScoreboardRow): number => row.net_pnl ?? Number.NEGATIVE_INFINITY;
+
+/** b before a by profit (descending, missing last): NaN when both are missing, so the caller's next key decides. */
+export const byNetDesc = (a: ScoreboardRow, b: ScoreboardRow): number => netKey(b) - netKey(a);
 
 export const tooFewToRank = (row: ScoreboardRow): boolean => row.sample_badge === "too_few_to_rank";

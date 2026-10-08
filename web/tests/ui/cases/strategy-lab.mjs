@@ -36,6 +36,8 @@ export const cases = [
     check: async (page) => {
       const problems = [];
       await press(page, "Basis", "Back-test");
+      const kept = await page.$eval(".p-lab .det .big", (b) => b.textContent);
+      if (!kept.startsWith("Model without news")) problems.push(`the selection followed the slice: ${kept}`);
       const back = await page.textContent(".p-lab .lb");
       if (!back.includes("not run")) problems.push("back-test basis shows no 'not run' strategy");
       if (!(await page.textContent(".p-lab")).includes("Back-test run.")) problems.push("back-test run facts missing");

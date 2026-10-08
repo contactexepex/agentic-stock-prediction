@@ -6,7 +6,7 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import {
-  familyLines, familyRow, matchTally, matchWinner, matches, perCompany, pickFor, tradeNet, viableLine, whoLeads,
+  familyLines, familyRow, notEnteredFor, matchTally, matchWinner, matches, perCompany, pickFor, tradeNet, viableLine, whoLeads,
   type RuleVsAiPayload, type SettledTrade,
 } from "../rule-vs-ai.ts";
 import {
@@ -31,7 +31,7 @@ test("rule vs AI: who leads, matches and their tally on the mockup", () => {
 
 const trade = (family: "rule" | "ai", ticker: string, entry: string, exit: string, net: number, id = `${family}-${ticker}-${entry}`): SettledTrade =>
   ({ trade_id: id, prediction_id: id, strategy_id: `${family}.x`, family, view: "head_to_head", pick_rule: "highest_probability",
-    ticker, horizon_days: 1, entry_date: entry, exit_date: exit, exit_date_actual: null, net_pnl: net, return_pct: net / 100,
+    ticker, horizon_days: 1, entry_date: entry, exit_date: exit, exit_date_actual: null, status: "settled", net_pnl: net, return_pct: net / 100,
     target_error_pct: 1, target_reached: true });
 
 test("matches: newest entry first; a one-sided match has no winner; a missing your-cost figure is unknown", () => {
@@ -59,6 +59,20 @@ test("per company sums and the cumulative family lines start at zero on the firs
   assert.deepEqual(perCompany(trades, [], "your")[0].rule, { n: 2, net: null, won: null });
   assert.deepEqual(familyLines(trades), { dates: ["2026-10-01", "2026-10-02", "2026-10-03"], rule: [0, 5, 4], ai: [0, 0, -2] });
   assert.deepEqual(familyLines([]), { dates: [], rule: [], ai: [] });
+});
+
+test("a trade that never entered is no side of a match, no company trade and no point of a line", () => {
+  const entered = trade("rule", "A", "2026-10-01", "2026-10-02", 5);
+  const never = { ...trade("ai", "A", "2026-10-01", "2026-10-02", 0), status: "no_entry", net_pnl: null, return_pct: null, target_reached: null };
+  const list = matches([entered, never]);
+  assert.equal(list.length, 1);
+  assert.equal(list[0].ai, null);
+  assert.equal(matchWinner(list[0], [], "market"), null);
+  assert.equal(notEnteredFor([entered, never], list[0], "ai")?.status, "no_entry");
+  assert.equal(notEnteredFor([entered, never], list[0], "rule"), null);
+  assert.deepEqual(perCompany([entered, never], [], "market"), [{ ticker: "A", rule: { n: 1, net: 5, won: 1 }, ai: null }]);
+  assert.deepEqual(familyLines([entered, never]), { dates: ["2026-10-01", "2026-10-02"], rule: [0, 5], ai: [0, 0] });
+  assert.deepEqual(matches([never]), []);
 });
 
 test("the picks' cost line", () => {
@@ -107,4 +121,5 @@ test("receipt states and the idempotency key's format", () => {
   assert.equal(receiptState(422), "refused");
   assert.equal(receiptState(409), "refused");
   assert.match(newIdempotencyKey(), /^[A-Za-z0-9_-]{8,64}$/);
+  assert.notEqual(newIdempotencyKey(), newIdempotencyKey());
 });

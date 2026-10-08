@@ -1,11 +1,11 @@
-// Home (design/mockups/01-home/): owned by B14, who replaces this placeholder.
+// Page 01, Home (design/mockups/01-home/; B14): the server part keeps the metadata, the client part (in `_home/`, a
+// private folder beside the other pages' route folders) reads the endpoint.
 import type { Metadata } from "next";
-import { PagePending } from "../../../components/shell/page-pending.tsx";
 import type { Market } from "../../../lib/data/constants.ts";
+import { HomePage } from "./_home/home-page.tsx";
 
 export const metadata: Metadata = { title: "Home" };
 
 export default async function Page({ params }: { params: Promise<{ market: string }> }) {
-  const market = (await params).market as Market;
-  return <PagePending market={market} pageKey="home" />;
+  return <HomePage market={(await params).market as Market} />;
 }

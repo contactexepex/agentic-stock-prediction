@@ -1,11 +1,11 @@
-// Watchlist (design/mockups/02-watchlist/): owned by B14, who replaces this placeholder.
+// Page 02, Watchlist (design/mockups/02-watchlist/; B14): the server part keeps the metadata, the client part reads
+// the endpoint.
 import type { Metadata } from "next";
-import { PagePending } from "../../../../components/shell/page-pending.tsx";
 import type { Market } from "../../../../lib/data/constants.ts";
+import { WatchlistPage } from "./_parts/watchlist-page.tsx";
 
 export const metadata: Metadata = { title: "Watchlist" };
 
 export default async function Page({ params }: { params: Promise<{ market: string }> }) {
-  const market = (await params).market as Market;
-  return <PagePending market={market} pageKey="watchlist" />;
+  return <WatchlistPage market={(await params).market as Market} />;
 }

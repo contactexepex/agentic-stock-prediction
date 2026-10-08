@@ -2,7 +2,7 @@
 // Small parts B16's pages share (05 Strategy lab, 06 Rule vs AI, 07 Paper portfolios, 08 Track record), drawn as the
 // mockups draw them: the luck-test bar, an interval bar, a host-width hook for the charts that redraw at the card's
 // width, and the cost switch. Their CSS sits in each page's stylesheet (scoped per page). Private folder: no route.
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Segmented } from "../../../../components/ui/controls.tsx";
 import { HelpTip } from "../../../../components/ui/icon.tsx";
 import { Label } from "../../../../components/ui/primitives.tsx";
@@ -12,19 +12,19 @@ import {
   figure, luckOf, luckScale, luckVerdict, tooFewToRank, type CostView, type ScoreboardRow,
 } from "../../../../lib/strategy-pages/scoreboard.ts";
 
-/** The width of a host element, updated on resize (null before the first layout). */
-export function useWidth<T extends HTMLElement>(): [React.RefObject<T | null>, number | null] {
-  const ref = useRef<T>(null);
+/** A callback ref and the width of the element it is attached to, updated on resize (null before the first layout).
+ * A callback ref, so an element that appears later (e.g. a chart once its data exists) is measured too. */
+export function useWidth<T extends HTMLElement>(): [(node: T | null) => void, number | null] {
+  const [node, setNode] = useState<T | null>(null);
   const [width, setWidth] = useState<number | null>(null);
   useEffect(() => {
-    const node = ref.current;
     if (!node) return;
     setWidth(node.clientWidth);
     const observer = new ResizeObserver(() => setWidth((old) => (old === null || Math.abs(old - node.clientWidth) > 2 ? node.clientWidth : old)));
     observer.observe(node);
     return () => observer.disconnect();
-  }, []);
-  return [ref, width];
+  }, [node]);
+  return [setNode, width];
 }
 
 const VERDICT_TONE = { edge: "success", loss: "danger", "luck?": "neutral" } as const;
@@ -34,7 +34,7 @@ const VERDICT_TONE = { edge: "success", loss: "danger", "luck?": "neutral" } as 
 export function LuckBar({ row, cost, span = 88, none = "none yet" }: { row: ScoreboardRow; cost: CostView; span?: number; none?: string }) {
   const test = luckOf(row, cost);
   if (!test || test.low_pct === null || test.high_pct === null) {
-    const stored = row.trades >= 2 && cost === "your";
+    const stored = row.trades >= 2;
     return (
       <span className="muted" data-tip={stored ? "No luck test stored for this cost view." : "Fewer than 2 trades: no luck interval yet."}>
         {stored ? "not stored" : none}
