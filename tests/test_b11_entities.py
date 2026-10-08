@@ -15,6 +15,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 import common  # noqa: E402
+from marketbrief.analytics.news_tags import TAG_VERSION  # noqa: E402
 from marketbrief.core import database  # noqa: E402
 from marketbrief.core.market_config import load_market  # noqa: E402
 from marketbrief.warehouse import calendar_events, company_records, news_items  # noqa: E402
@@ -32,8 +33,10 @@ def append(root: Path, kind: str, day: str, rows: list[dict]) -> None:
             handle.write(json.dumps(row) + "\n")
 
 
-def news(news_id: str, first_seen: str, tickers: list[str], primary: list[str]) -> dict:
-    return {"id": news_id, "title": f"Headline {news_id}", "url": f"https://example.com/{news_id}", "source": "Example",
+def news(news_id: str, first_seen: str, tickers: list[str], primary: list[str], title: str | None = None) -> dict:
+    """A stored news row written by the current tagger (`tag_version`), so the `news` views keep its tags."""
+    return {"id": news_id, "title": title or f"Headline {news_id}", "tag_version": TAG_VERSION,
+            "url": f"https://example.com/{news_id}", "source": "Example",
             "source_domain": "example.com", "published_at": first_seen, "first_seen_at": first_seen,
             "feed": "test", "category": "company" if primary else "macro", "tickers": tickers,
             "primary_tickers": primary}
@@ -61,15 +64,23 @@ def store(root: Path) -> None:
         news("macro-high", BEFORE, [], []),
         news("macro-offtopic", BEFORE, [], []),                 # relevance below 0.4
         news("aapl-old", "2026-09-20T08:00:00+00:00", ["AAPL"], ["AAPL"]),
+        # PGR is deleted before the cut-off; DAL went inactive on 2026-10-05
+        news("aapl-pgr", BEFORE, ["PGR", "AAPL"], ["PGR", "AAPL"], "Progressive and Apple sign insurance deal"),
+        news("pgr-only", BEFORE, ["PGR"], ["PGR"], "Progressive raises auto insurance rates"),
+        news("dal-new", BEFORE, ["DAL"], ["DAL"], "Delta Air Lines adds routes"),
+        news("dal-pre", "2026-10-04T00:00:00+00:00", ["DAL"], ["DAL"], "Delta Air Lines cuts fares"),
     ])
     append(root, "news_enriched", day, [
         enriched("aapl-ok", BEFORE), enriched("aapl-late", AFTER), enriched("aapl-unscored", AFTER),
         enriched("macro-high", BEFORE, materiality="high", event_type="macro"),
         enriched("macro-offtopic", BEFORE, relevance=0.2), enriched("aapl-old", "2026-09-20T09:00:00+00:00"),
+        enriched("aapl-pgr", BEFORE), enriched("pgr-only", BEFORE), enriched("dal-new", BEFORE),
+        enriched("dal-pre", "2026-10-04T01:00:00+00:00"),
     ])
     append(root, "news_verified", day, [verified("v1", BEFORE, "single_source", "aapl-ok"),
                                         verified("v2", AFTER, "contradicted", "aapl-ok"),
-                                        verified("v3", BEFORE, "rumour", "aapl-ok", ticker="JPM")])
+                                        verified("v3", BEFORE, "rumour", "aapl-ok", ticker="JPM"),
+                                        verified("v4", BEFORE, "rumour", "aapl-pgr", ticker="PGR")])
     append(root, "news_updates", day, [
         {"id": "u1", "news_id": "aapl-ok", "title": "Earlier headline", "seen_at": BEFORE},
         {"id": "u2", "news_id": "aapl-ok", "title": "Later headline", "seen_at": AFTER},
@@ -126,7 +137,7 @@ def market(tmp_path_factory):
 def test_news_items_only_what_was_known_at_the_cutoff(market):
     cfg, con = market
     items = {item["id"]: item for item in news_items.news_items(cfg, con, CUTOFF)}
-    assert set(items) == {"aapl-ok", "macro-high", "aapl-old"}
+    assert set(items) == {"aapl-ok", "macro-high", "aapl-old", "aapl-pgr", "dal-new", "dal-pre"}
     ok = items["aapl-ok"]
     assert ok["status"] == "single_source"          # the contradicted row is stored after the cut-off
     assert ok["headline_history"] == [{"seen_at": "2026-10-07T08:00:00Z", "title": "Earlier headline"}]
@@ -136,14 +147,27 @@ def test_news_items_only_what_was_known_at_the_cutoff(market):
     assert macro["scope"] == "market" and macro["market_moving"] is True and macro["status"] is None
     assert macro["summary_source"] == "none"         # the analyst's summary is the templated form
     ordered = news_items.news_items(cfg, con, CUTOFF)
-    assert [i["id"] for i in ordered] == ["aapl-ok", "macro-high", "aapl-old"]   # newest first, then by id
+    assert [i["id"] for i in ordered] == ["aapl-ok", "aapl-pgr", "dal-new", "macro-high", "dal-pre", "aapl-old"]
+
+
+def test_news_items_never_show_a_deleted_company(market):
+    cfg, con = market
+    items = {i["id"]: i for i in news_items.news_items(cfg, con, CUTOFF)}
+    assert "pgr-only" not in items                                       # tagged with the deleted company only
+    shared = items["aapl-pgr"]
+    assert (shared["tickers"], shared["primary_tickers"]) == (["AAPL"], ["AAPL"])
+    assert shared["status"] is None and shared["cluster_id"] is None    # PGR's status is not shown
+    assert "PGR" not in json.dumps(list(items.values()))
+    assert news_items.news_items(cfg, con, CUTOFF, tickers=["PGR"]) == []
 
 
 def test_news_items_filters_by_ticker_and_since(market):
     cfg, con = market
     since = datetime.fromisoformat("2026-10-01T00:00:00+00:00")
-    assert [i["id"] for i in news_items.news_items(cfg, con, CUTOFF, tickers=["AAPL"])] == ["aapl-ok", "aapl-old"]
-    assert [i["id"] for i in news_items.news_items(cfg, con, CUTOFF, tickers=["AAPL"], since=since)] == ["aapl-ok"]
+    by_ticker = news_items.news_items(cfg, con, CUTOFF, tickers=["AAPL"])
+    assert [i["id"] for i in by_ticker] == ["aapl-ok", "aapl-pgr", "aapl-old"]
+    recent = news_items.news_items(cfg, con, CUTOFF, tickers=["AAPL"], since=since)
+    assert [i["id"] for i in recent] == ["aapl-ok", "aapl-pgr"]
 
 
 def test_news_items_status_of_a_named_ticker(market):
@@ -156,9 +180,9 @@ def test_news_items_status_of_a_named_ticker(market):
 def test_news_window_counts_and_record(market):
     cfg, con = market
     items, window = news_items.news_window(cfg, con, CUTOFF, 3, 50)
-    assert [i["id"] for i in items] == ["aapl-ok", "macro-high"]      # same time: by id
+    assert [i["id"] for i in items] == ["aapl-ok", "aapl-pgr", "dal-new", "macro-high"]   # same time: by id
     assert window == {"days": 3, "from": "2026-10-04T12:00:00Z", "to": "2026-10-07T12:00:00Z", "max_items": 50,
-                      "stored_in_window": 2, "older_hidden": 1}
+                      "stored_in_window": 4, "older_hidden": 2}
 
 
 def record(news_id: str, scope: str, seen: str, moving: bool = False, materiality: str = "low") -> dict:
@@ -210,10 +234,8 @@ def test_lifecycle_and_commands_hide_deleted_company(market):
     assert commands[1]["message"] == "SPY is an ETF"
 
 
-def test_inactive_news_since_deactivation():
-    companies = [{"ticker": "DAL", "state": "inactive", "state_since": "2026-10-05T11:45:00Z"},
-                 {"ticker": "AAPL", "state": "active", "state_since": "2024-10-07T00:00:00Z"}]
-    items = [{"id": "a", "tickers": ["DAL"], "first_seen_at": "2026-10-06T00:00:00Z"},
-             {"id": "b", "tickers": ["DAL"], "first_seen_at": "2026-10-04T00:00:00Z"},
-             {"id": "c", "tickers": ["AAPL"], "first_seen_at": "2026-10-06T00:00:00Z"}]
-    assert [i["id"] for i in company_records.inactive_news(items, companies)] == ["a"]
+def test_inactive_news_since_deactivation(market):
+    cfg, con = market
+    companies, _deleted = company_records.shown_companies("us", CUTOFF)   # B1's records: state_since is a time
+    items = news_items.news_items(cfg, con, CUTOFF)
+    assert [i["id"] for i in company_records.inactive_news(items, companies)] == ["dal-new"]   # dal-pre is earlier

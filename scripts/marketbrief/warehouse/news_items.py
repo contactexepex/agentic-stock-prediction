@@ -6,17 +6,20 @@ design/mockups/09-news/notes.md). Every read is as of the cut-off: the item list
 and Home's selection.
 
 The rules are W1's of the catalogue build (design/catalogue/catalogue_newsfeed.py, data request 8): `scope`, the
-`summary` line and the `market_moving` flag. The item's status is the one of its first primary ticker (or of the
+`summary` line and the `market_moving` flag. A company deleted by the cut-off is never shown (decision 12): it is
+taken out of every item's `tickers` and `primary_tickers`, and an item tagged only with deleted companies is left
+out. The item's status is the one of its first primary ticker (or of the
 ticker the caller names); a market-wide item has none, because verification is per company."""
 
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 import pandas as pd
 
 from marketbrief.constants.market_pages import (
+    EARLIEST,
     EVENT_EARNINGS,
     HEADLINE_HISTORY_STATUS,
     MATERIALITY_HIGH,
@@ -30,12 +33,19 @@ from marketbrief.constants.market_pages import (
     SUMMARY_NONE,
     TEMPLATED_SUMMARY_MARK,
 )
+from marketbrief.lifecycle import accessor
+from marketbrief.lifecycle.constants import STATE_DELETED
 from marketbrief.utils.numbers import json_safe_float
 
 # the items first seen in (from, to], each with its newest enrichment, article read, status and cluster by the cut-off
 ITEMS_SQL = """
 WITH n AS (SELECT DISTINCT ON (id) * FROM news_asof($cutoff::TIMESTAMPTZ) ORDER BY id, first_seen_at),
-w AS (SELECT * FROM n WHERE first_seen_at > $start::TIMESTAMPTZ AND first_seen_at <= $cutoff::TIMESTAMPTZ),
+t AS (SELECT *, len(coalesce(tickers, [])) > 0 AS tagged FROM n
+      WHERE first_seen_at > $start::TIMESTAMPTZ AND first_seen_at <= $cutoff::TIMESTAMPTZ),
+d AS (SELECT * REPLACE (list_filter(tickers, x -> NOT list_contains($deleted, x)) AS tickers,
+                        list_filter(primary_tickers, x -> NOT list_contains($deleted, x)) AS primary_tickers)
+      FROM t),
+w AS (SELECT * EXCLUDE (tagged) FROM d WHERE NOT tagged OR len(coalesce(tickers, [])) > 0),
 e AS (SELECT DISTINCT ON (id) * FROM news_enriched WHERE analyzed_at <= $cutoff::TIMESTAMPTZ
       ORDER BY id, analyzed_at DESC),
 s AS (SELECT * FROM news_status_ids_asof($cutoff::TIMESTAMPTZ)),
@@ -179,18 +189,19 @@ def capped(records: list[dict], max_items: int) -> list[dict]:
     return sorted(kept, key=newest_first)
 
 
-EARLIEST = datetime(1970, 1, 1, tzinfo=timezone.utc)
-
-
 def news_items(cfg: dict, con, cutoff: datetime, tickers: list[str] | None = None, since: datetime | None = None,
                status_ticker: str | None = None) -> list[dict]:
     """Every News item record first seen in (since, cutoff] (since None: from the first stored item) that the
-    analyst scored by the cut-off, about a collected company or market-wide and relevant (`shown`); with `tickers`,
+    analyst scored by the cut-off, about a company collected at the cut-off (B1's records) or market-wide and
+    relevant (`shown`), deleted companies taken out of its tags; with `tickers`,
     only items tagged with one of them. `status`, `status_as_of`, `cluster_id`, `independent_origins` and
     `primary_ids` are those of `status_ticker` (a company page's own company) when given, else of the item's first
     primary ticker. Newest first, uncapped."""
-    params = {"cutoff": cutoff.isoformat(), "start": (since or EARLIEST).isoformat(), "status_ticker": status_ticker}
-    collected = set(cfg["tickers"])
+    records = accessor.records(cfg["market"], cutoff)
+    collected = {record["ticker"] for record in records if record["state"] != STATE_DELETED}
+    deleted = sorted(record["ticker"] for record in records if record["state"] == STATE_DELETED)
+    params = {"cutoff": cutoff.isoformat(), "start": (since or EARLIEST).isoformat(), "status_ticker": status_ticker,
+              "deleted": deleted}
     rows = [row for row in con.execute(ITEMS_SQL, params).df().to_dict("records") if shown(row, collected)]
     if tickers is not None:
         wanted = set(tickers)
@@ -208,8 +219,7 @@ def news_window(cfg: dict, con, cutoff: datetime, days: int, max_items: int) -> 
     (`capped`), newest first; `window` is the selection's record (from, to, counts)."""
     start = cutoff - timedelta(days=days)
     records = news_items(cfg, con, cutoff, since=start)
-    params = {"cutoff": cutoff.isoformat(), "start": start.isoformat()}
-    older = con.execute(COUNT_BEFORE_SQL, params).fetchone()[0]
+    older = con.execute(COUNT_BEFORE_SQL, {"cutoff": cutoff.isoformat(), "start": start.isoformat()}).fetchone()[0]
     window = {
         "days": days,
         "from": iso(start),

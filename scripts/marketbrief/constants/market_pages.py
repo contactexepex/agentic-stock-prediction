@@ -3,9 +3,13 @@ Each setting names its source (the page's design/mockups/<page>/notes.md or the 
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 RM_HOME = "home"
 RM_NEWS = "news"
 RM_COMPANIES = "companies"
+# news_items without a lower bound: from the first stored item
+EARLIEST = datetime(1970, 1, 1, tzinfo=timezone.utc)
 # the News page's window (design/mockups/09-news/notes.md: 3 days before the cut-off, at most 50 items)
 NEWS_WINDOW_DAYS = 3
 NEWS_MAX_ITEMS = 50

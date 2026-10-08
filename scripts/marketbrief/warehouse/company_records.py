@@ -81,7 +81,8 @@ def command_rows(con, cutoff: datetime, deleted: set[str]) -> list[dict]:
 
 
 def inactive_news(items: list[dict], companies: list[dict]) -> list[dict]:
-    """News items tagged with an inactive company and first seen since it went inactive, newest first."""
-    since = {row["ticker"]: row["state_since"] for row in companies if row["state"] != STATE_ACTIVE}
-    return [item for item in items
-            if any(ticker in since and item["first_seen_at"] >= since[ticker] for ticker in item["tickers"])]
+    """News items tagged with an inactive company and first seen since it went inactive (B1's `state_since`, a time
+    or ISO text), in the items' order."""
+    since = {row["ticker"]: pd.Timestamp(row["state_since"]) for row in companies if row["state"] != STATE_ACTIVE}
+    return [item for item in items if any(ticker in since and pd.Timestamp(item["first_seen_at"]) >= since[ticker]
+                                          for ticker in item["tickers"])]
