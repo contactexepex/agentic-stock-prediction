@@ -1,0 +1,15 @@
+// The statements the assistant sends to MotherDuck market_brief_inbox (DuckDB SQL over the Postgres endpoint, $n
+// parameters). Plain template literals without interpolation: tests/test_b8_assistant.py runs each against a local
+// DuckDB built from web/lib/assistant/app.sql and mcp/inbox.sql. Spend since a time is an answered question's real
+// cost, else its reservation (the repeated sub-select); the caps allow
+// 1e-9 for float sums.
+
+export const APP_SQL = {
+  reserve: `INSERT INTO app.assistant_questions (id, market, channel, actor, agent, question, ticker, strategy_id, asked_at, reserved_usd) SELECT $1, $2, $3, $4, $5, $6, $7, $8, CAST($9 AS TIMESTAMPTZ), CAST($10 AS DOUBLE) WHERE (SELECT coalesce(sum(coalesce(a.cost_usd, q.reserved_usd)), 0) FROM app.assistant_questions q LEFT JOIN app.assistant_answers a ON a.id = q.id WHERE q.asked_at >= CAST($11 AS TIMESTAMPTZ)) + CAST($10 AS DOUBLE) <= CAST($13 AS DOUBLE) + 1e-9 AND (SELECT coalesce(sum(coalesce(a.cost_usd, q.reserved_usd)), 0) FROM app.assistant_questions q LEFT JOIN app.assistant_answers a ON a.id = q.id WHERE q.asked_at >= CAST($12 AS TIMESTAMPTZ)) + CAST($10 AS DOUBLE) <= CAST($14 AS DOUBLE) + 1e-9 ON CONFLICT (id) DO NOTHING RETURNING id`,
+  answer: `INSERT INTO app.assistant_answers (id, status, text, cited, sources, not_in_data, declined, model, input_tokens, cache_write_tokens, cache_read_tokens, output_tokens, model_calls, tool_calls, cost_usd, completed_at) VALUES ($1, $2, $3, CAST($4 AS JSON), CAST($5 AS JSON), CAST($6 AS BOOLEAN), $7, $8, CAST($9 AS INTEGER), CAST($10 AS INTEGER), CAST($11 AS INTEGER), CAST($12 AS INTEGER), CAST($13 AS INTEGER), CAST($14 AS INTEGER), CAST($15 AS DOUBLE), CAST($16 AS TIMESTAMPTZ)) ON CONFLICT (id) DO NOTHING`,
+  spend: `SELECT (SELECT coalesce(sum(coalesce(a.cost_usd, q.reserved_usd)), 0) FROM app.assistant_questions q LEFT JOIN app.assistant_answers a ON a.id = q.id WHERE q.asked_at >= CAST($1 AS TIMESTAMPTZ)) AS day, (SELECT coalesce(sum(coalesce(a.cost_usd, q.reserved_usd)), 0) FROM app.assistant_questions q LEFT JOIN app.assistant_answers a ON a.id = q.id WHERE q.asked_at >= CAST($2 AS TIMESTAMPTZ)) AS month`,
+  enabled: `SELECT bool_and(enabled) AS enabled FROM (SELECT agent, arg_max(enabled, updated_at) AS enabled FROM inbox.controls WHERE agent IN ($1, '*') GROUP BY agent)`,
+  list: `SELECT q.id, q.market, q.channel, q.question, q.asked_at, a.status, a.text, CAST(a.cited AS VARCHAR) AS cited, CAST(a.sources AS VARCHAR) AS sources, a.not_in_data, a.declined, coalesce(a.cost_usd, q.reserved_usd) AS cost_usd FROM app.assistant_questions q LEFT JOIN app.assistant_answers a ON a.id = q.id WHERE q.market = $1 AND q.asked_at >= CAST($2 AS TIMESTAMPTZ) ORDER BY q.asked_at DESC, q.id DESC LIMIT CAST($3 AS INTEGER)`,
+  purgeAnswers: `DELETE FROM app.assistant_answers WHERE id IN (SELECT id FROM app.assistant_questions WHERE asked_at < CAST($1 AS TIMESTAMPTZ))`,
+  purgeQuestions: `DELETE FROM app.assistant_questions WHERE asked_at < CAST($1 AS TIMESTAMPTZ)`,
+} as const;
