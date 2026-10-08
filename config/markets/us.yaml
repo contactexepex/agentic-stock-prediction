@@ -84,7 +84,12 @@ sectors:
 # wire_names: the names `watchlist_only` (press-release wire) feeds match, case-insensitively and
 # as whole words (scripts/collect_news.py): full company names where the name or an alias is a
 # common word ("Apple", "Meta", "Progressive", "iPhone", "Facebook"). Default: name and aliases.
-tickers:
+# company_meta: per-company metadata (name, Yahoo symbol, news names, aliases, ADR ...) of the companies on the
+# watchlist. The companies themselves come only from the watchlist events (data/<market>/watchlist_events/,
+# `scripts/company.py`; marketbrief/lifecycle/loader.py): an entry here never adds a company, and a company added
+# through onboarding without an entry gets its meta from its add event. (Until B18 this key was the company list
+# `tickers:`.)
+company_meta:
   JPM:   {name: JPMorgan, aliases: [JPMorgan Chase, J.P. Morgan, Jamie Dimon, JPM], wire_names: [JPMorgan Chase, JPMorgan, J.P. Morgan],
          broker: true}
   BAC:   {name: Bank of America, aliases: [BofA, BoA], broker: true}
