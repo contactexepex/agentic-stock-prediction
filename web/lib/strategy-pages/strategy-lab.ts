@@ -2,7 +2,7 @@
 // by the page"): the ranking order, the KPI picks, the compact heatmap profit, the heatmap colour share and the
 // cumulative lines per series. Forward and back-test rows are never pooled: every function takes one basis. Pure.
 import {
-  FAMILY_ORDER, figure, rowsOf, type Basis, type CostView, type ScoreboardRow, type ScoreView, type Strategy,
+  byNetDesc, FAMILY_ORDER, figure, rowsOf, type Basis, type CostView, type ScoreboardRow, type ScoreView, type Strategy,
 } from "./scoreboard.ts";
 
 export interface HeatmapCell {
@@ -89,7 +89,7 @@ export function ranking(payload: StrategyLabPayload, slice: Slice): { ids: strin
   for (const row of rowsOf(payload.rows, "strategy", slice.horizon, slice.view, slice.basis)) byId.set(row.strategy_id, row);
   const ids = Object.keys(payload.strategies).sort((x, y) => {
     const a = byId.get(x), b = byId.get(y);
-    if (a && b) return b.net_pnl - a.net_pnl || b.trades - a.trades || x.localeCompare(y);
+    if (a && b) return byNetDesc(a, b) || b.trades - a.trades || x.localeCompare(y);
     if (a) return -1;
     if (b) return 1;
     return FAMILY_ORDER[payload.strategies[x].family] - FAMILY_ORDER[payload.strategies[y].family] || x.localeCompare(y);
@@ -112,7 +112,8 @@ export function kpiPicks(payload: StrategyLabPayload, slice: Slice): KpiPicks {
   const ranked = ids.filter((id) => byId.has(id)).map((id) => byId.get(id) as ScoreboardRow);
   const bestBaseline = ranked.find((row) => row.family === "baseline") ?? null;
   const contenders = ranked.filter((row) => row.family !== "baseline");
-  const beat = bestBaseline ? contenders.filter((row) => row.net_pnl > bestBaseline.net_pnl).length : 0;
+  const best = bestBaseline?.net_pnl ?? null;
+  const beat = best !== null ? contenders.filter((row) => row.net_pnl !== null && row.net_pnl > best).length : 0;
   const nearest = contenders.filter((row) => row.go_live)
     .sort((a, b) => (a.go_live?.trades_needed ?? 0) - (b.go_live?.trades_needed ?? 0))[0] ?? null;
   return { leader: ranked[0] ?? null, bestBaseline, beat, contenders: contenders.length, nearest };
