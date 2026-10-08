@@ -326,3 +326,40 @@ def test_status_page_values_come_from_the_stored_data(warehouse):
     assert india["runs"]["news"] == {"at": None, "ok": None, "new_items": None}  # the first news run is 14:19 UTC
     assert india["runs"]["post_close"]["next_at"] == "2026-10-07T12:15:00Z"  # 17:45 IST
     assert "freshness" not in india and "cutoff" not in india  # added when served, never stored
+
+
+def test_a_sync_revalidates_written_and_deleted_pages_in_both_modes(warehouse, monkeypatch):
+    """The keys a sync to MotherDuck would post after its commit: every written page and every page no longer built,
+    after an incremental sync and after a --full rebuild (which deletes the rows before rebuilding them)."""
+    posted = []
+    monkeypatch.setattr(sync, "PROVIDER_MOTHERDUCK", "local")  # the local file stands in for MotherDuck here
+    monkeypatch.setattr(sync, "revalidate", lambda url, build_id, keys: posted.append((url, keys)) or "ok")
+    mp = pytest.MonkeyPatch()
+    saved_root = common.ROOT
+    common.ROOT = warehouse["root"]
+    mp.setenv("MB_NOW", CUTOFF)
+    mp.delenv("MOTHERDUCK_TOKEN", raising=False)
+    path = warehouse["root"] / WAREHOUSE
+    gone = {"table": "status", "market": "us", "page_key": "GONE"}
+
+    def add_gone_page():
+        con = duckdb.connect(str(path))
+        con.execute("INSERT INTO rm.status SELECT * REPLACE ('GONE' AS page_key) FROM rm.status WHERE market = 'us'")
+        con.close()
+
+    try:
+        cfg = load_market("us")
+        for full in (False, True):
+            add_gone_page()
+            posted.clear()
+            summary = sync.sync_market(cfg, full=full, force_local=True)
+            assert summary["revalidate"] == "ok" and summary["pages_deleted"] == 1, (full, summary)
+            ((url, keys),) = posted
+            assert url == "https://omenix.vercel.app"
+            assert gone in keys
+            written = summary["pages_written"]
+            assert len(keys) == written + 1  # incremental: nothing else changed; full: every page is written anew
+            assert (written == 0) if not full else (written == sum(summary["read_model_pages"].values()))
+    finally:
+        common.ROOT = saved_root
+        mp.undo()

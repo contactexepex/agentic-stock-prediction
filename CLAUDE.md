@@ -141,7 +141,7 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   `MOTHERDUCK_TOKEN`, never printed; without it the local file of the config under `work/`): one schema per market
   with the cockpit's tables (bars, quotes, features, regime, predictions, track record per label basis, ranges, model
   scores and versions, news with status, events, agent reasoning, lessons, reviews), replaced in one transaction, plus
-  per-page read models in `rm` (`overview`, `watchlist`, `stock`, `bars`, `track_record`; key `(market, page_key)`,
+  per-page read models in `rm` (`overview`, `watchlist`, `stock`, `bars`, `track_record`, `status`; key `(market, page_key)`,
   payload sliced from `gather_dashboard`, upserted by `payload_sha256`), `rm.builds` and `meta.sync_runs`. Kill switch
   `enabled` and `monthly_hours_ceiling` in the config. Optional, non-blocking, rebuildable with `--full`; static
   `reports/` and Slack never depend on it. Read-model framework (B4, docs/ws/b4.md): each `rm.<table>` is a

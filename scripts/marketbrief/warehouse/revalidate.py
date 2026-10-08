@@ -6,6 +6,7 @@ Skipped for the local warehouse file, a dry run, no changed key, or without REVA
 
 from __future__ import annotations
 
+import http.client
 import json
 import os
 import urllib.error
@@ -60,7 +61,7 @@ def revalidate(app_url: str, build_id: str, keys: list[dict], opener=None) -> st
         body = json.dumps({"build_id": build_id, "keys": keys[start : start + REVALIDATE_BATCH]}).encode()
         try:
             status = client.send(app_url.rstrip("/") + REVALIDATE_PATH, headers=headers, data=body, method="POST")
-        except (ConnectionError, OSError) as exc:
+        except (ConnectionError, OSError, http.client.HTTPException) as exc:
             return MSG_REVALIDATE_FAILED.format(reason=type(exc).__name__)
         if status != 200:
             return MSG_REVALIDATE_FAILED.format(reason=f"HTTP {status}")

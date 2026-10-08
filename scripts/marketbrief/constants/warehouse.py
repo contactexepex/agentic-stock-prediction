@@ -29,7 +29,7 @@ RM_MODULE_PREFIX = "rm_"  # warehouse/rm_<page>.py modules declare BUILDERS and 
 MSG_DUPLICATE_TABLE = "read models: table {table!r} is built by two modules (owners {owners})"
 # How a route serves a stored row (warehouse/contract.serve, web/lib/data/serve.ts):
 SERVE_VERBATIM = "verbatim"  # 1.0 pages: the payload as stored
-SERVE_PAGE = "page"  # 1.1 pages: plus cutoff and built_at at the top and status.freshness
+SERVE_PAGE = "page"  # 2.0 page payloads: plus cutoff and built_at at the top and status.freshness
 SERVE_STATUS = "status"  # the status page: plus freshness at the top
 FRESH_MINUTES = 480  # a page older than this is stale (two missed 4-hourly news syncs; web/lib/data/constants.ts)
 FRESHNESS_FRESH, FRESHNESS_STALE, FRESHNESS_UNKNOWN = "fresh", "stale", "unknown"
