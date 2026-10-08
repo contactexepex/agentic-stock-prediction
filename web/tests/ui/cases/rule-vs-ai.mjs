@@ -23,7 +23,7 @@ export const cases = [
     api: mockupReview,
     widths: [1280, 390],
     waitFor: ".p-compare .rev .lead-row",
-    expectText: [PAPER, "Head-to-head: the strongest rule strategy vs the strongest AI trader", "Level", "Today’s picks for", "not viable at your cost", "Match by match", "draw", "Gain-pick vs probability-pick", "Per company", "Why: the end-of-day analyst", "The week’s research review", "No proposals this week.", "Which news moved prices", "too few"],
+    expectText: [PAPER, "Head-to-head: the strongest rule strategy vs the strongest AI trader", "Level", "Today’s picks for", "not viable at your cost", "Match by match", "draw", "Gain-pick vs probability-pick", "Per company", "Why: the end-of-day analyst", "The week’s research review", "No proposals this week.", "confirmed primary · high · 2026-W40", "too few"],
     expectSelector: [".p-compare .luck svg, .p-compare .vs", ".p-compare .mb-chart svg", ".p-compare .pk .mb-odds"],
   },
   { name: "rule-vs-ai-us", path: "/us/rule-vs-ai", market: "us", mockup: "06-rule-vs-ai", api: mockupReview, widths: [1280], waitFor: ".p-compare .rev h3", expectText: [PAPER, "$"] },

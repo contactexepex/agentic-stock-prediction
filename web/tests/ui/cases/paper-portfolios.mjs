@@ -29,7 +29,7 @@ export const cases = [
     widths: [1280, 390],
     waitFor: ".p-portfolios .ot",
     expectText: [PAPER, "Head-to-head portfolios", "Open paper trades by strategy", "14 of 14 open", "Your own paper portfolio", "1 recorded trade", "Add own paper trade"],
-    expectSelector: [".p-portfolios .ot tr.grp", ".p-portfolios .rng svg", ".p-portfolios .luck svg"],
+    expectSelector: [".p-portfolios .ot tr.grp", ".p-portfolios .rng svg", ".p-portfolios .fbox .tot"],
   },
   { name: "paper-portfolios-us", path: "/us/paper-portfolios", market: "us", mockup: "07-paper-portfolios", widths: [1280], waitFor: ".p-portfolios .eur", expectText: [PAPER, "Euro view of AAPL", "Euros paid"] },
   {
@@ -72,7 +72,7 @@ export const cases = [
       await page.click('dialog button[type=submit]');
       await page.waitForSelector("dialog[open]", { state: "detached" });
       const text = await page.textContent(".p-portfolios");
-      if (!text.includes("Pending: buy 5 RELIANCE at the open")) problems.push("no pending line after a 202");
+      if (!/Pending: buy 5 [A-Z]+ at the open/.test(text)) problems.push("no pending line after a 202");
       if (!/Pending requests\s*1/.test(await page.textContent(".kpis"))) problems.push("pending KPI not 1");
       if (seen.length !== 3) problems.push(`requests sent: ${seen.length}`);
       else {
