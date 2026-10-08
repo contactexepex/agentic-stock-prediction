@@ -53,3 +53,10 @@ narrative_sign_check: false
 # Headlines and summaries of news, filings and announcements first seen in the last N days are
 # sources too (the agents quote numbers from them).
 narrative_news_days: 7
+# News gate (issue #46): a warning (ENRICH_TEMPLATED, listed in the report's data_quality) when more than this share of
+# the analyst's watchlist records (an announcement or a news item tagged with a watchlist ticker) share their summary
+# word for word with another record of the file, with at least min_records watchlist records. Measured on the stored
+# runs: India 2026-10-07 (scored by a keyword-rule pass) 0.67, US 2026-10-07 0.09 and 0.12.
+news_templated:
+  max_shared_summary_share: 0.3
+  min_records: 20

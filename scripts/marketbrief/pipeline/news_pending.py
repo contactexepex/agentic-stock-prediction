@@ -1,7 +1,9 @@
 """News and NSE announcements awaiting the news analyst (routine step 7; docs/DESIGN.md section 3, "News timing").
 
 With news-only light runs collecting every 4 hours, the pre-open run must enrich everything stored since the
-previous pre-open enrichment, not just today's file. The window is (since, now], since = the EARLIER of
+previous pre-open enrichment, not just today's file. The window is [since, now] (closed at since, issue #51: one
+collector run stamps all its items with one first_seen_at, so an item of the newest enriched item's run that the
+analyst skipped stays pending), since = the EARLIER of
 - the newest `first_seen_at` among the news and announcements already enriched (news_enriched rows analyzed
   at or before now): items collected after the last enriched item, even by a light run that pushed while
   the previous pre-open run was working, are pending; and
@@ -11,7 +13,11 @@ Pending = the window's news and announcement ids that have no news_enriched row 
 headline changed in the window (a news_updates row seen in (since, now], news de-duplication, DESIGN.md section 3)
 after its latest enrichment: the analyst scores the new headline and appends a newer news_enriched row, so the
 latest enrichment as of a time belongs to the headline shown then. Such rows carry `headline_updated_at`.
-`validate.py --stage news` checks the analyst's file against the same window.
+Every line carries `priority` (issue #46): `watchlist` for an announcement or a news item tagged with a watchlist
+ticker, else `background`; watchlist lines come first (each group oldest first). The analyst reads each watchlist
+item on its own and may score background items in groups.
+`validate.py --stage news` checks the analyst's file against the same window (and warns, ENRICH_TEMPLATED, when
+watchlist records share templated summaries).
 
     python scripts/news_pending.py [--out work/news_pending.jsonl]
 
@@ -33,6 +39,8 @@ from marketbrief.constants.news_pending import (
     NEWS_COLUMNS,
     PENDING_FILE,
     PENDING_MAX_DAYS,
+    PRIORITY_BACKGROUND,
+    PRIORITY_WATCHLIST,
     STEP_NEWS_PENDING,
 )
 from marketbrief.core import paths
@@ -48,11 +56,11 @@ SELECT max(first_seen_at) FROM (
 ) WHERE first_seen_at <= ?::TIMESTAMPTZ"""
 ENRICHED_SQL = "SELECT DISTINCT id FROM news_enriched"
 WINDOW_SQL = (
-    "SELECT {columns} FROM {table} WHERE first_seen_at > ?::TIMESTAMPTZ AND first_seen_at <= ?::TIMESTAMPTZ "
+    "SELECT {columns} FROM {table} WHERE first_seen_at >= ?::TIMESTAMPTZ AND first_seen_at <= ?::TIMESTAMPTZ "
     "ORDER BY first_seen_at, id"
 )
 NEWS_WINDOW_SQL = (  # one row per item, the headline seen by now
-    "SELECT {columns} FROM news_asof(?::TIMESTAMPTZ) WHERE first_seen_at > ?::TIMESTAMPTZ "
+    "SELECT {columns} FROM news_asof(?::TIMESTAMPTZ) WHERE first_seen_at >= ?::TIMESTAMPTZ "
     "AND first_seen_at <= ?::TIMESTAMPTZ ORDER BY first_seen_at, id"
 )
 UPDATED_SQL = """
@@ -99,7 +107,7 @@ def rescore_ids(con, since: pd.Timestamp, now) -> set[str]:
 
 
 def window_rows(con, since: pd.Timestamp, now) -> list[dict]:
-    """News and announcement rows first seen in (since, now], oldest first, each with its `kind`, then the news items
+    """News and announcement rows first seen in [since, now], oldest first, each with its `kind`, then the news items
     first seen earlier whose headline changed in the window; a news row shows its headline as of now."""
     now_text = as_utc(now).isoformat()
     bounds = [since.isoformat(), now_text]
@@ -141,6 +149,19 @@ def clean(value):
     return value
 
 
+def priority(row: dict) -> str:
+    """`watchlist` for an announcement or a news item with a watchlist ticker tag, else `background` (issue #46)."""
+    if row["kind"] == ITEM_KIND_ANNOUNCEMENT or row.get("tickers"):
+        return PRIORITY_WATCHLIST
+    return PRIORITY_BACKGROUND
+
+
+def window_priorities(con, now) -> tuple[pd.Timestamp, dict[str, str]]:
+    """(since, id -> priority of every news and announcement item first seen in the window, enriched or not)."""
+    since = enrichment_since(con, now)
+    return since, {row["id"]: priority(row) for row in window_rows(con, since, now)}
+
+
 def window_ids(con, now) -> tuple[pd.Timestamp, set[str]]:
     """(since, every news and announcement id first seen in the window, enriched or not)."""
     since = enrichment_since(con, now)
@@ -152,7 +173,13 @@ def pending_rows(con, now) -> tuple[pd.Timestamp, list[dict]]:
     since = enrichment_since(con, now)
     done = {row[0] for row in con.execute(ENRICHED_SQL).fetchall()}
     again = rescore_ids(con, since, now)
-    return since, [row for row in window_rows(con, since, now) if row["id"] not in done or row["id"] in again]
+    rows = [
+        {**row, "priority": priority(row)}
+        for row in window_rows(con, since, now)
+        if row["id"] not in done or row["id"] in again
+    ]
+    # watchlist lines first; the sort is stable, so each group keeps its oldest-first order
+    return since, sorted(rows, key=lambda row: row["priority"] != PRIORITY_WATCHLIST)
 
 
 def write_pending(market: str, out: Path) -> dict:
@@ -168,6 +195,8 @@ def write_pending(market: str, out: Path) -> dict:
         "since": since.isoformat(),
         "news": sum(1 for row in rows if row["kind"] == ITEM_KIND_NEWS),
         "announcements": sum(1 for row in rows if row["kind"] == ITEM_KIND_ANNOUNCEMENT),
+        "watchlist": sum(1 for row in rows if row["priority"] == PRIORITY_WATCHLIST),
+        "background": sum(1 for row in rows if row["priority"] == PRIORITY_BACKGROUND),
         "out": out.relative_to(paths.ROOT).as_posix() if out.is_relative_to(paths.ROOT) else str(out),
     }
 

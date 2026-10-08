@@ -24,6 +24,7 @@ BY_MARKET_SUFFIX = "_by_market"
 CFG_CALENDAR = "calendar"
 CFG_HOLIDAYS = "holidays"
 CFG_SPECIAL_SESSIONS = "special_sessions"
+CFG_SPECIAL_SESSION_HOURS = "special_session_hours"
 CFG_TIMEZONE = "timezone"
 
 CFG_RELATIONS = "relations"

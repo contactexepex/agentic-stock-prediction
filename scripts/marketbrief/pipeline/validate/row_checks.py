@@ -21,6 +21,7 @@ from marketbrief.constants.validation import (
     FUTURE_TIME_COLUMNS,
     TRADING_DATE_KINDS,
 )
+from marketbrief.constants.files import CSV_LINE_ENDING, MSG_CSV_LINE_ENDINGS
 from marketbrief.core import paths, schemas
 from marketbrief.utils.timefmt import ISO_UTC, as_utc_timestamp
 
@@ -56,6 +57,20 @@ def todays_files(market: str, kind: str, today: date) -> list[Path]:
         ):
             out.append(path)
     return out
+
+
+def bare_lf_lines(raw: bytes) -> tuple[int, int]:
+    """(lines ending in a bare LF, all lines) of a file's bytes; a stored CSV must end every line in CRLF."""
+    lines = raw.count(b"\n")
+    return lines - raw.count(CSV_LINE_ENDING), lines
+
+
+def csv_line_ending_problem(path: Path, raw: bytes | None = None) -> str | None:
+    """Why a CSV would vanish from DuckDB's glob read (issue #47), or None when every line ends in CRLF."""
+    bare, lines = bare_lf_lines(path.read_bytes() if raw is None else raw)
+    if not bare:
+        return None
+    return MSG_CSV_LINE_ENDINGS.format(relative_path=path.relative_to(paths.ROOT).as_posix(), bare=bare, lines=lines)
 
 
 def read_rows(path: Path) -> tuple[list[dict], list[str]]:

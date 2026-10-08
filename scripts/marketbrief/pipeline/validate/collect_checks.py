@@ -7,6 +7,7 @@ from datetime import date, timedelta
 
 import pandas as pd
 
+from marketbrief.constants.files import CSV_FORMAT
 from marketbrief.constants.kinds import KIND_NEWS, KIND_NEWS_RUNS, NEWS_STORED_VIEW
 from marketbrief.constants.prices import HELD_ESCALATE_SESSIONS, SUMMARY_HELD_TOO_LONG
 from marketbrief.constants.validation import (
@@ -38,6 +39,8 @@ from marketbrief.core import market_config, paths, schemas
 from marketbrief.pipeline.validate.gate_result import Result, work_dir
 from marketbrief.pipeline.validate.row_checks import (
     check_rows,
+    csv_line_ending_problem,
+    kind_files,
     read_rows,
     tickers_in,
     todays_files,
@@ -74,7 +77,20 @@ def check_files(res: Result, cfg: dict, kinds, today: date, now: pd.Timestamp, v
                     tickers_in(rows),
                 )
         counts[kind] = row_count
+    check_csv_line_endings(res, cfg, kinds)
     return counts
+
+
+def check_csv_line_endings(res: Result, cfg: dict, kinds) -> None:
+    """Every stored CSV of the stage's kinds, not only today's, ends each line in CRLF (issue #47): DuckDB's one
+    read_csv over a glob silently drops a file whose line ending differs from the first file's."""
+    for kind in kinds:
+        if schemas.SCHEMAS[kind][0] != CSV_FORMAT:
+            continue
+        for path in kind_files(cfg["market"], kind):
+            problem = csv_line_ending_problem(path)
+            if problem:
+                res.block("CSV_LINE_ENDINGS", problem)
 
 
 def stored_table(kind: str) -> str:

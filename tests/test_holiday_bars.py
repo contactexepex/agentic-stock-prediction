@@ -183,6 +183,31 @@ def test_special_sessions_count_as_sessions():
     assert prev_session(cfg, date(2025, 10, 22)) == date(2025, 10, 21)
 
 
+def test_special_sessions_use_their_own_hours():
+    """Issue #45: a Muhurat session opens and closes at its `special_session_hours` (NSE circulars), not at the
+    regular 09:15-15:30 IST; a special session without hours keeps the regular hours."""
+    from datetime import datetime, timezone
+
+    from marketbrief.core.calendar import last_complete_session, session_close_utc, session_open_utc
+    from marketbrief.core.market_config import load_market
+
+    cfg = load_market("india")
+    utc = timezone.utc
+    assert session_open_utc(cfg, date(2024, 11, 1)) == datetime(2024, 11, 1, 12, 30, tzinfo=utc)   # 18:00 IST
+    assert session_close_utc(cfg, date(2024, 11, 1)) == datetime(2024, 11, 1, 13, 30, tzinfo=utc)  # 19:00 IST
+    assert session_open_utc(cfg, date(2025, 10, 21)) == datetime(2025, 10, 21, 8, 15, tzinfo=utc)  # 13:45 IST
+    assert session_close_utc(cfg, date(2025, 10, 21)) == datetime(2025, 10, 21, 9, 15, tzinfo=utc) # 14:45 IST
+    assert session_close_utc(cfg, date(2025, 10, 20)) == datetime(2025, 10, 20, 10, 0, tzinfo=utc)  # regular 15:30
+    regular = {**cfg, "special_session_hours": {}}
+    assert session_close_utc(regular, date(2025, 10, 21)) == datetime(2025, 10, 21, 10, 0, tzinfo=utc)
+    # the Muhurat bar is final 120 min (BAR_SETTLE_MINUTES) after its own 14:45 close, before the regular one
+    assert last_complete_session(cfg, datetime(2025, 10, 21, 11, 30, tzinfo=utc)) == date(2025, 10, 21)
+    assert last_complete_session(regular, datetime(2025, 10, 21, 11, 30, tzinfo=utc)) == date(2025, 10, 20)
+    for bad in ("13:45", "14:45-13:45", "1:45 pm-2:45 pm"):                # a malformed entry names itself
+        with pytest.raises(ValueError, match="special_session_hours 2025-10-21"):
+            session_open_utc({**cfg, "special_session_hours": {"2025-10-21": bad}}, date(2025, 10, 21))
+
+
 @pytest.mark.usefixtures("env")
 def test_special_session_bars_are_kept_on_read():
     header = "date,ticker,open,high,low,close,adj_close,volume,collected_at\n"
