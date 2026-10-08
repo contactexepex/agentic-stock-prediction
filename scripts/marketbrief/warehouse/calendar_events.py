@@ -6,7 +6,7 @@ date to a last date. Rules as in W1's catalogue build (design/catalogue/catalogu
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 import pandas as pd
 
@@ -22,6 +22,7 @@ from marketbrief.constants.market_pages import (
     WIDENS_MARKET,
 )
 from marketbrief.core import calendar
+from marketbrief.lifecycle import accessor
 from marketbrief.presentation.dashboard import reads
 
 COMPANY_EVENTS_SQL = f"""SELECT ticker, id, date, type, source, timing FROM ({reads.COMPANY_EVENTS_ASOF_SQL})
@@ -88,7 +89,11 @@ def company_rows(con, cfg: dict, active: set[str], first: date, last: date, cuto
     return rows
 
 
-def calendar_rows(con, cfg: dict, active: set[str], first: date, last: date, cutoff: str) -> list[dict]:
-    """Every calendar row from `first` to `last`, by date, major events first, then company rows, type and name."""
-    rows = market_rows(cfg, first, last) + company_rows(con, cfg, active, first, last, cutoff)
+def calendar_events(cfg: dict, con, cutoff: datetime, from_date: date, to_date: date) -> list[dict]:
+    """Every calendar row from `from_date` to `to_date` as known by the cut-off (the active companies as of it), by
+    date, major events first, then market rows before company rows, by type and name. Shared with the company page
+    (B12), which filters it per ticker."""
+    active = {record["ticker"] for record in accessor.watchlist(cfg["market"], cutoff)}
+    rows = market_rows(cfg, from_date, to_date) + company_rows(con, cfg, active, from_date, to_date,
+                                                               cutoff.isoformat())
     return sorted(rows, key=lambda r: (r["date"], not r["major"], r["ticker"] is not None, r["type"], r["name"]))

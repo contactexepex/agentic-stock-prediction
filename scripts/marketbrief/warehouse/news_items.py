@@ -2,15 +2,17 @@
 design/mockups/09-news/notes.md). Every read is as of the cut-off: the item list of `news_asof`, the newest
 `news_enriched` and `news_articles` rows by then, the status of `news_status_ids_asof` and the newest cluster row of
 `news_verified_asof`, the headline history of `news_updates` seen by then. Nothing stored later reaches a page.
+`news_items` is shared with the company page (B12), which filters it per ticker; `news_window` is the News page's
+and Home's selection.
 
 The rules are W1's of the catalogue build (design/catalogue/catalogue_newsfeed.py, data request 8): `scope`, the
-`summary` line and the `market_moving` flag. The item's status is the one of its first primary ticker (else its
-first ticker); a market-wide item has none, because verification is per company."""
+`summary` line and the `market_moving` flag. The item's status is the one of its first primary ticker; a
+market-wide item has none, because verification is per company."""
 
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pandas as pd
 
@@ -46,7 +48,7 @@ SELECT w.id, w.title, w.url, w.source, w.source_domain, w.published_at, w.first_
        e.urgency, e.priced_in, e.geopolitical, e.summary AS analyst_summary, s.status, s.cluster_id,
        s.as_of AS status_as_of, v.independent_origins, v.primary_ids, a.access, a.extract
 FROM w JOIN e USING (id)
-LEFT JOIN s ON s.news_id = w.id AND s.ticker = coalesce(w.primary_tickers[1], w.tickers[1])
+LEFT JOIN s ON s.news_id = w.id AND s.ticker = w.primary_tickers[1]
 LEFT JOIN v ON v.cluster_id = s.cluster_id
 LEFT JOIN a ON a.id = w.id
 ORDER BY w.first_seen_at DESC, w.id"""
@@ -172,21 +174,34 @@ def capped(records: list[dict], max_items: int) -> list[dict]:
     return sorted(kept, key=lambda r: (r["first_seen_at"], r["id"]), reverse=True)
 
 
-def news_window(con, cfg: dict, cutoff: datetime, days: int, max_items: int) -> tuple[list[dict], dict]:
-    """(items, window) of a market: the scored items first seen in the `days` before the cut-off, about a collected
-    company or market-wide and relevant, at most `max_items` (`capped`), newest first;
-    `window` is the selection's record (from, to, counts)."""
-    start = cutoff - timedelta(days=days)
-    params = {"cutoff": cutoff.isoformat(), "start": start.isoformat()}
-    rows = [row for row in con.execute(ITEMS_SQL, params).df().to_dict("records") if shown(row, set(cfg["tickers"]))]
+EARLIEST = datetime(1970, 1, 1, tzinfo=timezone.utc)
+
+
+def news_items(cfg: dict, con, cutoff: datetime, tickers: list[str] | None = None,
+               since: datetime | None = None) -> list[dict]:
+    """Every News item record first seen in (since, cutoff] (since None: from the first stored item) that the
+    analyst scored by the cut-off, about a collected company or market-wide and relevant (`shown`); with `tickers`,
+    only items tagged with one of them. Newest first, uncapped."""
+    params = {"cutoff": cutoff.isoformat(), "start": (since or EARLIEST).isoformat()}
+    collected = set(cfg["tickers"])
+    rows = [row for row in con.execute(ITEMS_SQL, params).df().to_dict("records") if shown(row, collected)]
+    if tickers is not None:
+        wanted = set(tickers)
+        rows = [row for row in rows if wanted & set(id_list(row["tickers"]))]
     history: dict[str, list[dict]] = {}
     ids = [row["id"] for row in rows]
     if ids:
         for news_id, title, seen_at in con.execute(UPDATES_SQL, {"cutoff": params["cutoff"], "ids": ids}).fetchall():
             history.setdefault(news_id, []).append({"seen_at": iso(seen_at), "title": title})
-    records = [item(cfg["market"], row, history) for row in rows]
-    kept = capped(records, max_items)
-    older = con.execute(COUNT_BEFORE_SQL, params).fetchone()[0]
+    return [item(cfg["market"], row, history) for row in rows]
+
+
+def news_window(cfg: dict, con, cutoff: datetime, days: int, max_items: int) -> tuple[list[dict], dict]:
+    """(items, window) of a market: `news_items` first seen in the `days` before the cut-off, at most `max_items`
+    (`capped`), newest first; `window` is the selection's record (from, to, counts)."""
+    start = cutoff - timedelta(days=days)
+    records = news_items(cfg, con, cutoff, since=start)
+    older = con.execute(COUNT_BEFORE_SQL, {"cutoff": cutoff.isoformat(), "start": start.isoformat()}).fetchone()[0]
     window = {
         "days": days,
         "from": iso(start),
@@ -195,4 +210,4 @@ def news_window(con, cfg: dict, cutoff: datetime, days: int, max_items: int) -> 
         "stored_in_window": len(records),
         "older_hidden": int(older),
     }
-    return kept, window
+    return capped(records, max_items), window
