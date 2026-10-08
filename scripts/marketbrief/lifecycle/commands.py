@@ -88,7 +88,7 @@ def pending_company(market: str, ticker: str, stored: list[dict], received) -> d
     second deactivate is refused. The new event never takes effect before the newest stored one (effective_time)."""
     newest = newest_effective(stored, ticker)
     as_of = max(received, newest) if newest else received
-    return companies_as_of(market, accessor.config_lists(market), as_of).get(ticker)
+    return companies_as_of(market, accessor.config_company_keys(market), as_of).get(ticker)
 
 
 def strip(row: dict) -> dict:

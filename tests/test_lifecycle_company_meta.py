@@ -1,8 +1,8 @@
 """Wave 5 (B18's config change, B1's loader): config/markets/<market>.yaml's `tickers:` becomes `company_meta:`
 (per-company metadata only). Membership comes from the watchlist events alone; company_meta entries act as the
-implicit seed only while a market has no stored watchlist event. The proof: on the real configs and the real seed
-events, everything the lifecycle gives (load_market, the active lists, the accessor, every watchlist state, the
-command validator's pending state) is byte-identical with either key, at clocks from before the seed's
+implicit seed only while a market has no stored seed event (channel `seed`). The proof: on the real configs and the
+real seed events, everything the lifecycle gives (load_market, the active lists, the accessor, every watchlist
+state, the command validator's pending state) is byte-identical with either key, at clocks from before the seed's
 effective_from to now. Offline: a temporary data root holding a copy of the repo's watchlist events."""
 from __future__ import annotations
 
