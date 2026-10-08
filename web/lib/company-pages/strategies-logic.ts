@@ -18,9 +18,13 @@ const byProfit = (a: StrategyRow, b: StrategyRow) =>
 export const bestOf = (rows: StrategyRow[]): StrategyRow | null =>
   rows.filter(r => r.trades > 0 && r.net_pnl != null).sort(byProfit)[0] ?? null;
 
-/** Every strategy id, those with a row on this company first by profit after costs, then the rest by id. */
+/** A row takes a rank only with a stored profit after costs; a null profit is not read as 0. */
+export const isRanked = (r: StrategyRow | null | undefined): r is StrategyRow & { net_pnl: number } => r != null && r.net_pnl != null;
+
+/** Every strategy id: those with a stored profit on this company first, by profit after costs, then trades, then
+ *  id; then the rest (no row, or no stored profit) by id. */
 export function rankedIds(strategyIds: string[], rows: StrategyRow[]): string[] {
-  const byId = new Map(rows.map(r => [r.strategy_id, r] as [string, StrategyRow]));
+  const byId = new Map(rows.filter(isRanked).map(r => [r.strategy_id, r] as [string, StrategyRow]));
   return [...strategyIds].sort((x, y) => {
     const a = byId.get(x), b = byId.get(y);
     if (a && b) return byProfit(a, b);

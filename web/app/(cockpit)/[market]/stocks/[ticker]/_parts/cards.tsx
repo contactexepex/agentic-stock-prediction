@@ -10,7 +10,7 @@ import { CURRENCY_SYMBOL, LOCALE } from "../../../../../../lib/ui/constants.ts";
 import { DOW, fmtDate, fmtDateYear, money, signed } from "../../../../../../lib/ui/format.ts";
 import { lifecyclePath, pagePath } from "../../../../../../lib/ui/routes.ts";
 import { companyEventEffect, horizonOfId, nextCompanyEvent } from "../../../../../../lib/company-pages/company-logic.ts";
-import type { AiReason, CompanyPayload, NewsItem, ResultsDigest } from "../../../../../../lib/company-pages/types.ts";
+import type { AiReason, CompanyPayload, NewsItem } from "../../../../../../lib/company-pages/types.ts";
 import type { PageCtx } from "./context.ts";
 import { eventWords, NOTE_KIND, plural } from "./labels.ts";
 

@@ -2,12 +2,10 @@
 // The company page's two trade tables (design/mockups/03-company openTrades, settled): today's path of every open
 // paper trade with its latest intraday check (F5), and the settled trades newest first with the automatic reason
 // split as a diverging "why" bar (F1.9-F1.10, decision 43). Monitoring and records only; nothing is traded.
-import { strategyOf } from "../../../../../../components/blocks/records.tsx";
 import { RangeBar } from "../../../../../../components/charts/small.tsx";
-import { Icon } from "../../../../../../components/ui/icon.tsx";
-import { Card, CardHead, Delta, FamilyLabel, GoLink, Label, MoneyDelta, PaperTag, Quiet } from "../../../../../../components/ui/primitives.tsx";
+import { Card, CardHead, Delta, GoLink, Label, MoneyDelta, PaperTag, Quiet } from "../../../../../../components/ui/primitives.tsx";
 import { DataTable, type Column } from "../../../../../../components/ui/table.tsx";
-import { BAND, BAND_SHORT, FAMILY_SHORT, FLAG, FLAG_SHORT, PICK_RULE } from "../../../../../../lib/ui/constants.ts";
+import { PICK_RULE } from "../../../../../../lib/ui/constants.ts";
 import { fmtDate, money, pct, price, signed } from "../../../../../../lib/ui/format.ts";
 import { stockStrategiesPath } from "../../../../../../lib/ui/routes.ts";
 import { bandsOf, isSettled, settledSummary, whyScale, whySegments } from "../../../../../../lib/company-pages/company-logic.ts";

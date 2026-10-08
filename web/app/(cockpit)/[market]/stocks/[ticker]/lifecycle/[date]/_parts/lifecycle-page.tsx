@@ -7,14 +7,13 @@
 import Link from "next/link";
 import { CostLabels } from "../../../../../../../../components/blocks/costs.tsx";
 import { PageFooter, PageHead, SignalsBand } from "../../../../../../../../components/blocks/page-head.tsx";
-import { strategyOf } from "../../../../../../../../components/blocks/records.tsx";
 import { RangeBar } from "../../../../../../../../components/charts/small.tsx";
 import { Icon } from "../../../../../../../../components/ui/icon.tsx";
 import { Card, CardHead, FamilyLabel, Label, MoneyDelta, Odds, PaperTag, Quiet } from "../../../../../../../../components/ui/primitives.tsx";
 import { ErrorState, LoadingState, PageState } from "../../../../../../../../components/ui/states.tsx";
 import { DataTable, type Column } from "../../../../../../../../components/ui/table.tsx";
-import { BAND, BAND_SHORT, FAMILY_SHORT, FLAG, FLAG_SHORT, MARKET_LABEL, PICK_RULE } from "../../../../../../../../lib/ui/constants.ts";
-import { fmtDate, fmtDateYear, pct, price, signed } from "../../../../../../../../lib/ui/format.ts";
+import { FAMILY_SHORT, MARKET_LABEL, PICK_RULE } from "../../../../../../../../lib/ui/constants.ts";
+import { fmtDate, fmtDateYear, price, signed } from "../../../../../../../../lib/ui/format.ts";
 import { companyPath, lifecyclePath } from "../../../../../../../../lib/ui/routes.ts";
 import { usePage } from "../../../../../../../../lib/ui/use-api.ts";
 import type { Market } from "../../../../../../../../lib/data/constants.ts";

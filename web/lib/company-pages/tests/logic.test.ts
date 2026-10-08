@@ -96,6 +96,8 @@ test("ranking: profit after costs, then trades, then id; unranked strategies aft
   assert.equal(bestOf([{ strategy_id: "z", horizon_days: "all", trades: 0, net_pnl: 5 }]), null);
   assert.equal(bestOf([{ strategy_id: "n", horizon_days: "all", trades: 4, net_pnl: null }]), null, "a row without a stored profit is not the best");
   const raw: ScoreRow[] = [{ strategy_id: null, horizon_days: "all", trades: 3, net_pnl: 1 }, { strategy_id: "a", horizon_days: 1, trades: 3, net_pnl: 1 }, ...rows];
+  const withNull: StrategyRow[] = [...rows, { strategy_id: "n", horizon_days: "all", trades: 2, net_pnl: null }];
+  assert.deepEqual(rankedIds(["x", "c", "n", "a"], withNull), ["a", "c", "n", "x"], "a null profit is unranked, never read as 0");
   assert.deepEqual(pooledRows(raw).map((r) => r.strategy_id), rows.map((r) => r.strategy_id), "null ids and per-horizon rows are left out");
 });
 

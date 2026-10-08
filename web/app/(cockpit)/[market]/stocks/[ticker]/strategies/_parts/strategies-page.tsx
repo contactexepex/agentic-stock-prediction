@@ -20,7 +20,7 @@ import { usePage } from "../../../../../../../lib/ui/use-api.ts";
 import type { Market } from "../../../../../../../lib/data/constants.ts";
 import type { StrategyMap } from "../../../../../../../lib/ui/types.ts";
 import { bandsOf } from "../../../../../../../lib/company-pages/company-logic.ts";
-import { agreementAt, bestOf, buyShare, expectedGainMoney, pooledRows, rankedIds } from "../../../../../../../lib/company-pages/strategies-logic.ts";
+import { agreementAt, bestOf, buyShare, expectedGainMoney, isRanked, pooledRows, rankedIds } from "../../../../../../../lib/company-pages/strategies-logic.ts";
 import type { HeadToHeadPick, ScoreRow, StockStrategiesPayload } from "../../../../../../../lib/company-pages/types.ts";
 import { StrategiesLegend } from "../../_parts/legend.tsx";
 import "./strategies.css";
@@ -260,14 +260,14 @@ function RankedCard({ p, horizon, onPick, strategies }: { p: StockStrategiesPayl
           <tbody>
             {ids.map((id) => {
               const st = strategies[id], r = byId.get(id), o = overall.get(id), pr = preds.get(id);
-              if (r) rank += 1;
+              if (isRanked(r)) rank += 1;
               const bands = pr ? bandsOf(pr) : null;
               const cls = [r ? (r.sample_badge === "too_few_to_rank" ? "few" : "") : "none", best && r === best ? "best" : ""].filter(Boolean).join(" ");
               const sub = st.differs_in ? `differs from the reference in ${st.differs_in.replace(/_/g, " ")}` : st.family === "baseline" ? "yardstick, not a contender" : st.family === "ai" ? (st.parameters?.sees_model_score ? "sees the model score" : "blind to the model score") : "the reference rule strategy";
               const predicts = (st.horizons ?? p.horizons).includes(horizon);
               return (
                 <tr key={id} className={cls || undefined}>
-                  <td className="rank cm">{r ? String(rank) : "—"}</td>
+                  <td className="rank cm">{isRanked(r) ? String(rank) : "—"}</td>
                   <td>
                     <span className="nm">
                       <b><Link className="tk" href={`${pagePath(p.market, "lab")}#${id}`} data-tip={`${st.description ?? st.name} Open it in the Strategy lab.`}>{st.name}</Link> <FamilyLabel family={st.family}>{FAMILY_SHORT[st.family]}</FamilyLabel></b>

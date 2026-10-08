@@ -79,8 +79,8 @@ function CompanyBody({ p }: { p: CompanyPayload }) {
       <CompanyLegend />
       <PageFooter page={p} endpoint={`stocks/${co.ticker}`} />
       {intent ? (
-        <CommandDialog key={openings} intent={intent} market={ctx.market} currency={ctx.currency} defaultAmount={co.amount ?? 0}
-          onClose={() => setIntent(null)} onRecorded={(r) => setRecorded((list) => [...list, r])} onSwitch={setIntent} />
+        <CommandDialog key={openings} intent={intent} market={ctx.market} currency={ctx.currency} defaultAmount={co.amount ?? 0} /* read only by the dialog's add intent, which this page never opens */
+          onClose={() => setIntent(null)} onRecorded={(r) => setRecorded((list) => [...list, r])} onSwitch={(next) => { setOpenings((n) => n + 1); setIntent(next); }} />
       ) : null}
     </>
   );
