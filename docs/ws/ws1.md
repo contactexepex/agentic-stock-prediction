@@ -146,7 +146,9 @@ each page type now belongs to the session named below, and WS1 keeps two builder
 - Exit codes: 1 when the sync failed or a page failed validation. 0 otherwise, a kill-switch skip
   included.
 - Kill switch: `enabled: false` skips before connecting. A sync also skips when this UTC month's recorded
-  sync wall time in `meta.sync_runs` (both markets) reaches `monthly_hours_ceiling` (7). This guard is
+  MotherDuck time in `meta.sync_runs` (both markets) reaches `monthly_hours_ceiling` (7). Each run counts its
+  `connected_s` (from the connect to the close; the local staging is not counted), and a run recorded before
+  that column existed counts its whole wall time (follow-up of 2026-10-08 below). This guard is
   self-measured, because Lite offers no usage query (see below).
 
 ### Design decisions
@@ -365,7 +367,24 @@ sync_market wall   base: 4.62 new: 4.87
    "network_clean": true,
   ```
 
+## Follow-up 2026-10-08: restore, and a ceiling on MotherDuck time only
+- Restore (orchestrator's request): the `india` schema was missing from `market_brief`. `--full` syncs of
+  both markets on main c09eed8d rebuilt it (india 22,894 rows, us 27,714 rows, 727 pages each, no invalid
+  page); `scripts/api_contract.py` against the live warehouse gave `"problems": [], "ok": true` for both.
+  `meta.sync_runs` kept its history. Both runs got HTTP 404 from the app's revalidate endpoint.
+- Ceiling. Owner decision (this session, 2026-10-08): count only the time a run holds the MotherDuck
+  connection. Reason: since the 2.0 read models a sync took 52-64 s of wall time (12:09Z-18:20Z runs),
+  of which about 40 s is local staging that MotherDuck never sees. With B17's added intraday, post-close and
+  weekly syncs (about 485 a month) the wall-time measure reached about 8.1 h and would have skipped every
+  sync from about day 26; the connected time of the same runs is about 23-27 s each (about 3.3-3.6 h).
+- Change: `meta.sync_runs.connected_s` (DOUBLE; `ensure_sync_runs_table` adds it to an existing table with
+  `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`; older rows keep NULL and count their wall time); the summary
+  shows `connected_s`. Test: `tests/test_warehouse_ceiling.py`, plus a check in `test_sync_runs_are_recorded`.
+
 ## Proposed edits to shared docs
+Status (2026-10-08): the warehouse bullet is on main; its sentence on the
+HTTPS-only extension install and the duckdb pin was applied by WS1 at the owner's request. The routine
+steps 12a and 3a are on main.
 
 **routine/PROMPT.md**, a new step after step 12 (Save), before step 13 (Notify). It comes after the save
 rather than inside step 11 so that `source_commit` is the pushed commit holding the data the pages were

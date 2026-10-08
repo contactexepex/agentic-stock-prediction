@@ -1,6 +1,6 @@
 """What a warehouse sync records about itself: its row in meta.sync_runs, its row in rm.builds, the
 summary JSON under work/warehouse/, and the facts these share (source commit, page counts, the month's
-recorded sync time that the kill switch reads)."""
+recorded MotherDuck time that the kill switch reads)."""
 
 from __future__ import annotations
 
@@ -35,9 +35,10 @@ SYNC_RUNS_COLUMNS = {
     "mode": "VARCHAR",
     "ok": "BOOLEAN",
     "error": "VARCHAR",
+    "connected_s": "DOUBLE",
 }
 SYNC_RUNS = f"{META_SCHEMA}.{SYNC_RUNS_TABLE}"
-MONTH_HOURS_SQL = f"""SELECT coalesce(sum(epoch(finished_at) - epoch(started_at)), 0) / 3600
+MONTH_HOURS_SQL = f"""SELECT coalesce(sum(coalesce(connected_s, epoch(finished_at) - epoch(started_at))), 0) / 3600
                       FROM {SYNC_RUNS} WHERE started_at >= ?"""
 
 
@@ -110,9 +111,10 @@ def build_row(run: dict, kind: str, commit: str, page_counts: dict, invalid_page
 
 
 def ensure_sync_runs_table(warehouse) -> None:
-    """The meta.sync_runs table."""
+    """The meta.sync_runs table; a table created before connected_s existed gets the column (NULL in old rows)."""
     warehouse.execute(f"CREATE SCHEMA IF NOT EXISTS {META_SCHEMA}")
     warehouse.execute(f"CREATE TABLE IF NOT EXISTS {SYNC_RUNS} ({column_definitions(SYNC_RUNS_COLUMNS)})")
+    warehouse.execute(f"ALTER TABLE {SYNC_RUNS} ADD COLUMN IF NOT EXISTS connected_s DOUBLE")
 
 
 def record_sync_run(warehouse, run: dict) -> None:
@@ -121,7 +123,8 @@ def record_sync_run(warehouse, run: dict) -> None:
 
 
 def month_hours(warehouse, now: datetime) -> float:
-    """This UTC month's recorded sync wall time in hours (all markets)."""
+    """This UTC month's recorded MotherDuck time in hours (all markets): each run's connected_s, or its whole
+    wall time for a run recorded before connected_s existed."""
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     return float(warehouse.execute(MONTH_HOURS_SQL, [month_start]).fetchone()[0])
 

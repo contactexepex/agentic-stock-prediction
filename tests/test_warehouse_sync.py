@@ -201,8 +201,11 @@ def test_sync_runs_are_recorded(synced):
     rows = query(
         synced["root"],
         "SELECT run_id, market, mode, ok, error, rows, read_models, cutoff, target, tables, table_rows, "
-        "started_at <= finished_at FROM meta.sync_runs ORDER BY started_at",
+        "started_at <= finished_at, connected_s, epoch(finished_at) - epoch(started_at) "
+        "FROM meta.sync_runs ORDER BY started_at",
     )
+    for r in rows[:2]:  # the connected time is part of the run's wall time
+        assert 0 < r[12] <= r[13]
     assert [r[0] for r in rows[:2]] == [synced["first"]["run_id"], synced["second"]["run_id"]]
     for r in rows[:2]:
         assert r[1:5] == ("us", "replace", True, None)
@@ -211,6 +214,7 @@ def test_sync_runs_are_recorded(synced):
         assert set(r[9]) == MIRRORED and json.loads(r[10]) == synced["first"]["tables"] and r[11]
     summary = json.loads((synced["root"] / "work" / "warehouse" / "us-sync.json").read_text())
     assert summary["run_id"] == synced["second"]["run_id"] and summary["ok"] is True
+    assert summary["connected_s"] == rows[1][12]
     assert not list((synced["root"] / "work" / "warehouse").glob("stage-*"))  # staging removed
     builds = query(
         synced["root"],

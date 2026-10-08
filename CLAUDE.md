@@ -143,7 +143,10 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   scores and versions, news with status, events, agent reasoning, lessons, reviews), replaced in one transaction, plus
   per-page read models in `rm` (`overview`, `watchlist`, `stock`, `bars`, `track_record`, `status`; key `(market, page_key)`,
   payload sliced from `gather_dashboard`, upserted by `payload_sha256`), `rm.builds` and `meta.sync_runs`. Kill switch
-  `enabled` and `monthly_hours_ceiling` in the config. Optional, non-blocking, rebuildable with `--full`; static
+  `enabled` and `monthly_hours_ceiling` in the config. The MotherDuck extension is installed by
+  `marketbrief/warehouse/extension.py` over HTTPS only (both signed files downloaded through the proxy, DuckDB checks
+  the signatures; never `INSTALL motherduck`, whose downloads are plain HTTP); `duckdb` is pinned in requirements.txt
+  and the matching extension build under `extension:` in `config/warehouse.yaml`. Optional, non-blocking, rebuildable with `--full`; static
   `reports/` and Slack never depend on it. Read-model framework (B4, docs/ws/b4.md): each `rm.<table>` is a
   `PageBuilder` declared in a `warehouse/rm_<page>.py` module (found by name; shared page blocks in `rm_common.py`,
   as of the clock, collected companies only via B1's `watchlist(market, cutoff, "collected")`), checked against its
