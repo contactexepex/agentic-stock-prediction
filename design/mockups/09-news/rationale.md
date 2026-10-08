@@ -79,9 +79,11 @@ other page.
 `check_page.js`: no console errors, no overflow, no external requests at 1280 and 390 px. `check_text.js` (twelve
 widths, both markets): no clipped, overflowing or overlapping text. Rebuild is byte-identical. A script in both
 markets: the band holds 10 stories (India: 5 flagged first; US: 5 flagged first), the feed 29 stories on 3 pages
-(India 14 in the last 24 h, US 29), the filters give India 14 / 12 / 5 / 1 stories and the US 29 / 12 / 5 / none for
-last 24 h / market-wide / market moving / can carry a call, page 2 adds the 5 Oct day group in India, the company
-rail counts RELIANCE 8 and HDFCBANK 4 (India) and NVDA 4, AAPL 2, JPM 1 (US), no page error.
+(India 5 published in the last 24 h, US 22), the filters give India 5 / 12 / 5 / 1 stories and the US 22 / 12 / 5 /
+none for last 24 h / market-wide / market moving / can carry a call (the last-24 h counts by the outlet's publish time
+since the closing round; rounds 1 and 2 counted by the stored time, India 14 and US 29), page 2 adds the 5 Oct day
+group in India, the company rail counts RELIANCE 8 and HDFCBANK 4 (India) and NVDA 4, AAPL 2, JPM 1 (US), no page
+error.
 
 Judge round 1 (2026-10-08) found three blockers, fixed before round 2: the notes said two older items are hidden in
 each market (India hides one, the US two, and the US invented item first seen after the cut-off is excluded); the

@@ -29,15 +29,15 @@ implements the mockups as React components on the design system.
 ## Pages (SPEC section 6)
 | # | Page | Folder | Status |
 |---|---|---|---|
-| 1 | Home | `mockups/01-home/` | approved by the owner (2026-10-08, with "fix the clipped and overlapping text"); judge PASS round 3 at a0467b2; on main |
+| 1 | Home | `mockups/01-home/` | approved by the owner (2026-10-08, with "fix the clipped and overlapping text"); judge PASS round 3 at a0467b2; on main; cosmetic issues #160-#162 |
 | 2 | Watchlist | `mockups/02-watchlist/` | built on the owner's delegated authority (2026-10-08); judge PASS round 2 at b1c9127; on main; cosmetic issues #152-#155 |
-| 3 | Company | `mockups/03-company/` | built on the owner's delegated authority (2026-10-08); judge PASS round 2 at 8912657; on main |
-| 4 | Stock strategies | `mockups/04-stock-strategies/` | built on the owner's delegated authority (2026-10-08); judge PASS round 2 at ca019cd; on main |
+| 3 | Company | `mockups/03-company/` | built on the owner's delegated authority (2026-10-08); judge PASS round 2 at 8912657; on main; cosmetic issues #169-#175 |
+| 4 | Stock strategies | `mockups/04-stock-strategies/` | built on the owner's delegated authority (2026-10-08); judge PASS round 2 at ca019cd; on main; cosmetic issues #157-#158, #163-#168 |
 | 5 | Strategy lab | `mockups/05-strategy-lab/` | built on the owner's delegated authority (2026-10-08); judge PASS round 2 at a7c4ff3 and, reading W1's back-test rows on the Back-test basis, PASS round 4 at 4d03deb, and reading W1's heatmap cells and cumulative lines PASS round 2 at 5c5c60b; on main; cosmetic issues #197-#207, #219-#221, #223-#224 |
 | 6 | Rule vs AI | `mockups/06-rule-vs-ai/` | built on the owner's delegated authority (2026-10-08); judge PASS round 4 at e0d2b7d and, rebuilt on W1's W40 research reviews, round 7 at 821298d; on main; cosmetic issues #179-#189 |
 | 7 | Paper portfolios | `mockups/07-paper-portfolios/` | built on the owner's delegated authority (2026-10-08); judge PASS round 2 at 5d22863; on main; cosmetic issues #190-#193 |
 | 8 | Track record | `mockups/08-track-record/` | built on W1's `track_record` entity (2026-10-08); judge PASS round 2 at 17c5c6f; on main; cosmetic issues #213-#216 |
-| 9 | News | `mockups/09-news/` | built on the owner's rules of 2026-10-08 (the last 3 days, the market movers first, every story linking to its article, the calendar and the companies in a rail) and W1's data request 8; judge PASS round 2 at 163963a and, with the publish time, round 3 at 022a83a; on main; cosmetic issues #225-#227 |
+| 9 | News | `mockups/09-news/` | built on the owner's rules of 2026-10-08 (the last 3 days, the market movers first, every story linking to its article, the calendar and the companies in a rail) and W1's data request 8; judge PASS round 2 at 163963a and, with the publish time, round 3 at 022a83a, closing round judged (verdict in `judgments/log.jsonl`); on main; cosmetic issues #225-#226 (#227 fixed by the closing round) |
 | 10 | Companies | `mockups/10-companies/` | built on the owner's delegated authority (2026-10-08); judge PASS round 2 at 23c56a4; on main; cosmetic issues #194-#196 |
 | 11 | Assistant | `mockups/11-assistant/` | built on W1's `assistant_answer` entity (2026-10-08); judge PASS round 2 at 656b699 and, rebuilt on W1's data request 7 (answers asked before the cut-off), round 3 at 437a891; on main; cosmetic issues #217-#218 |
 | 12 | Help | `mockups/12-help/` | built on the owner's delegated authority (2026-10-08); judge PASS round 3 at 962b8dc; on main; cosmetic issues #208-#212 |
@@ -92,20 +92,29 @@ API work (WS2, `api/openapi.yaml`) and the app (WS3) take from here:
 | 11-assistant | `POST /api/assistant (the explain tool)` | `(none: conversations are an operational log in MotherDuck schema app, kept 90 days)` |
 | 12-help | `(static content; no endpoint)` | `(none)` |
 
-- **Open data requests** are the `_data_requests` lists in the pages' `data.json` files: the Assistant's budget
-  state (F11), a weekly call series for Track record (B4), and the News findings of issue #226 (events already past,
-  the per-company rail beyond the catalogue's four companies, the kind word, W1's market-moving rule on promotional
-  items). Everything else W1 answered (requests 1-8).
+- **Open data requests** are what the `_data_requests` lists in the pages' `data.json` files leave open: the
+  Assistant's budget state (F11, not in the catalogue); a weekly series of hit rate and Brier per scoring basis for
+  Track record (B4); for Strategy lab, a back-test run on the 15-year history cache and the model-only rows (W1's
+  back-test rows cover always-up and momentum on the stored bars); for News, what the stored data cannot supply (a
+  region, confirmed or corroborated statuses on the stored items, clusters with more than one origin, summaries for
+  most US items); for Rule vs AI, reading the per-company head-to-head cut from the heatmap cells is a follow-up.
+  W1 answered the rest of requests 1-8. Issue #226 holds the News page's further findings for W1 and the owner
+  (events already past, the per-company rail beyond the catalogue's four companies, the kind word, W1's
+  market-moving rule on promotional items); they are an issue, not a `_data_requests` entry.
 - **Rules the pages encode as named constants** (`mockups/_shared/shell.js`, each with its source): the go-live bar
-  (2 months, about 300 trades), two intraday checks a session, 20 trades to rank, the 95% luck interval, the 60-word
-  reason limit, the assistant's 500 characters / $0.65 a day / $20 a month / 90 days, the News page's 10 movers,
-  10 a page and 24 hours; the News window (3 days) and cap (50) are in its build.
+  (2 months, about 300 trades), two intraday checks a session, 20 trades to rank, the 15-year back-test, the 95%
+  luck interval, the 60-word reason limit, the assistant's 500 characters / $0.65 a day / $20 a month / 90 days,
+  the News page's 10 movers, 10 a page and 24 hours, and the 0.05 sentiment band (flat between -0.05 and +0.05);
+  the News window (3 days) and cap (50) are in its build.
 - **Presentation rules** every page follows (the agreement above): the design system in `system/`, never colour
   alone, keyboard usable, Paper labels, "No proven strong signals today" until the weekly review's `model_skill`,
   research only. The React components of WS3 implement the mockups' layouts; the mockups' `template.html` files
   show every state (filters, empty states, dialogs).
-- **Backlog**: the judge's cosmetic findings are GitHub issues #152-#155 and #174-#227 labelled `cosmetic`, held
-  for a round after the API and app work has started; none blocks the contract.
+- **Backlog**: the judge's cosmetic findings on the design track are GitHub issues #152-#155, #157-#177 and
+  #179-#227 labelled `cosmetic` (#159, #176 and #177 concern the shared scaffold and checks; #156 and #178 are
+  other work: the web tier's URL guard and the B1 inbox fix), held
+  for a round after the API and app work has started; none blocks the contract. #227 is fixed by the closing round
+  and is closed when it lands.
 
 ## Design system
 `system/`: scheme v2 "modern admin light" (2026-10-08; `system/README.md`): the look of modern admin templates the
