@@ -25,8 +25,13 @@ FIRST_RANGE_OUTCOMES_SQL = """SELECT DISTINCT ON (range_id) * FROM range_outcome
                               ORDER BY range_id, scored_at"""
 SCORED_CALLS_CTE = f"WITH calls AS ({FIRST_CALLS_SQL}), scored AS ({FIRST_CALL_OUTCOMES_SQL})"
 SCORED_RANGES_CTE = f"WITH published AS ({FIRST_RANGES_SQL}), scored AS ({FIRST_RANGE_OUTCOMES_SQL})"
-# a plain http(s) link or NULL (view_data.safe_url in SQL): feed links are stored unchecked
-SAFE_URL_SQL = "CASE WHEN regexp_full_match(trim({col}), '(?i)https?://\\S+') THEN trim({col}) END"
+# a plain http(s) link or NULL, with the characters " ' < > and backtick percent-encoded: view_data.safe_url in
+# SQL, mirroring its encoding (issue #48); feed links are stored unchecked
+SAFE_URL_SQL = (
+    "CASE WHEN regexp_full_match(trim({col}), '(?i)https?://\\S+') THEN "
+    "replace(replace(replace(replace(replace(trim({col}), '\"', '%22'), '''', '%27'), '<', '%3C'), '>', '%3E'), "
+    "'`', '%60') END"
+)
 
 
 @dataclass(frozen=True)
