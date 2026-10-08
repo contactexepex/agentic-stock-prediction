@@ -20,6 +20,7 @@ from marketbrief.constants.kinds import (
     KIND_STRATEGY_PREDICTIONS,
 )
 from marketbrief.core.schemas import SCHEMAS
+from marketbrief.lab.registry import is_live, registry
 from marketbrief.intraday.constants import KIND_INTRADAY_ALERTS
 
 VIEW_ALERTS_FEED = "intraday_alerts_feed"   # B9: intraday_alerts plus the explainer's note
@@ -78,6 +79,13 @@ def with_costs(con, rows: list[dict], record_kind: str, now: datetime) -> list[d
     by_id = {r["record_id"]: r for r in found}
     return [{**row, **{name: by_id[row["id"]].get(column) for column, name in mapping.items()}}
             if row["id"] in by_id else row for row in rows]
+
+
+def live_only(rows: list[dict], session_date: str) -> list[dict]:
+    """The rows whose strategy is live for the session (B2's go-live switch, `live_from` <= D in
+    config/strategies.yaml); rehearsal rows of strategies not live yet are left out (B19, Wave 5)."""
+    reg = registry()
+    return [r for r in rows if is_live(r["strategy_id"], session_date, reg)]
 
 
 def session_predictions(con, session_date: str, now: datetime) -> list[dict]:

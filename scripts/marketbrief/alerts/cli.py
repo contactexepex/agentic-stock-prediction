@@ -26,6 +26,8 @@ from marketbrief.alerts import reads
 from marketbrief.alerts.close import build_close
 from marketbrief.alerts.constants import (
     CORRECTION_DAYS,
+    MSG_NO_PREDICTIONS,
+    MSG_NOT_LIVE,
     MSG_NOTHING,
     POST_ALERTS,
     POST_CLOSE,
@@ -106,8 +108,12 @@ def build(args, cfg: dict) -> Message | None:
     day = args.date or (market_status["previous_session"] if args.post == "close" else market_status["session_date"])
     thread = f"{market}:{day}"
     if args.post == "morning":
-        text = build_morning(market, day, reads.session_predictions(con, day, now), reads.session_picks(con, day, now),
+        stored = reads.session_predictions(con, day, now)
+        preds = reads.live_only(stored, day)   # only strategies live for D (go-live switch); rehearsal rows left out
+        text = build_morning(market, day, preds, reads.live_only(reads.session_picks(con, day, now), day),
                              horizons(), names)
+        if stored and not preds:   # predictions stored, but no strategy is live for D yet: say so
+            text = text.replace(MSG_NO_PREDICTIONS, MSG_NOT_LIVE)
         return Message(POST_MORNING, f"{POST_MORNING}:{market}:{day}", text, thread)
     if args.post == "close":
         text = build_close(market, day, reads.settled_today(con, day, cfg["timezone"], now),
