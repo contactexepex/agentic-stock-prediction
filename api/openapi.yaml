@@ -656,6 +656,110 @@ components:
       type: object
       description: Strategy id -> StrategyEntry
       additionalProperties: {$ref: '#/components/schemas/StrategyEntry'}
+    BuySplit:
+      type: object
+      required: [buy, of]
+      properties:
+        buy: {type: integer, description: Strategies whose call qualifies as a trade}
+        of: {type: integer, description: Strategies that predicted it at this horizon}
+    CompanyRecord:
+      type: object
+      x-source: warehouse/rm_entities.companies
+      description: >-
+        A company as of the cut-off (catalogue entity Company): B1's accessor (active and inactive, never deleted),
+        the newest two raw closes collected by the cut-off, its N+1 agreement (active companies; null otherwise) and
+        its open paper trades (the OpenTrade records). A page carries the fields its mockup lists
+      required: [market, ticker, name, state]
+      properties:
+        market: {$ref: '#/components/schemas/Market'}
+        ticker: {$ref: '#/components/schemas/Ticker'}
+        name: {type: string}
+        exchange: {type: ['string', 'null']}
+        sector: {type: ['string', 'null']}
+        state: {type: string, enum: [active, inactive]}
+        state_since: {type: ['string', 'null'], format: date-time}
+        added_at: {type: ['string', 'null'], format: date-time}
+        amount: {$ref: '#/components/schemas/NullableNumber'}
+        amount_overridden: {type: boolean}
+        currency: {type: string, enum: [INR, USD]}
+        yahoo: {type: ['string', 'null']}
+        nse_symbol: {type: ['string', 'null']}
+        cik: {type: ['string', 'null']}
+        last_close: {$ref: '#/components/schemas/NullableNumber'}
+        last_close_date: {type: ['string', 'null'], format: date}
+        change_pct: {type: ['number', 'null'], description: '% from the previous stored close'}
+        agreement_n1:
+          oneOf: [{$ref: '#/components/schemas/BuySplit'}, {type: 'null'}]
+        open_trades: {type: integer}
+    AgreementRow:
+      type: object
+      x-source: warehouse/rm_entities.agreement
+      description: >-
+        How many strategies buy an active company at one horizon (catalogue entity Agreement), from the newest
+        predictions made by the cut-off; rank = most buyers, then the higher average probability, then the ticker
+      required: [market, as_of_date, session_date, rank, ticker, name, horizon_days, buy, of, by_family, avg_prob_up,
+                 label, paper]
+      properties:
+        market: {$ref: '#/components/schemas/Market'}
+        as_of_date: {type: ['string', 'null'], format: date}
+        session_date: {type: ['string', 'null'], format: date}
+        rank: {type: integer, minimum: 1}
+        ticker: {$ref: '#/components/schemas/Ticker'}
+        name: {type: string}
+        horizon_days: {$ref: '#/components/schemas/Horizon'}
+        buy: {type: integer}
+        of: {type: integer}
+        by_family:
+          type: object
+          required: [rule, baseline, ai]
+          properties:
+            rule: {$ref: '#/components/schemas/BuySplit'}
+            baseline: {$ref: '#/components/schemas/BuySplit'}
+            ai: {$ref: '#/components/schemas/BuySplit'}
+        avg_prob_up: {$ref: '#/components/schemas/NullableNumber'}
+        label: {type: string}
+        paper: {type: boolean, const: true}
+    AgreementMap:
+      type: object
+      description: Horizon k (as text, "1".."5") -> its AgreementRow list by rank
+      additionalProperties:
+        type: array
+        items: {$ref: '#/components/schemas/AgreementRow'}
+    OpenTrade:
+      type: object
+      x-source: warehouse/rm_entities.open_trades
+      description: >-
+        A paper trade that has entered and not yet settled (catalogue entity Open trade; intraday/trades.open_trades
+        as of the cut-off), valued at the newest stored close before costs on today's price basis. Paper only
+      required: [trade_id, view, prediction_id, strategy_id, family, market, ticker, horizon_days, entry_date,
+                 exit_date, entry_price, quantity, amount, currency, last_price, last_price_date, unrealised_pnl,
+                 unrealised_pct, paper]
+      properties:
+        trade_id: {type: string}
+        view: {type: string, enum: [accuracy, head_to_head]}
+        prediction_id: {type: string}
+        strategy_id: {type: string}
+        family: {type: string, enum: [rule, baseline, ai]}
+        market: {$ref: '#/components/schemas/Market'}
+        ticker: {$ref: '#/components/schemas/Ticker'}
+        horizon_days: {$ref: '#/components/schemas/Horizon'}
+        entry_date: {$ref: '#/components/schemas/IsoDate'}
+        exit_date: {$ref: '#/components/schemas/IsoDate'}
+        entry_price: {type: number}
+        quantity: {type: number, exclusiveMinimum: 0}
+        amount: {type: number}
+        currency: {type: string, enum: [INR, USD]}
+        target_price: {$ref: '#/components/schemas/NullableNumber'}
+        lo80: {$ref: '#/components/schemas/NullableNumber'}
+        lo50: {$ref: '#/components/schemas/NullableNumber'}
+        hi50: {$ref: '#/components/schemas/NullableNumber'}
+        hi80: {$ref: '#/components/schemas/NullableNumber'}
+        last_price: {type: number}
+        last_price_date: {$ref: '#/components/schemas/IsoDate'}
+        unrealised_pnl: {type: number}
+        unrealised_pct: {type: number}
+        to_target_pct: {$ref: '#/components/schemas/NullableNumber'}
+        paper: {type: boolean, const: true}
 
     Overview:
       type: object
