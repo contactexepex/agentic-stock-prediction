@@ -153,6 +153,7 @@ KIND_FILES = {
     "trade_reasons_ai": "reason_ai.json",
     "eod_analyses": "eod_analysis.json",
     "research_reviews": "research_review.json",
+    "news_impact": "news_impact.json",
 }
 MOCKUP_06 = Path(__file__).resolve().parents[1] / "design/mockups/06-rule-vs-ai/data.json"
 
@@ -251,3 +252,71 @@ def test_example_records_validate_against_the_page_schemas(market):
     body = json.loads((REPO / "design/catalogue/scoreboard_backtest_row.json").read_text())
     backtest = [rm_strategies.backtest_row(r) for r in body["records"] if r["market"] == market]
     assert backtest and schema_errors(backtest, "ScoreboardRow") == []
+
+
+# ---------- batch 2: per-strategy and per-company pages, rm.review (B5's read tools) ----------
+def test_every_strategy_has_its_page_with_its_own_rows():
+    ctx = lab_context("us")
+    ctx.memo["b13_backtest"] = {"run": {}, "rows": []}
+    ctx.memo["status_block"] = {"session": {"session_date": "2026-10-07"}}
+    entries = rm_strategies.rm_common.strategies(ctx)
+    pages = {sid: rm_strategies.strategy_page(ctx, sid, entry) for sid, entry in entries.items()}
+    assert len(pages) == 15
+    reference = pages["rule.model_news.v1"]
+    expected = [
+        r for r in catalogue("scoreboard_row.json") if r["market"] == "us" and r["strategy_id"] == "rule.model_news.v1"
+    ]
+    assert canonical(reference["rows"]) == canonical(expected)
+    accuracy_all = next(
+        r for r in expected if r["scope"] == "strategy" and r["view"] == "accuracy" and r["horizon_days"] == "all"
+    )
+    assert reference["go_live"] == accuracy_all["go_live"]
+    assert reference["cells"] and all(c["strategy_id"] == "rule.model_news.v1" for c in reference["cells"])
+    assert reference["lines"] and all(line["series"] == "rule.model_news.v1" for line in reference["lines"])
+    traded = {r["strategy_id"] for r in catalogue("scoreboard_row.json") if r["market"] == "us"}
+    for sid, page in pages.items():  # a strategy without trades: an empty page, never a missing one
+        if sid not in traded:
+            assert page["rows"] == page["cells"] == page["lines"] == [] and page["go_live"] is None
+
+
+def test_company_pages_cut_the_head_to_head_records_per_ticker():
+    ctx = compare_context("us")
+    page = rm_compare.company_page(ctx, "NVDA")
+    assert page["trades"] and {t["ticker"] for t in page["trades"]} == {"NVDA"}
+    assert {r["trade_id"] for r in page["your_costs"]} <= {t["trade_id"] for t in page["trades"]}
+    assert page["picks"] and {p["ticker"] for p in page["picks"]} == {"NVDA"}
+    assert page["cells"] and all(
+        c["view"] == "head_to_head" and c["dimension"] == "company" and c["column"] == "NVDA" for c in page["cells"]
+    )
+    quiet = next(t for t in sorted(ctx.collected) if not any(x["ticker"] == t for x in rm_compare.picks(ctx)))
+    empty = rm_compare.company_page(ctx, quiet)
+    assert [empty[k] for k in ("cells", "trades", "your_costs", "picks", "reasons")] == [[]] * 5
+
+
+def test_a_deleted_company_has_no_picks_reasons_or_page(monkeypatch):
+    ctx = compare_context("us")
+    assert any(p["ticker"] == "NVDA" for p in rm_compare.picks(ctx))
+    ctx = compare_context("us")
+    ctx.__dict__["collected"] = ctx.collected - {"NVDA"}
+    assert all(p["ticker"] != "NVDA" for p in rm_compare.picks(ctx))
+    assert all(r["ticker"] != "NVDA" for r in rm_compare.reasons(ctx))
+    ctx.memo.update(status_block={"session": {"session_date": "2026-10-07"}})
+    for name in ("header", "horizons", "go_live"):
+        monkeypatch.setattr(rm_compare.rm_common, name, lambda _c: {})
+    monkeypatch.setattr(rm_compare, "companies", lambda _c, _f: [])
+    pages = rm_compare.compare_pages(ctx)
+    assert "NVDA" not in pages and sorted(pages) == sorted(["_", *ctx.collected])
+
+
+def test_review_page_reads_reviews_and_the_newest_news_impact_week_by_the_cut_off():
+    ctx = compare_context("us")
+    ctx.__dict__["dashboard"] = {"as_of": EXAMPLE_AS_OF, "name": "United States", "currency": "USD"}
+    page = rm_compare.review_pages(ctx)["_"]
+    assert [r["iso_week"] for r in page["reviews"]] == ["2026-W40"]
+    assert page["news_impact"] == []  # the W41 rows are computed on 10 Oct, after the cut-off
+    later = compare_context("us")
+    later.cutoff_time = datetime.fromisoformat("2026-10-10T18:00:00+00:00")
+    rows = rm_compare.news_impact(later)
+    assert rows and {r["iso_week"] for r in rows} == {"2026-W41"}
+    assert schema_errors(rows, "NewsImpactRow") == []
+    assert schema_errors(page["reviews"], "ResearchReview") == []

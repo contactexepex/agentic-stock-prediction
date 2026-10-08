@@ -19,9 +19,18 @@ from marketbrief.core.schemas import SCHEMAS
 from marketbrief.lab import reads as lab_reads
 from marketbrief.warehouse import rm_common
 from marketbrief.warehouse.rm_registry import BuildContext, ContractCase, PageBuilder
-from marketbrief.warehouse.rm_strategies import ALL_HORIZONS, companies, market_mockup, pick, scoreboard_rows
+from marketbrief.warehouse.rm_strategies import (
+    ALL_HORIZONS,
+    CELL_FIELDS,
+    companies,
+    market_mockup,
+    pick,
+    scoreboard_rows,
+)
 
 RM_COMPARE = "compare"
+RM_REVIEW = "review"
+DIMENSION_COMPANY = "company"
 VIEW_HEAD_TO_HEAD = "head_to_head"
 REASON_KIND_HEAD_TO_HEAD = "head_to_head"
 RECORD_KIND_SETTLEMENT = "settlement"
@@ -158,7 +167,26 @@ REVIEW_FIELDS = (
 LEADER_FIELDS = ("scope", "strategy_id", "net_pnl", "trades")
 FINDING_FIELDS = ("text", "cited_ids")
 PROPOSAL_FIELDS = ("proposal_id", "kind", "file", "diff", "rationale", "cited_ids", "status")
-TIME_FIELDS = ("made_at", "settled_at", "computed_at", "created_at", "written_at")
+NEWS_IMPACT_FIELDS = (
+    "id",
+    "market",
+    "iso_week",
+    "as_of",
+    "event_type",
+    "status",
+    "materiality",
+    "horizon_days",
+    "n_events",
+    "mean_abnormal_pct",
+    "ci_low_pct",
+    "ci_high_pct",
+    "mean_benchmark_pct",
+    "mean_sector_pct",
+    "enough",
+    "news_ids",
+    "computed_at",
+)
+TIME_FIELDS = ("made_at", "settled_at", "computed_at", "created_at", "written_at", "as_of")
 
 
 def stored(ctx: BuildContext, kind: str, time_column: str) -> list[dict]:
@@ -200,36 +228,48 @@ def head_to_head_trades(ctx: BuildContext) -> list[dict]:
 def your_costs(ctx: BuildContext) -> list[dict]:
     """The cost_views rows of the head-to-head trades' newest settlements stored by the cut-off (the your-cost
     figures of the page's trades), in time order."""
-    settlement_ids = {t["id"] for t in rm_common.settled_trades(ctx) if t["view"] == VIEW_HEAD_TO_HEAD}
-    return [
-        pick(row, YOUR_COST_FIELDS)
-        for row in stored(ctx, "cost_views", "computed_at")
-        if row["record_kind"] == RECORD_KIND_SETTLEMENT and row["record_id"] in settlement_ids
-    ]
+
+    def compute() -> list[dict]:
+        settlement_ids = {t["id"] for t in rm_common.settled_trades(ctx) if t["view"] == VIEW_HEAD_TO_HEAD}
+        return [
+            pick(row, YOUR_COST_FIELDS)
+            for row in stored(ctx, "cost_views", "computed_at")
+            if row["record_kind"] == RECORD_KIND_SETTLEMENT and row["record_id"] in settlement_ids
+        ]
+
+    return ctx.shared("b13_your_costs", compute)
 
 
 def picks(ctx: BuildContext) -> list[dict]:
     """Every head-to-head pick made by the cut-off (collected companies; first row of each id), in its page fields,
-    by session date, company, family and pick rule."""
-    rows = [row for row in lab_reads.picks(ctx.con, ctx.cutoff_time) if row["ticker"] in ctx.collected]
-    out = []
-    for row in rows:
-        item = pick(row, PICK_FIELDS)
-        item["made_at"] = rm_common.iso_z(item["made_at"])
-        item["candidates"] = [pick(candidate, CANDIDATE_FIELDS) for candidate in row.get("candidates") or []]
-        out.append(item)
-    order = ("session_date", "ticker", "family", "pick_rule", "id")
-    return sorted(out, key=lambda p: tuple(p[name] or "" for name in order))
+    by session date, company, family and pick rule (Home filters today's session from it)."""
+
+    def compute() -> list[dict]:
+        rows = [row for row in lab_reads.picks(ctx.con, ctx.cutoff_time) if row["ticker"] in ctx.collected]
+        out = []
+        for row in rows:
+            item = pick(row, PICK_FIELDS)
+            item["made_at"] = rm_common.iso_z(item["made_at"])
+            item["candidates"] = [pick(candidate, CANDIDATE_FIELDS) for candidate in row.get("candidates") or []]
+            out.append(item)
+        order = ("session_date", "ticker", "family", "pick_rule", "id")
+        return sorted(out, key=lambda p: tuple(p[name] or "" for name in order))
+
+    return ctx.shared("b13_picks", compute)
 
 
 def reasons(ctx: BuildContext) -> list[dict]:
     """The AI reasons of kind head_to_head written by the cut-off (collected companies), newest first."""
-    rows = [
-        pick(row, REASON_FIELDS)
-        for row in stored(ctx, "trade_reasons_ai", "created_at")
-        if row["kind"] == REASON_KIND_HEAD_TO_HEAD and row["ticker"] in ctx.collected
-    ]
-    return newest_first(rows, "created_at")
+
+    def compute() -> list[dict]:
+        rows = [
+            pick(row, REASON_FIELDS)
+            for row in stored(ctx, "trade_reasons_ai", "created_at")
+            if row["kind"] == REASON_KIND_HEAD_TO_HEAD and row["ticker"] in ctx.collected
+        ]
+        return newest_first(rows, "created_at")
+
+    return ctx.shared("b13_reasons", compute)
 
 
 def eod_record(row: dict) -> dict:
@@ -264,8 +304,13 @@ def review_record(row: dict) -> dict:
 
 
 def reviews(ctx: BuildContext) -> list[dict]:
-    """The research reviews written by the cut-off, newest first."""
-    return newest_first([review_record(row) for row in stored(ctx, "research_reviews", "written_at")], "written_at")
+    """The research reviews written by the cut-off, newest first (rm.compare and rm.review show the same list)."""
+
+    def compute() -> list[dict]:
+        rows = [review_record(row) for row in stored(ctx, "research_reviews", "written_at")]
+        return newest_first(rows, "written_at")
+
+    return ctx.shared("b13_reviews", compute)
 
 
 def review_due(ctx: BuildContext, written: list[dict]) -> dict:
@@ -293,7 +338,7 @@ def head_to_head_rows(ctx: BuildContext) -> list[dict]:
 
 
 def compare_pages(ctx: BuildContext) -> dict[str, dict]:
-    """rm.compare: the market's one Rule vs AI page."""
+    """rm.compare: the market's Rule vs AI page `_` and one page per collected company."""
     status = rm_common.status_block(ctx)
     trades = head_to_head_trades(ctx)
     written = reviews(ctx)
@@ -315,11 +360,60 @@ def compare_pages(ctx: BuildContext) -> dict[str, dict]:
             "eod": eod_analyses(ctx),
             "reviews": written,
             "review_due": review_due(ctx, written),
+        },
+        **{ticker: company_page(ctx, ticker) for ticker in sorted(ctx.collected)},
+    }
+
+
+def company_page(ctx: BuildContext, ticker: str) -> dict:
+    """One company's head-to-head cut (B5's compare_rule_vs_ai with a ticker): its head-to-head heatmap cells of
+    dimension company, its trades, their your-cost rows, its picks and its AI reasons; empty lists before any."""
+    trades = [trade for trade in head_to_head_trades(ctx) if trade["ticker"] == ticker]
+    trade_ids = {trade["trade_id"] for trade in trades}
+    cells = rm_common.lab_summary(ctx)["heatmaps"]["cells"]
+    return {
+        "market": ctx.market,
+        "as_of": ctx.as_of,
+        "ticker": ticker,
+        "cells": [
+            pick(cell, CELL_FIELDS)
+            for cell in cells
+            if cell["view"] == VIEW_HEAD_TO_HEAD and cell["dimension"] == DIMENSION_COMPANY and cell["column"] == ticker
+        ],
+        "trades": trades,
+        "your_costs": [row for row in your_costs(ctx) if row["trade_id"] in trade_ids],
+        "picks": [item for item in picks(ctx) if item["ticker"] == ticker],
+        "reasons": [item for item in reasons(ctx) if item["ticker"] == ticker],
+    }
+
+
+def news_impact(ctx: BuildContext) -> list[dict]:
+    """The news-impact rows (F3) of the newest ISO week computed by the cut-off, by id."""
+    rows = stored(ctx, "news_impact", "computed_at")
+    if not rows:
+        return []
+    newest = max(row["iso_week"] for row in rows)
+    return sorted((pick(row, NEWS_IMPACT_FIELDS) for row in rows if row["iso_week"] == newest), key=lambda r: r["id"])
+
+
+def review_pages(ctx: BuildContext) -> dict[str, dict]:
+    """rm.review: the market's research reviews, the next one due and the newest news-impact week (B5's read tools
+    compare_rule_vs_ai and get_news; GET /api/v1/markets/{market}/review)."""
+    written = reviews(ctx)
+    return {
+        MARKET_PAGE_KEY: {
+            **rm_common.header(ctx),
+            "reviews": written,
+            "review_due": review_due(ctx, written),
+            "news_impact": news_impact(ctx),
         }
     }
 
 
-BUILDERS = (PageBuilder(RM_COMPARE, "RuleVsAi", compare_pages, owner="B13"),)
+BUILDERS = (
+    PageBuilder(RM_COMPARE, "RuleVsAiTable", compare_pages, owner="B13"),
+    PageBuilder(RM_REVIEW, "ResearchReviewPage", review_pages, owner="B13"),
+)
 CONTRACT_CASES = (
     ContractCase(
         path="/api/v1/markets/{market}/compare",
@@ -327,5 +421,6 @@ CONTRACT_CASES = (
         mockup="design/mockups/06-rule-vs-ai/data.json",
         mockup_payload=market_mockup,
         map_paths=("$.strategies",),
+        page_keys=lambda key: key == MARKET_PAGE_KEY,
     ),
 )

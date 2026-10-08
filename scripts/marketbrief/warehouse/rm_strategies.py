@@ -18,6 +18,8 @@ from marketbrief.warehouse.rm_registry import BuildContext, ContractCase, PageBu
 RM_STRATEGIES = "strategies"
 ALL_HORIZONS = "all"
 BASIS_BACKTEST = "backtest"
+BASIS_FORWARD = "forward"
+VIEW_ACCURACY = "accuracy"
 SCOPE_STRATEGY = "strategy"
 # Scoreboard row fields (docs/DATA_CATALOGUE.md "Scoreboard row"; 05-strategy-lab notes.md `rows`)
 ROW_FIELDS = (
@@ -194,10 +196,12 @@ def heatmaps(ctx: BuildContext) -> dict:
 
 
 def strategy_lab_pages(ctx: BuildContext) -> dict[str, dict]:
-    """rm.strategies: the market's one Strategy lab page."""
+    """rm.strategies: the market's Strategy lab page `_` and one page per registry strategy (its id)."""
     tested = backtest(ctx)
     rows = scoreboard_rows(ctx) + tested["rows"]
+    entries = rm_common.strategies(ctx)
     return {
+        **{strategy_id: strategy_page(ctx, strategy_id, entry) for strategy_id, entry in entries.items()},
         MARKET_PAGE_KEY: {
             **rm_common.header(ctx),
             "status": rm_common.status_block(ctx),
@@ -205,13 +209,41 @@ def strategy_lab_pages(ctx: BuildContext) -> dict[str, dict]:
             "default_horizon": ALL_HORIZONS,
             "reference_strategy": REFERENCE_STRATEGY,
             "go_live": rm_common.go_live(ctx),
-            "strategies": rm_common.strategies(ctx),
+            "strategies": entries,
             "companies": companies(ctx),
             "rows": rows,
             **heatmaps(ctx),
             "bases": sorted({row["basis"] for row in rows}),
             "backtest_run": tested["run"],
-        }
+        },
+    }
+
+
+def strategy_page(ctx: BuildContext, strategy_id: str, entry: dict) -> dict:
+    """One strategy's detail (B5's get_scoreboard with a strategy id): its registry entry, every scoreboard row of it
+    (all scopes, views and bases), its heatmap cells, its cumulative line (accuracy view) and the go-live block of its
+    accuracy row over all horizons (null before any settled trade); empty lists before any."""
+    rows = [row for row in scoreboard_rows(ctx) + backtest(ctx)["rows"] if row["strategy_id"] == strategy_id]
+    data = heatmaps(ctx)
+    accuracy = next(
+        (
+            row
+            for row in rows
+            if row["scope"] == SCOPE_STRATEGY
+            and row["view"] == VIEW_ACCURACY
+            and row["basis"] == BASIS_FORWARD
+            and str(row["horizon_days"]) == ALL_HORIZONS
+        ),
+        None,
+    )
+    return {
+        "market": ctx.market,
+        "as_of": ctx.as_of,
+        "strategy": entry,
+        "go_live": None if accuracy is None else accuracy.get("go_live"),
+        "rows": rows,
+        "cells": [cell for cell in data["cells"] if cell["strategy_id"] == strategy_id],
+        "lines": [line for line in data["lines"] if line["view"] == VIEW_ACCURACY and line["series"] == strategy_id],
     }
 
 
@@ -220,7 +252,7 @@ def market_mockup(mockup: dict, market: str, _page_key: str) -> dict:
     return mockup["markets"][market]
 
 
-BUILDERS = (PageBuilder(RM_STRATEGIES, "StrategyLab", strategy_lab_pages, owner="B13"),)
+BUILDERS = (PageBuilder(RM_STRATEGIES, "StrategyLabTable", strategy_lab_pages, owner="B13"),)
 CONTRACT_CASES = (
     ContractCase(
         path="/api/v1/markets/{market}/strategies",
@@ -228,5 +260,6 @@ CONTRACT_CASES = (
         mockup="design/mockups/05-strategy-lab/data.json",
         mockup_payload=market_mockup,
         map_paths=("$.strategies",),
+        page_keys=lambda key: key == MARKET_PAGE_KEY,
     ),
 )
