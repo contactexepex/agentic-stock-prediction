@@ -34,8 +34,9 @@ Every step prints a JSON summary: save it under `work/steps/`.
 4. Settle: first deepen a shallow clone, so the lock check (a prediction or pick counts only when its row was
    first committed before D's open) can find each row's first commit:
    `[ "$(git rev-parse --is-shallow-repository)" = true ] && git fetch --shallow-since="$(date -u -d '21 days ago' +%F)" origin main || true`
-   (21 days cover N+5 plus the sessions a trade may stay due; a failed fetch never blocks: the lock then checks
-   `made_at` only; say so in your final message). Then
+   (21 days cover N+5 plus the sessions a trade may stay due; a shallow clone already deeper than that may be cut
+   back to 21 days, which the lock does not mind; a failed fetch never blocks: the lock then checks `made_at`
+   only; say so in your final message). Then
    `python scripts/lab.py settle > work/steps/lab_settle.json` (session B2's engine, docs/ws/b2.md). It
    settles every paper trade whose exit bar is final, in both views (accuracy, head-to-head), exactly once, and
    appends the rows to `data/<market>/paper_trades_settled/` and their two cost views to `data/<market>/cost_views/`.

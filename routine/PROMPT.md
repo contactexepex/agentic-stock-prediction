@@ -292,10 +292,10 @@ Warnings never block: list them in `data_quality`.
     step 12. `git add` those of `data/<market>/strategy_predictions data/<market>/strategy_abstentions
     data/<market>/head_to_head_picks data/<market>/cost_views` that exist, then
     `git diff --cached --quiet || git commit -m "<market> paper predictions TODAY"` and `git push origin HEAD:main`.
-    If the push is rejected: `git fetch origin main && git rebase --committer-date-is-author-date origin/main`
-    (a plain rebase would move the commit's time past the open) and push again. If that rebase stops on a
-    conflict, `git rebase --abort`, add a `data_quality` line and leave the rows to step 12. Skip 9e when 9b-9d
-    wrote nothing.
+    What locks the rows is the local commit's time, not the push. If the push is rejected, do not rebase now (the
+    tree still holds this run's uncommitted data, so a rebase would refuse to start): leave the commit as it is,
+    add a `data_quality` line, and step 12 pushes it, rebasing with `--committer-date-is-author-date`, which keeps
+    its time (a plain rebase would move it past the open). Skip 9e when 9b-9d wrote nothing.
 
 10. Summaries (in `summaries/<market>/`):
    - Write `daily/TODAY.md` (max 400 words): regime, per ticker what changed and why, macro
@@ -397,9 +397,10 @@ Warnings never block: list them in `data_quality`.
     final message and go on; never retry by hand (a rerun posts only what is missing).
 
 13. Notify: run `python scripts/notify_slack.py`. With `SLACK_BOT_TOKEN` set it posts into today's
-    #market-brief thread for the market (channel id in `config/settings.yaml`; the thread step 13a's
-    morning picks started, or a new one when none exists): the filled `work/slack_<market>.md` as a
-    reply (once per day, recorded in `data/<market>/slack_posts/`), then the chart images as one reply,
+    #market-brief thread for the market (channel id in `config/settings.yaml`): the filled
+    `work/slack_<market>.md` as a reply in the thread step 13a's morning picks started, or as the first
+    message of a new thread when none exists (once per day, recorded in `data/<market>/slack_posts/`),
+    then the chart images as one reply,
     then the HTML report file as a reply, then the dashboard file as a reply. Without the token it
     posts the summary text as ONE message through the incoming webhook in `SLACK_WEBHOOK_URL`. If it
     exits with code 2 (neither configured) and a Slack connector is available in this session, post
