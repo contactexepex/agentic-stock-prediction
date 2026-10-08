@@ -1,0 +1,400 @@
+{
+ "market": "india",
+ "name": "India (NSE)",
+ "currency": "INR",
+ "as_of": "2026-10-07",
+ "status": {
+  "market": "india",
+  "name": "India (NSE)",
+  "currency": "INR",
+  "as_of": "2026-10-07",
+  "session": {
+   "local_time": "2026-10-08T19:31+05:30",
+   "trading_day": true,
+   "session_date": "2026-10-09",
+   "previous_session": "2026-10-08",
+   "calendar_covered": true,
+   "session_open_utc": "2026-10-09T03:45:00+00:00",
+   "session_close_utc": "2026-10-09T10:00:00+00:00",
+   "in_session": false,
+   "late_run": false
+  },
+  "regime": "CALM",
+  "benchmark": {
+   "symbol": "NIFTY50",
+   "name": "Nifty 50",
+   "close": 22603.0508,
+   "close_date": "2026-10-07",
+   "change_pct": -0.76,
+   "change_5d_pct": -0.5
+  },
+  "vol_index": {
+   "symbol": "INDIAVIX",
+   "name": "India VIX",
+   "close": 13.89,
+   "close_date": "2026-10-07",
+   "change_pct": 2.06,
+   "change_5d_pct": 3.58
+  },
+  "runs": {
+   "pre_open": {
+    "at": "2026-10-08T02:17:36Z",
+    "ok": true
+   },
+   "intraday": [],
+   "post_close": {
+    "at": null,
+    "ok": null,
+    "next_at": "2026-10-09T12:15:00Z"
+   },
+   "news": {
+    "at": "2026-10-08T10:19:00Z",
+    "ok": true,
+    "new_items": 378
+   }
+  },
+  "paper_label": "Paper only \u2014 no proven edge yet"
+ },
+ "horizons": [
+  1,
+  2,
+  3,
+  4,
+  5
+ ],
+ "default_horizon": 1,
+ "go_live": {
+  "proven": false,
+  "months_forward": 0.0,
+  "trades_needed": 300,
+  "beats_best_baseline": null
+ },
+ "track": {
+  "market": "india",
+  "as_of": "2026-10-07",
+  "skill": {
+   "state": "paper",
+   "label": "Paper only \u2014 no proven edge yet",
+   "why": "No: the signal model has not shown skill. No horizon has at least 500 out-of-sample rows with a Brier skill above 0.0 against the base rate and an AUC 95% interval above 0.5. Its paper long beats no baseline after costs (95% interval above 0).",
+   "rule": "Skill means: at least 500 out-of-sample rows, a Brier skill above 0.0 against the base rate, and an AUC 95% interval whose low end is above 0.5 (config/review.yaml model_skill).",
+   "review": {
+    "id": "2026-W40",
+    "computed_at": "2026-10-07T05:14:58+00:00"
+   }
+  },
+  "calls": [],
+  "ranges": [],
+  "replay": null,
+  "min_sample": 10,
+  "backtest": {
+   "computed_at": "2026-10-07T05:14:49+00:00",
+   "data": {
+    "panel_rows": 8720,
+    "first_bar": "2024-10-07",
+    "first_panel_date": "2025-01-01",
+    "last_panel_date": "2026-10-06",
+    "tickers": 20,
+    "round_trip_cost_pct_at_100": 0.2225
+   },
+   "scores": [
+    {
+     "key": "1d close_to_close",
+     "n": 6660,
+     "dates": 333,
+     "brier": 0.2512,
+     "brier_base_rate": 0.25,
+     "brier_skill": -0.0045,
+     "auc": 0.5187,
+     "auc95": [
+      0.4894,
+      0.5473
+     ],
+     "skill": false
+    },
+    {
+     "key": "1d open_to_close",
+     "n": 6640,
+     "dates": 332,
+     "brier": 0.2514,
+     "brier_base_rate": 0.2496,
+     "brier_skill": -0.0069,
+     "auc": 0.4853,
+     "auc95": [
+      0.4563,
+      0.5174
+     ],
+     "skill": false
+    },
+    {
+     "key": "5d close_to_close",
+     "n": 6160,
+     "dates": 308,
+     "brier": 0.2553,
+     "brier_base_rate": 0.2512,
+     "brier_skill": -0.0163,
+     "auc": 0.4999,
+     "auc95": [
+      0.4469,
+      0.5451
+     ],
+     "skill": false
+    },
+    {
+     "key": "5d open_to_close",
+     "n": 6160,
+     "dates": 308,
+     "brier": 0.2555,
+     "brier_base_rate": 0.2509,
+     "brier_skill": -0.0186,
+     "auc": 0.5023,
+     "auc95": [
+      0.4529,
+      0.5469
+     ],
+     "skill": false
+    }
+   ],
+   "strategy": [
+    {
+     "key": "1d open_to_close",
+     "threshold": "0.55",
+     "positions": 25,
+     "baseline": "always_up",
+     "dates": 11,
+     "mean_pct": -0.4369,
+     "ci95_pct": [
+      -0.92,
+      0.01
+     ],
+     "verdict": "fewer than 20 dates"
+    },
+    {
+     "key": "1d open_to_close",
+     "threshold": "0.55",
+     "positions": 25,
+     "baseline": "momentum_5d",
+     "dates": 11,
+     "mean_pct": -0.2335,
+     "ci95_pct": [
+      -0.78,
+      0.03
+     ],
+     "verdict": "fewer than 20 dates"
+    },
+    {
+     "key": "1d open_to_close",
+     "threshold": "0.55",
+     "positions": 25,
+     "baseline": "rsi_mean_reversion",
+     "dates": 7,
+     "mean_pct": -0.5443,
+     "ci95_pct": [
+      -1.1,
+      -0.05
+     ],
+     "verdict": "fewer than 20 dates"
+    },
+    {
+     "key": "1d open_to_close",
+     "threshold": "0.55",
+     "positions": 25,
+     "baseline": "benchmark_long_per_date",
+     "dates": 11,
+     "mean_pct": -0.4929,
+     "ci95_pct": [
+      -1.05,
+      0.0
+     ],
+     "verdict": "fewer than 20 dates"
+    },
+    {
+     "key": "1d open_to_close",
+     "threshold": "0.60",
+     "positions": 0,
+     "baseline": "\u2013",
+     "dates": 0,
+     "mean_pct": null,
+     "ci95_pct": [
+      null,
+      null
+     ],
+     "verdict": "no positions"
+    },
+    {
+     "key": "1d open_to_close",
+     "threshold": "0.65",
+     "positions": 0,
+     "baseline": "\u2013",
+     "dates": 0,
+     "mean_pct": null,
+     "ci95_pct": [
+      null,
+      null
+     ],
+     "verdict": "no positions"
+    },
+    {
+     "key": "5d open_to_close",
+     "threshold": "0.55",
+     "positions": 1592,
+     "baseline": "always_up",
+     "dates": 108,
+     "mean_pct": -0.1706,
+     "ci95_pct": [
+      -0.6,
+      0.1
+     ],
+     "verdict": "not distinguishable"
+    },
+    {
+     "key": "5d open_to_close",
+     "threshold": "0.55",
+     "positions": 1592,
+     "baseline": "momentum_5d",
+     "dates": 108,
+     "mean_pct": -0.2491,
+     "ci95_pct": [
+      -0.8,
+      0.12
+     ],
+     "verdict": "not distinguishable"
+    },
+    {
+     "key": "5d open_to_close",
+     "threshold": "0.55",
+     "positions": 1592,
+     "baseline": "rsi_mean_reversion",
+     "dates": 62,
+     "mean_pct": -0.2357,
+     "ci95_pct": [
+      -0.62,
+      0.19
+     ],
+     "verdict": "not distinguishable"
+    },
+    {
+     "key": "5d open_to_close",
+     "threshold": "0.55",
+     "positions": 1592,
+     "baseline": "benchmark_long_per_date",
+     "dates": 108,
+     "mean_pct": -0.1492,
+     "ci95_pct": [
+      -0.55,
+      0.14
+     ],
+     "verdict": "not distinguishable"
+    },
+    {
+     "key": "5d open_to_close",
+     "threshold": "0.60",
+     "positions": 999,
+     "baseline": "always_up",
+     "dates": 76,
+     "mean_pct": 0.1003,
+     "ci95_pct": [
+      -0.16,
+      0.32
+     ],
+     "verdict": "not distinguishable"
+    },
+    {
+     "key": "5d open_to_close",
+     "threshold": "0.60",
+     "positions": 999,
+     "baseline": "momentum_5d",
+     "dates": 76,
+     "mean_pct": 0.0599,
+     "ci95_pct": [
+      -0.38,
+      0.48
+     ],
+     "verdict": "not distinguishable"
+    },
+    {
+     "key": "5d open_to_close",
+     "threshold": "0.60",
+     "positions": 999,
+     "baseline": "rsi_mean_reversion",
+     "dates": 40,
+     "mean_pct": -0.4226,
+     "ci95_pct": [
+      -1.08,
+      0.19
+     ],
+     "verdict": "not distinguishable"
+    },
+    {
+     "key": "5d open_to_close",
+     "threshold": "0.60",
+     "positions": 999,
+     "baseline": "benchmark_long_per_date",
+     "dates": 76,
+     "mean_pct": 0.1164,
+     "ci95_pct": [
+      -0.16,
+      0.36
+     ],
+     "verdict": "not distinguishable"
+    },
+    {
+     "key": "5d open_to_close",
+     "threshold": "0.65",
+     "positions": 403,
+     "baseline": "always_up",
+     "dates": 60,
+     "mean_pct": 0.3017,
+     "ci95_pct": [
+      -0.36,
+      0.79
+     ],
+     "verdict": "not distinguishable"
+    },
+    {
+     "key": "5d open_to_close",
+     "threshold": "0.65",
+     "positions": 403,
+     "baseline": "momentum_5d",
+     "dates": 60,
+     "mean_pct": 0.2092,
+     "ci95_pct": [
+      -0.59,
+      0.89
+     ],
+     "verdict": "not distinguishable"
+    },
+    {
+     "key": "5d open_to_close",
+     "threshold": "0.65",
+     "positions": 403,
+     "baseline": "rsi_mean_reversion",
+     "dates": 30,
+     "mean_pct": 0.1259,
+     "ci95_pct": [
+      -0.99,
+      1.22
+     ],
+     "verdict": "not distinguishable"
+    },
+    {
+     "key": "5d open_to_close",
+     "threshold": "0.65",
+     "positions": 403,
+     "baseline": "benchmark_long_per_date",
+     "dates": 60,
+     "mean_pct": 0.3018,
+     "ci95_pct": [
+      -0.41,
+      0.81
+     ],
+     "verdict": "not distinguishable"
+    }
+   ],
+   "verdict": "No: the signal model has not shown skill. No horizon has at least 500 out-of-sample rows with a Brier skill above 0.0 against the base rate and an AUC 95% interval above 0.5. Its paper long beats no baseline after costs (95% interval above 0).",
+   "json": "work/model_backtest/model-backtest-india-2026-10-06.json",
+   "reliability": {}
+  },
+  "example_parts": []
+ },
+ "weekly": []
+}
