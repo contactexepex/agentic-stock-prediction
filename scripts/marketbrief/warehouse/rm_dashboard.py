@@ -1,13 +1,12 @@
-"""The 1.0 pages (WS1, docs/ws/ws1.md): rm.overview, rm.watchlist and rm.track_record, sliced from the dashboard's
-data as of the cut-off (warehouse/read_models.page_payloads) and served verbatim. Their payload schemas are the 1.0
-components of api/openapi.yaml (Overview, Watchlist, TrackRecord). rm.stock and rm.bars are the company page's in
-2.0 (B12, warehouse/rm_company.py)."""
+"""The 1.0 pages (WS1, docs/ws/ws1.md): rm.overview and rm.watchlist, sliced from the dashboard's data as of the
+cut-off (warehouse/read_models.page_payloads) and served verbatim. Their payload schemas are the 1.0 components of
+api/openapi.yaml (Overview, Watchlist). rm.track_record moved to B13's rm_track_record.py and rm.stock and rm.bars
+to B12's rm_company.py (contract 2.0)."""
 
 from __future__ import annotations
 
 from marketbrief.constants.warehouse import (
     RM_OVERVIEW,
-    RM_TRACK_RECORD,
     RM_WATCHLIST,
     SERVE_VERBATIM,
 )
@@ -17,7 +16,6 @@ from marketbrief.warehouse.rm_registry import BuildContext, PageBuilder
 SCHEMAS = {
     RM_OVERVIEW: "Overview",
     RM_WATCHLIST: "Watchlist",
-    RM_TRACK_RECORD: "TrackRecord",
 }
 
 

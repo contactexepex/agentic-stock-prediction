@@ -3,6 +3,8 @@
 # 04-stock-strategies (GET .../stocks/{ticker}/strategies, rm.stock_strategies). Field lists: the mockups' notes.md
 # (design/mockups/03-company/, 04-stock-strategies/); field meanings: docs/DATA_CATALOGUE.md. Stored measures may be
 # null (a missing bar, a trade not entered), so numbers are nullable unless the engine always sets them.
+# HeadToHeadPick, PickCandidate, LuckTest and AiReason are B13's (api/schemas/rule-vs-ai.yaml, strategy-lab.yaml); OpenTrade,
+# CompanyRecord and AgreementMap B4's; NewsItemRecord, CalendarEvent and LifecycleEventRecord B11's.
 
 # ---------- responses ----------
 CompanyPageResponse:
@@ -134,11 +136,11 @@ StockStrategiesPage:
         on_company:
           type: array
           description: Scope strategy_company, accuracy view, this company, all horizons and each horizon
-          items: {$ref: '#/components/schemas/ScoreboardRow'}
+          items: {$ref: '#/components/schemas/StrategyScoreRow'}
         overall:
           type: array
           description: Scope strategy, accuracy view, all horizons
-          items: {$ref: '#/components/schemas/ScoreboardRow'}
+          items: {$ref: '#/components/schemas/StrategyScoreRow'}
         go_live: {$ref: '#/components/schemas/GoLive'}
         strategies: {$ref: '#/components/schemas/StrategyMap'}
 CompanyBars:
@@ -190,66 +192,6 @@ CompanyBar:
     close: {type: number}
     volume: {type: ['integer', 'null']}
     adjusted: {type: boolean}
-PickRanking:
-  type: object
-  required: [strategy_id, rank, basis, settled_trades, net_pnl]
-  properties:
-    strategy_id: {type: string}
-    rank: {type: integer}
-    basis: {type: string}
-    settled_trades: {type: integer}
-    net_pnl: {$ref: '#/components/schemas/NullableNumber'}
-PickCandidate:
-  type: object
-  required: [horizon_days, prediction_id]
-  properties:
-    horizon_days: {$ref: '#/components/schemas/Horizon'}
-    prediction_id: {type: string}
-    prob_up: {$ref: '#/components/schemas/NullableNumber'}
-    move_pct: {$ref: '#/components/schemas/NullableNumber'}
-    loss_pct: {$ref: '#/components/schemas/NullableNumber'}
-    costs_pct: {$ref: '#/components/schemas/NullableNumber'}
-    expected_gain_pct: {$ref: '#/components/schemas/NullableNumber'}
-    gain_per_session_pct: {$ref: '#/components/schemas/NullableNumber'}
-    expected_move_pct: {$ref: '#/components/schemas/NullableNumber'}
-    your_cost_pct: {$ref: '#/components/schemas/NullableNumber'}
-    expected_gain_your_pct: {$ref: '#/components/schemas/NullableNumber'}
-    cost_viable: {type: ['boolean', 'null']}
-    eligible: {type: ['boolean', 'null']}
-HeadToHeadPick:
-  type: object
-  description: A head-to-head pick (kind head_to_head_picks); status other than `picked` = no candidate
-  x-source: lab/reads.picks
-  required: [id, market, ticker, made_at, as_of_date, session_date, family, pick_rule, status]
-  properties:
-    id: {type: string}
-    market: {$ref: '#/components/schemas/Market'}
-    ticker: {$ref: '#/components/schemas/Ticker'}
-    made_at: {$ref: '#/components/schemas/IsoTime'}
-    as_of_date: {$ref: '#/components/schemas/IsoDate'}
-    session_date: {$ref: '#/components/schemas/IsoDate'}
-    family: {type: string, enum: [rule, baseline, ai]}
-    pick_rule: {type: string}
-    status: {type: string}
-    strategy_id: {type: ['string', 'null']}
-    strongest_basis: {type: ['string', 'null']}
-    ranking:
-      type: ['array', 'null']
-      items: {$ref: '#/components/schemas/PickRanking'}
-    horizon_days: {type: ['integer', 'null'], minimum: 1, maximum: 5}
-    prediction_id: {type: ['string', 'null']}
-    base_close: {$ref: '#/components/schemas/NullableNumber'}
-    prob_up: {$ref: '#/components/schemas/NullableNumber'}
-    move_pct: {$ref: '#/components/schemas/NullableNumber'}
-    loss_pct: {$ref: '#/components/schemas/NullableNumber'}
-    costs_pct: {$ref: '#/components/schemas/NullableNumber'}
-    expected_gain_pct: {$ref: '#/components/schemas/NullableNumber'}
-    candidates:
-      type: ['array', 'null']
-      items: {$ref: '#/components/schemas/PickCandidate'}
-    amount: {$ref: '#/components/schemas/NullableNumber'}
-    currency: {type: ['string', 'null']}
-    method_version: {type: ['string', 'null'], description: 04-stock-strategies only}
 StrategyPrediction:
   type: object
   description: >-
@@ -413,28 +355,6 @@ SettledTrade:
     reason_detail: {type: ['object', 'null'], description: 'benchmark, benchmark_pct, beta, sector_source, news_statuses; note on skipped rows'}
     regime: {type: ['string', 'null']}
     settled_at: {$ref: '#/components/schemas/IsoTime'}
-AiReason:
-  type: object
-  description: An AI reason of the EOD analyst (kind trade_reasons_ai), at most 60 words; never advice
-  x-source: warehouse/company_sources.REASONS_SQL
-  required: [id, market, ticker, session_date, kind, text, created_at]
-  properties:
-    id: {type: string}
-    trade_id: {type: ['string', 'null']}
-    market: {$ref: '#/components/schemas/Market'}
-    ticker: {$ref: '#/components/schemas/Ticker'}
-    strategy_id: {type: ['string', 'null']}
-    session_date: {$ref: '#/components/schemas/IsoDate'}
-    kind: {type: string}
-    rank: {type: ['integer', 'null']}
-    text: {type: string}
-    cited_ids:
-      type: ['array', 'null']
-      items: {type: string}
-    reason_codes:
-      type: ['array', 'null']
-      items: {type: string}
-    created_at: {$ref: '#/components/schemas/IsoTime'}
 ResultsDigest:
   type: object
   description: A results digest (kind results_digests, macro results_digests_asof); numbers as of the release
@@ -464,20 +384,6 @@ ResultsDigest:
       type: ['array', 'null']
       items: {type: object}
     created_at: {$ref: '#/components/schemas/IsoTime'}
-LuckTest:
-  type: object
-  description: lab/luck.luck_test (bootstrap interval of the mean return, Bonferroni-corrected over m)
-  required: [method, n, m]
-  properties:
-    method: {type: string}
-    n: {type: integer}
-    m: {type: integer}
-    low_pct: {$ref: '#/components/schemas/NullableNumber'}
-    high_pct: {$ref: '#/components/schemas/NullableNumber'}
-    excludes_zero: {type: ['boolean', 'null']}
-    corrected_low_pct: {$ref: '#/components/schemas/NullableNumber'}
-    corrected_high_pct: {$ref: '#/components/schemas/NullableNumber'}
-    corrected: {type: ['boolean', 'null']}
 CompanyScoreRow:
   type: object
   description: A scoreboard row as the company page carries it (lab/scoreboard; scope strategy_company)
@@ -495,7 +401,7 @@ CompanyScoreRow:
     net_pnl: {$ref: '#/components/schemas/NullableNumber'}
     win_rate: {$ref: '#/components/schemas/NullableNumber'}
     sample_badge: {type: ['string', 'null']}
-ScoreboardRow:
+StrategyScoreRow:
   type: object
   description: A scoreboard row (lab/scoreboard, market-cost view, forward basis) as 04-stock-strategies carries it
   x-source: warehouse/rm_common.lab_summary

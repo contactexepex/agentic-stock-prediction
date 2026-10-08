@@ -5,9 +5,8 @@ recomputed here.
 
   rm.overview      page_key _        Overview: header, session plan, skill verdict, market overview tiles
   rm.watchlist     page_key _        Watchlist: one row per stock (last session, P(up), calls, ranges)
-  rm.track_record  page_key _        TrackRecord: calls per scoring basis, ranges, replay, backtest
 
-`build_rows` runs every registered builder (warehouse/rm_registry.py; these five 1.0 pages are rm_dashboard.py's) and
+`build_rows` runs every registered builder (warehouse/rm_registry.py; these two 1.0 pages are rm_dashboard.py's) and
 checks each payload against its schema in api/openapi.yaml before it is written. The 1.0 rm.stock and rm.bars pages
 were replaced in 2.0 by the company page's (B12, warehouse/rm_company.py).
 
@@ -20,11 +19,9 @@ import hashlib
 import json
 from datetime import datetime
 
-
 from marketbrief.constants.warehouse import (
     MARKET_PAGE_KEY,
     RM_OVERVIEW,
-    RM_TRACK_RECORD,
     RM_WATCHLIST,
 )
 from marketbrief.warehouse import openapi_spec, rm_registry, schema_check
@@ -66,7 +63,6 @@ def page_payloads(data: dict) -> dict[str, dict[str, dict]]:
     return {
         RM_OVERVIEW: {MARKET_PAGE_KEY: {**header, "overview": data["overview"]}},
         RM_WATCHLIST: {MARKET_PAGE_KEY: {**page_basics, "rows": [watchlist_row(company) for company in companies]}},
-        RM_TRACK_RECORD: {MARKET_PAGE_KEY: {"skill": data["skill"], **data["track"], "backtest": data["backtest"]}},
     }
 
 

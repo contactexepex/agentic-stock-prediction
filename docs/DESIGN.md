@@ -2059,8 +2059,13 @@ trade counts once (its newest row).
 - **Live inputs.** `predict` reads `contracts.horizons.scores_asof` / `ranges_asof`; until B10 builds them it
   refuses with a message and writes nothing.
 - **Back-test** (`backtest`, F2.3): always-up and momentum on adjusted bars stored by the clock (plus the history
-  cache with `--history`), basis `backtest`, written only to `--out`, never to data/. Both cost views come from
-  `lab/costs.py`. Model-only needs B10's per-horizon walk-forward probabilities and is not run yet. Without stored
+  cache with `--history`), basis `backtest`, written to `--out`, and with `--store` appended to the kind
+  `lab_backtests` (`lab/backtest_store.py`; id `bt:<run_id>:<strategy_id>:<horizon>`, run_id
+  `<market>-<as_of_date>-<stored|history>`, written once; read by B13's Strategy-lab read model). Both cost views
+  come from `lab/costs.py`. The model strategies without news (`base.model_only.v1`) use B10's walk-forward
+  probabilities (`lab/backtest_probs.py`: open_to_close, every horizon, inputs cut to the clock's last complete
+  session, each monthly fit on labels resolved by its refit date; `probs_source` `walk_forward:<model_version>`);
+  strategies that need news stay out (no news archive). Without stored
   EURUSD bars the US order fee needs `--eurusd` (an ASSUMED constant, labelled in the output). Limits: today's
   watchlist (survivorship), split adjustment as of the fetch, no stored past ranges (no target or range measures),
   and overlapping trades, so the bootstrap intervals are too narrow.
