@@ -4,6 +4,7 @@ payloads (design/mockups/03-company/data.json, 04-stock-strategies/data.json) ke
 record stored after the cut-off is never read) and the bars' as-of split rule. Offline."""
 from __future__ import annotations
 
+import importlib
 import json
 import sys
 from datetime import datetime, timezone
@@ -183,3 +184,13 @@ def test_bars_apply_only_the_splits_known_by_the_cutoff(tmp_path, monkeypatch):
     after = company_payloads.bars_payload(sources_of("us"), "AAPL")
     assert [(b["date"], b["close"], b["adjusted"]) for b in after["bars"]] == [
         ("2026-10-01", 100.0, True), ("2026-10-02", 100.0, False), ("2026-10-05", 101.0, False)]
+
+
+def test_w1_catalogue_modules_still_import():
+    """The 1.0 stock/bars removal keeps what W1's catalogue build (design/catalogue/make_examples.py) imports."""
+    sys.path.insert(0, str(CATALOGUE))
+    try:
+        for name in ("catalogue_calendar", "catalogue_entities", "catalogue_more"):
+            importlib.import_module(name)
+    finally:
+        sys.path.remove(str(CATALOGUE))

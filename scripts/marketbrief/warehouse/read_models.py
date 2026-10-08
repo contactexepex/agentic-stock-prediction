@@ -19,11 +19,16 @@ import hashlib
 import json
 from datetime import datetime
 
+import pandas as pd
+
 from marketbrief.constants.warehouse import (
     MARKET_PAGE_KEY,
     RM_OVERVIEW,
     RM_WATCHLIST,
 )
+from marketbrief.presentation.dashboard import reads
+from marketbrief.presentation.dashboard.stock import iso_day
+from marketbrief.utils.numbers import json_safe_float
 from marketbrief.warehouse import openapi_spec, rm_registry, schema_check
 from marketbrief.warehouse.rm_registry import BuildContext, PageBuilder
 
@@ -38,10 +43,32 @@ READ_MODEL_COLUMNS = {
     "payload_sha256": "VARCHAR",
     "payload": "JSON",
 }
+# upcoming company events as of the cut-off, dated after the as-of date (no longer a page of its own in 2.0; W1's
+# catalogue build, design/catalogue/catalogue_calendar.py, reads them)
+EVENTS_SQL = f"""SELECT ticker, id, date, type, name, source, timing, amount FROM ({reads.COMPANY_EVENTS_ASOF_SQL})
+WHERE date > $as_of ORDER BY ticker, date, type, id"""
 WATCHLIST_COMPANY_FIELDS = ("ticker", "name", "sector", "last", "calls", "ranges", "earnings")
 WATCHLIST_INDICATOR_FIELDS = ("ret_1d", "ret_5d", "quality", "days_to_earnings")
 WATCHLIST_SCORE_FIELDS = ("h", "id", "prob_up", "calibrated")
 HEADER = ("market", "name", "currency", "symbol", "as_of", "disclaimer", "not_available", "empty", "plan", "skill")
+
+
+def upcoming_events(con, as_of, cutoff: str) -> dict[str, list[dict]]:
+    """ticker -> its upcoming company events (CompanyEvent) as known by the cut-off."""
+    events_by_ticker: dict[str, list[dict]] = {}
+    for event in reads.frame(con, EVENTS_SQL, {"as_of": as_of, "cutoff": cutoff}).itertuples():
+        events_by_ticker.setdefault(event.ticker, []).append(
+            {
+                "id": event.id,
+                "date": iso_day(event.date),
+                "type": event.type,
+                "name": event.name,
+                "source": event.source,
+                "timing": None if pd.isna(event.timing) else event.timing,
+                "amount": json_safe_float(event.amount),
+            }
+        )
+    return events_by_ticker
 
 
 def watchlist_row(company: dict) -> dict:
