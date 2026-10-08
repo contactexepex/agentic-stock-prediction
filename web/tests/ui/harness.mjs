@@ -79,6 +79,10 @@ async function startServer() {
   throw new Error("next start did not come up:\n" + log);
 }
 
+/* Next.js prefetches the stylesheet of a page a visible link points to; when that page is not opened within a few
+   seconds Chromium logs this warning. It is about a prefetch of our own origin, not an error of the page under test. */
+const BENIGN_CONSOLE = [/^The resource http:\/\/127\.0\.0\.1:\d+\/_next\/static\/css\/[0-9a-f]+\.css was preloaded using link preload but not used/];
+
 const MOCKUP_SHOT = (mockup, width, market) => join(repo, "design", "mockups", mockup, `shot-${market === "us" ? "us-" : ""}${width}-full.png`);
 
 async function compareImage(browser, mockupPng, appPng, target, title) {
@@ -106,7 +110,7 @@ async function runCase(browser, c) {
     const page = await ctx.newPage();
     const tag = `${c.name} @${width}`;
     page.on("console", (m) => {
-      if ((m.type() === "error" || m.type() === "warning") && !(c.allowConsole ?? []).some((re) => re.test(m.text()))) errors.push(`${tag} console.${m.type()}: ${m.text()}`);
+      if ((m.type() === "error" || m.type() === "warning") && ![...BENIGN_CONSOLE, ...(c.allowConsole ?? [])].some((re) => re.test(m.text()))) errors.push(`${tag} console.${m.type()}: ${m.text()}`);
     });
     page.on("pageerror", (e) => errors.push(`${tag} pageerror: ${e.message}`));
     page.on("request", (r) => {
