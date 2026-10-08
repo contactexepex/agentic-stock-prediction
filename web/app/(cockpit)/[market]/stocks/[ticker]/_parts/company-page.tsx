@@ -12,6 +12,8 @@ import { usePage } from "../../../../../../lib/ui/use-api.ts";
 import type { Market } from "../../../../../../lib/data/constants.ts";
 import { lifecycleDates } from "../../../../../../lib/company-pages/company-logic.ts";
 import type { CompanyPayload } from "../../../../../../lib/company-pages/types.ts";
+import { Icon } from "../../../../../../components/ui/icon.tsx";
+import { useWatchlistActions } from "./actions.tsx";
 import { EventsCard, NewsCard, ReasonsCard, ResultsCard, WatchlistCard } from "./cards.tsx";
 import { pageCtx } from "./context.ts";
 import { CompanyLine, DecisionCard } from "./decision.tsx";
@@ -26,6 +28,25 @@ function CompanyBody({ p }: { p: CompanyPayload }) {
   const [horizon, setHorizon] = useState<number>(opening);
   const co = p.company;
   const dates = lifecycleDates(p.bars, p.status.session.session_date);
+  const actions = useWatchlistActions(co, ctx);
+  const buttons = (
+    <>
+      <button className="md-btn outlined small" type="button" onClick={() => actions.open("amount")}><Icon name="account_balance_wallet" />Change amount</button>
+      {co.state === "active"
+        ? <button className="md-btn outlined small" type="button" onClick={() => actions.open("deactivate")}><Icon name="pending" />Deactivate</button>
+        : <button className="md-btn outlined small" type="button" onClick={() => actions.open("reactivate")}><Icon name="check" />Reactivate</button>}
+    </>
+  );
+  const pending = actions.pending.length ? (
+    <div className="pend">
+      {actions.pending.map((r, i) => (
+        <div className="mb-alert" key={i} style={{ padding: "10px 14px" }} role="status">
+          <Icon name="pending" />
+          <div><b className="t">Pending: {r}</b><div className="s">Recorded as a request; the next run imports it (F10). Nothing is bought or sold.</div></div>
+        </div>
+      ))}
+    </div>
+  ) : null;
   return (
     <>
       <PageHead
@@ -33,7 +54,7 @@ function CompanyBody({ p }: { p: CompanyPayload }) {
         title={`${co.ticker} · ${co.name}`}
         subtitle={`${co.sector ?? "sector not set"} · ${p.name} · data as of the ${fmtDate(p.as_of, false)} close · research only, nothing here trades`}
       />
-      <CompanyLine p={p} ctx={ctx} actions={null} />
+      <CompanyLine p={p} ctx={ctx} actions={buttons} />
       <SignalsBand page={p} goLive={p.go_live} strategies={Object.keys(p.strategies).length} />
       <DecisionCard p={p} ctx={ctx} horizon={horizon} onHorizon={setHorizon} />
       <PriceChart p={p} ctx={ctx} horizon={horizon} />
@@ -43,7 +64,7 @@ function CompanyBody({ p }: { p: CompanyPayload }) {
         <div className="col">
           <ReasonsCard reasons={p.reasons} news={p.news} ctx={ctx} />
           <ResultsCard p={p} ctx={ctx} />
-          <WatchlistCard p={p} ctx={ctx} onChangeAmount={null} pending={null} historyDates={dates} />
+          <WatchlistCard p={p} ctx={ctx} onChangeAmount={() => actions.open("amount")} pending={pending} historyDates={dates} />
         </div>
         <div className="col">
           <NewsCard p={p} ctx={ctx} />
@@ -52,6 +73,7 @@ function CompanyBody({ p }: { p: CompanyPayload }) {
       </div>
       <CompanyLegend />
       <PageFooter page={p} endpoint={`stocks/${co.ticker}`} />
+      {actions.element}
     </>
   );
 }
