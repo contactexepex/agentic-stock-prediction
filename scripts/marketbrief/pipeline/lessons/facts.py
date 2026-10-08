@@ -146,11 +146,11 @@ def evidence(con, ids: list[str], made_at) -> list[dict]:
     ]
 
 
-
 def intraday_notes(con, fact: dict) -> list[dict]:
-    """The intraday notes (WS5) on the call's ticker for the sessions after its base date up to its target date, for
-    the reflector to read; not stored. Empty when none exist."""
+    """The intraday notes (WS5) on the call's ticker for the sessions after its base date up to its target date, as
+    stored by the call's settled_at, for the reflector to read; not stored. Empty when none exist."""
     if not fact.get("base_date") or not fact.get("target_date"):
         return []
-    return notes_in_window(con, intraday_config_or_default(), fact["ticker"], pd.Timestamp(fact["base_date"]).date(),
-                           pd.Timestamp(fact["target_date"]).date())
+    window = (pd.Timestamp(fact["base_date"]).date(), pd.Timestamp(fact["target_date"]).date())
+    settled_at = pd.Timestamp(fact["settled_at"]).to_pydatetime() if fact.get("settled_at") else None
+    return notes_in_window(con, intraday_config_or_default(), fact["ticker"], window, settled_at)

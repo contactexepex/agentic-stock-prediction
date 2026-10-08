@@ -27,7 +27,7 @@ def intraday_config_or_default() -> dict:
     try:
         return load_intraday_config()
     except FileNotFoundError:
-        return DEFAULT_OUTCOME_SETTINGS
+        return {key: dict(value) for key, value in DEFAULT_OUTCOME_SETTINGS.items()}
 
 
 def check_time(now: datetime) -> datetime:

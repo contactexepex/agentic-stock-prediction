@@ -483,10 +483,13 @@ def test_weekly_review_section_and_reflector_input(market, monkeypatch):
     assert "| week 2026-W41 | 1 | 1 | 0 | 0 | 0 |" in lines and "| since start · news | 1 | 1 | 0 | 0 | 0 |" in lines
     empty = intraday_outcomes(con, date(2026, 9, 28), date(2026, 10, 4))
     assert "No explained intraday deviation" in "\n".join(markdown_lines(empty, {"week": "w", "all": "a"}))
-    notes = notes_in_window(con, settings, "AAPL", date(2026, 10, 6), date(2026, 10, 7))
+    notes = notes_in_window(con, settings, "AAPL", (date(2026, 10, 6), date(2026, 10, 7)))
     assert [(n["explanation_id"], n["outcome"], n["attribution"]) for n in notes] == [
         (f"ix-{CHECK_ID}-AAPL", "held", "news")]
-    assert notes_in_window(con, settings, "AAPL", date(2026, 10, 7), date(2026, 10, 9)) == []  # after the session
-    assert notes_in_window(con, settings, "MSFT", date(2026, 10, 6), date(2026, 10, 7)) == []
-    fact = {"ticker": "AAPL", "base_date": "2026-10-06", "target_date": "2026-10-07"}
-    assert len(intraday_notes(con, fact)) == 1 and intraday_notes(con, {"ticker": "AAPL"}) == []
+    assert notes_in_window(con, settings, "AAPL", (date(2026, 10, 7), date(2026, 10, 9))) == []  # after the session
+    assert notes_in_window(con, settings, "MSFT", (date(2026, 10, 6), date(2026, 10, 7))) == []
+    fact = {"ticker": "AAPL", "base_date": "2026-10-06", "target_date": "2026-10-07",
+            "settled_at": "2026-10-08T12:00:00+00:00"}
+    assert [n["outcome"] for n in intraday_notes(con, fact)] == ["held"]
+    early = {**fact, "settled_at": "2026-10-07T16:35:00+00:00"}   # before the note was written (16:40)
+    assert intraday_notes(con, early) == [] and intraday_notes(con, {"ticker": "AAPL"}) == []

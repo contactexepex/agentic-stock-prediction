@@ -257,6 +257,7 @@ Mirrors `docs/ws/ws5-judgments.jsonl`.
 - Round 1, FAIL, b591a89: blockers: 1-day calls dropped on D+1 (window not from call_basis); previous close and
   entry opens read without a collected_at bound; ws5-judgments.jsonl claimed but missing.
 - Round 2, PASS, 13433f8: the three blockers fixed; 3 new cosmetic findings (below).
+- Follow-up round 1, FAIL, f0bb93e: blocker = a wrong test count in the build report (51 claimed, 52 true).
 
 ## Proposed edits to shared docs
 
@@ -305,9 +306,10 @@ requested by B18), see "Follow-up: weekly review and reflector" below.
   `outcome_summary(explanation_outcomes(...))` for the review week and since start, as of the clock (MB_NOW-aware),
   and the report section "Intraday deviations: held or reversed by the close" (counts per window and attribution;
   context only, never scored). A connection without the views (bare test connections) gives empty counts.
-  `review/cli.py`: `review_data["intraday"]` and `detail.intraday` in the stored record (3 lines);
-  `review/markdown.py`: the section after the signal-model check (3 lines).
-- `scripts/marketbrief/intraday/outcomes.py`: `notes_in_window(con, settings, ticker, after, through)`;
+  `review/cli.py`: the import, `review_data["intraday"]`, `detail.intraday` in the stored record and two docstring
+  lines; `review/markdown.py`: the import and the section after the signal-model check.
+- `scripts/marketbrief/intraday/outcomes.py`: `notes_in_window(con, settings, ticker, window, as_of)` (as_of = the
+  call's settled_at, so a note written or a close collected later never reaches the lesson);
   `intraday/settings.py`: `intraday_config_or_default()` (the outcome default when config/intraday.yaml is absent).
 - `scripts/marketbrief/pipeline/lessons/facts.py`: `intraday_notes(con, fact)` (the notes on the call's ticker for
   the sessions after its base date up to its target date); `lessons/cli.py` prepare adds `intraday_notes` to each
@@ -337,6 +339,12 @@ From judge round 2:
 - `tests/test_intraday.py` `test_stored_bars_as_of_the_check`: SPY's stored previous close is never asserted (only
   `bench_ret`, which comes from the intraday bars).
 - `scripts/marketbrief/intraday/constants.py`: "may" is not a banned word.
+
+From the follow-up's judge round 1 (fixed in its round 2: notes_in_window takes as_of = the call's settled_at; its
+docstring; blank lines in lessons/facts.py; the review/cli.py line count in this file; the default settings dict
+is copied):
+- `tests/`: the review's intraday section is tested through `markdown_lines` and `intraday_outcomes`; no test runs
+  `review.build` with stored intraday notes.
 
 ## Open questions
 1. News window for attribution: the spec says items first seen since the open (default `news_window: open`).
