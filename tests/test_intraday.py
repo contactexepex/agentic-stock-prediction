@@ -456,3 +456,40 @@ def test_daily_sigma_fallbacks():
     assert sigma == pytest.approx(0.05 / 5 ** 0.5) and note == "sigma_from_5d_range"
     assert daily_sigma({}, {"ewma_vol": 0.2})[1] == "sigma_from_ewma_vol"
     assert daily_sigma({}, None) == (None, "no_sigma")
+
+
+def test_weekly_review_section_and_reflector_input(market, monkeypatch):
+    from datetime import date
+
+    from marketbrief.intraday.outcomes import notes_in_window
+    from marketbrief.pipeline.lessons.facts import intraday_notes
+    from marketbrief.pipeline.review.intraday_review import intraday_outcomes, markdown_lines
+
+    root, cfg, settings = market
+    run_check(cfg, settings, connect(MARKET), FakeFetcher(), CHECK)
+    con = connect(MARKET)
+    monkeypatch.setenv("MB_NOW", "2026-10-07T16:40:00+00:00")
+    good, _ = validate_records([good_note(f"{CHECK_ID}-AAPL")], explain.flagged_rows(con), set(), SETTINGS)
+    explain.add(MARKET, good, explain.flagged_rows(con))
+    bars_csv(root, SESSION, {"AAPL": 106.5}, collected_at="2026-10-07T21:00:00+00:00")   # held by the close
+    con = connect(MARKET)
+    week = (date(2026, 10, 5), date(2026, 10, 11))
+    assert intraday_outcomes(con, *week)["week"]["outcomes"] == {"pending": 1}   # the close is not stored at 16:40
+    monkeypatch.setenv("MB_NOW", "2026-10-12T06:00:00+00:00")
+    data = intraday_outcomes(con, *week)
+    assert data["week"]["outcomes"] == {"held": 1} and data["all"]["by_attribution"] == {"news": {"held": 1}}
+    assert intraday_outcomes(con, date(2026, 9, 28), date(2026, 10, 4))["week"]["n"] == 0   # an earlier week
+    lines = markdown_lines(data, {"week": "week 2026-W41", "all": "since start"})
+    assert "| week 2026-W41 | 1 | 1 | 0 | 0 | 0 |" in lines and "| since start · news | 1 | 1 | 0 | 0 | 0 |" in lines
+    empty = intraday_outcomes(con, date(2026, 9, 28), date(2026, 10, 4))
+    assert "No explained intraday deviation" in "\n".join(markdown_lines(empty, {"week": "w", "all": "a"}))
+    notes = notes_in_window(con, settings, "AAPL", (date(2026, 10, 6), date(2026, 10, 7)))
+    assert [(n["explanation_id"], n["outcome"], n["attribution"]) for n in notes] == [
+        (f"ix-{CHECK_ID}-AAPL", "held", "news")]
+    assert notes_in_window(con, settings, "AAPL", (date(2026, 10, 7), date(2026, 10, 9))) == []  # after the session
+    assert notes_in_window(con, settings, "MSFT", (date(2026, 10, 6), date(2026, 10, 7))) == []
+    fact = {"ticker": "AAPL", "base_date": "2026-10-06", "target_date": "2026-10-07",
+            "settled_at": "2026-10-08T12:00:00+00:00"}
+    assert [n["outcome"] for n in intraday_notes(con, fact)] == ["held"]
+    early = {**fact, "settled_at": "2026-10-07T16:35:00+00:00"}   # before the note was written (16:40)
+    assert intraday_notes(con, early) == [] and intraday_notes(con, {"ticker": "AAPL"}) == []
