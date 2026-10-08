@@ -13,6 +13,15 @@ export function redact(text: string, secrets: string[]): string {
     .replace(/\beyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g, "[redacted]");
 }
 
+/** `redact` applied to every string inside a JSON-like value (the assistant's answer), at most 8 levels deep. */
+export function redactDeep(value: unknown, secrets: string[], depth = 0): unknown {
+  if (typeof value === "string") return redact(value, secrets);
+  if (value === null || typeof value !== "object" || depth >= 8) return typeof value === "object" && value !== null ? null : value;
+  if (Array.isArray(value)) return value.map((item) => redactDeep(item, secrets, depth + 1));
+  return Object.fromEntries(Object.entries(value as Record<string, unknown>)
+    .map(([key, item]) => [key, redactDeep(item, secrets, depth + 1)]));
+}
+
 /** Argument names whose values are never logged. */
 const SECRET_NAME = /token|secret|password|authorization|cookie|api[_-]?key/i;
 

@@ -92,13 +92,14 @@ API work (WS2, `api/openapi.yaml`) and the app (WS3) take from here:
 | 11-assistant | `POST /api/assistant (the explain tool)` | `(none: conversations are an operational log in MotherDuck schema app, kept 90 days)` |
 | 12-help | `(static content; no endpoint)` | `(none)` |
 
-- **Open data requests** are what the `_data_requests` lists in the pages' `data.json` files leave open: the
-  Assistant's budget state (F11, not in the catalogue); a weekly series of hit rate and Brier per scoring basis for
+- **Open data requests** are what the `_data_requests` lists in the pages' `data.json` files leave open: a weekly series of hit rate and Brier per scoring basis for
   Track record (B4); for Strategy lab, a back-test run on the 15-year history cache and the model-only rows (W1's
   back-test rows cover always-up and momentum on the stored bars); for News, what the stored data cannot supply (a
   region, confirmed or corroborated statuses on the stored items, clusters with more than one origin, summaries for
   most US items); for Rule vs AI, reading the per-company head-to-head cut from the heatmap cells is a follow-up.
-  W1 answered the rest of requests 1-8. Issue #226 holds the News page's further findings for W1 and the owner
+  W1 answered the rest of requests 1-8. The Assistant's budget state (F11) is answered by B8: the `budget` object of
+  `GET` and `POST /api/assistant` (today's and the month's spend against $0.65 and $20, `over_budget`, the kill
+  switch; docs/ws/b8.md). Issue #226 holds the News page's further findings for W1 and the owner
   (events already past, the per-company rail beyond the catalogue's four companies, the kind word, W1's
   market-moving rule on promotional items); they are an issue, not a `_data_requests` entry.
 - **Rules the pages encode as named constants** (`mockups/_shared/shell.js`, each with its source): the go-live bar
