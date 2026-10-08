@@ -5,7 +5,7 @@ Top level: `as_of`, `cutoff`, `built_at`, `endpoint`, `read_model`, `sources`, `
 
 | Payload key | Catalogue entity | Fields used | Selection |
 |---|---|---|---|
-| `status` | Market status | `market`, `name`, `as_of`, `currency`, `session.{local_time, trading_day, session_date, session_open_utc, session_close_utc, in_session, late_run}`, `regime`, `runs.{pre_open, intraday[], post_close, news}.{at, ok, next_at, new_items}`, `freshness.{state, built_at, age_minutes}`, `paper_label` | the market's record |
+| `status` | Market status | `market`, `name`, `as_of`, `currency`, `session.{local_time, trading_day, session_date, previous_session, calendar_covered, session_open_utc, session_close_utc, in_session, late_run}`, `regime`, `runs.{pre_open, intraday[], post_close, news}.{at, ok, next_at, new_items}`, `freshness.{state, built_at, age_minutes}`, `paper_label` | the market's record |
 | `companies` | Company | `market`, `ticker`, `name`, `exchange`, `sector`, `state`, `amount`, `amount_overridden`, `currency`, `last_close`, `last_close_date`, `change_pct`, `agreement_n1`, `open_trades` | the market's companies; inactive ones are kept in the payload (never shown on Home, decision 13) |
 | `agreement["1".."5"]` | Agreement | `market`, `as_of_date`, `session_date`, `rank`, `ticker`, `name`, `horizon_days`, `buy`, `of`, `by_family.{rule,baseline,ai}.{buy,of}`, `avg_prob_up`, `label`, `paper` | active companies, per horizon, top 5 by `rank` |
 | `head_to_head` | Head-to-head pick | `id`, `market`, `ticker`, `made_at`, `as_of_date`, `session_date`, `family`, `pick_rule`, `status`, `strategy_id`, `strongest_basis`, `ranking[]`, `horizon_days`, `prediction_id`, `base_close`, `prob_up`, `move_pct`, `loss_pct`, `costs_pct`, `expected_gain_pct`, `candidates[]`, `amount`, `currency`, `method_version` | picks whose `session_date` is the session being predicted |
@@ -15,13 +15,18 @@ Top level: `as_of`, `cutoff`, `built_at`, `endpoint`, `read_model`, `sources`, `
 | `to_date` | Scoreboard row | `scope`, `market`, `view`, `family`, `pick_rule`, `horizon_days`, `trades`, `net_pnl`, `currency`, `mean_return_pct`, `win_rate`, `sample_badge`, `basis`, `as_of` | rows with `scope` = `pick_rule`, `horizon_days` = `all` (head-to-head view) |
 | `go_live` | Scoreboard row | `go_live.{proven, months_forward, trades_needed, beats_best_baseline}` | of the reference strategy's accuracy row, all horizons |
 | `strategies` | Strategy | `id`, `family`, `name`, `threshold`, `horizons`, `live`, `settled_trades` | all 15, keyed by id (names for picks, open trades and alerts) |
-| `news` | News item | `id`, `market`, `tickers`, `primary_tickers`, `title`, `source`, `source_domain`, `url`, `published_at`, `first_seen_at`, `enrichment.{event_type, materiality, sentiment, relevance, novelty, urgency, priced_in, analyzed_at}`, `status`, `status_as_of`, `cluster_id`, `independent_origins`, `primary_ids`, `headline_history_status` | the market's items with `first_seen_at` at or before `cutoff`, newest first |
+| `news` | News item | `id`, `market`, `tickers`, `primary_tickers`, `title`, `source`, `source_domain`, `url`, `published_at`, `first_seen_at`, `enrichment.{event_type, materiality, sentiment, relevance, novelty, urgency, priced_in, analyzed_at}`, `status`, `status_as_of`, `cluster_id`, `independent_origins`, `primary_ids`, `headline_history[]`, `headline_history_status` | the market's items with `first_seen_at` at or before `cutoff`, newest first |
 | `settled_trades` | Paper trade (settled) | `trade_id`, `view`, `pick_rule`, `strategy_id`, `family`, `ticker`, `horizon_days`, `entry_date`, `exit_date`, `exit_date_actual`, `status`, `amount`, `currency`, `net_pnl`, `return_pct`, `reason_code`, `settled_at` | the market's settled trades with `settled_at` at or before `cutoff` (the cumulative profit chart; `rm.trades` keeps the last sessions' settled trades) |
 | `horizons`, `default_horizon` | (setting) | `config/strategies.yaml` horizons 1-5; N+1 opens (decision 39) | |
 
 Shown but computed by the page (presentation only): the KPI cards' counts and sums (trades, flagged checks, runs ok,
 unrealised total), the unrealised total per company (sum of `unrealised_pnl`), the cumulative profit per family and
-settlement day (sums of `net_pnl`), the range bar's and chart's geometry,
+settlement day (sums of `net_pnl`), the expected gain in money (`expected_gain_pct` × `amount` / 100), local times
+from the UTC fields and the market's `session.local_time` offset, the range bar's and chart's geometry,
+
+Spec constants in the template (not data, named once each with their source): the go-live bar's 2 months of forward
+paper trading (SPEC F7.2) and the two intraday checks per session (SPEC section 7, used for "n of N ok" and the two
+intraday slots of the runs timeline). The legend shows sample values (+1.2% / −1.2%) and says so.
 the expected gain in money (`expected_gain_pct` x `amount` / 100), local times from the UTC fields and the
 market's `session.local_time` offset, the "clears costs / below costs" reading (`expected_gain_pct` > 0, SPEC F9),
 the leader outline among the family tiles (highest `net_pnl` with trades).

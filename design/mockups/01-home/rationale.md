@@ -12,7 +12,8 @@ Files: `build.py` (catalogue -> `data.json` -> `template.html` -> `page.html`), 
 design system inlined, no request leaves the page), `notes.md` (every catalogue entity and field used), screenshots
 `shot-1280-full.png`, `shot-390-full.png`, `shot-390-viewport.png` (India, N+1), `shot-us-1280-full.png` (US),
 `shot-us-1280-n5.png` (horizon N+5 selected), `shot-1280-top.png` (the top of the desktop page at 2x),
-`shot-1280-trades.png` (the trades table at 2x), `shot-390-h2h.png`, `shot-390-trades.png` (phone cards).
+`shot-1280-trades.png` (the trades table at 2x), `shot-1024-full.png` and `shot-768-full.png` (laptop and tablet
+widths), `shot-390-h2h.png`, `shot-390-agree.png`, `shot-390-trades.png` (phone cards).
 
 ## What the page is for
 The first screen of the morning, one market at a time (the India/US switch in the top bar; the real app navigates
@@ -79,7 +80,8 @@ and the range bar. Text tones stay AA on white (figures in tokens.css).
     unrealised in money and percent, a **range bar** (the trade's own 50% and 80% bands, the entry dotted, the
     target as a triangle, the last price as the dark line; the numbers in the tooltip), distance to target ("past
     target" once reached), and **today's check** from the latest intraday trade check stored by the cut-off (band
-    position, flags; tooltip with the check's numbers). Phone: strategy, horizon, unrealised and the check.
+    position, flags; tooltip with the check's numbers). Below 1200 px the entry, last and to-target columns and the
+    dates go (the tooltips keep them); below 761 px the range bar goes too: strategy, horizon, unrealised, check.
 13. **Legend** (signs, tags, badges) and the **footer**: research-only line, `as_of`, `cutoff`, `built_at` and the
     endpoint.
 
@@ -87,7 +89,10 @@ and the range bar. Text tones stay AA on white (figures in tokens.css).
 - `data.json` is composed from eleven catalogue files only (`notes.md` lists each field). Nothing is invented in
   the builder; the only logic is selection (market, today's session, the latest check by the cut-off, news and
   settled trades stored by the cut-off, active companies, the top 5 per horizon) and ordering. The page computes
-  only counts and sums: the KPI cards, the unrealised total per company, the cumulative profit per family and day.
+  only presentation: counts and sums (the KPI cards, the unrealised total per company, the cumulative profit per
+  family and day), the expected gain in money, local times, and the geometry of the bars and the chart. Two spec
+  constants are named once in the template with their source (the go-live bar's 2 months, SPEC F7.2; two intraday
+  checks per session, SPEC section 7); the legend shows sample values and says so.
 - Per market the payload carries `as_of`, `cutoff` (the catalogue's clock, 2026-10-07T12:00Z) and `built_at` (the
   market status example's `freshness.built_at`), so the build is deterministic (two builds give the same bytes).
 - No look-ahead: intraday checks after the cut-off are left out (the US example's 16:27Z checks), which is why the
@@ -110,6 +115,14 @@ the viability line is an expected-gain reading); horizon selector N+1..N+5 openi
 ## Checked
 `node design/system/check_page.js design/mockups/01-home/page.html design/mockups/01-home shot`: no console
 errors, no horizontal overflow, no external requests, at 1280 and 390 px. Rebuild is byte-identical.
+
+- Keyboard: every element with a tooltip is focusable (links and buttons natively, the rest with `tabindex=0`), so
+  the range bars' and checks' figures can be reached without a mouse; Escape closes a tooltip and the drawer.
+- Text fit: `design/system/check_text.js` scans for clipped, overflowing and overlapping text at 390-1680 px for both
+  markets; the only reports left are bounding-box artefacts of an inline ticker before a wrapped headline.
+- Catalogue data note for W1 (cosmetic): India's market status lists two intraday runs (05:43Z and 08:43Z ok) but
+  trade_check.json holds rows for 05:43Z only, so the runs timeline shows check 2 done while the alerts card's
+  latest check is 11:13 IST.
 
 ## Design system change (this version)
 `design/system/tokens.css` and `components.css` moved to scheme v2 (same token and class names, new values and a

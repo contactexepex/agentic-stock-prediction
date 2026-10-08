@@ -1,6 +1,7 @@
 // Playwright scan of a built page for clipped, overflowing and overlapping text at eight widths (390-1680 px) and both
 // markets (#india, #us): node design/system/check_text.js <page.html>. Inline elements that wrap (a ticker before a
 // multi-line headline) are reported as overlaps by their bounding boxes; read the list, it is not a pass/fail gate.
+// A table cell cut at its scrolling wrapper's edge counts as clipped (the wrapper's scrollbar is not a fix).
 const { chromium } = require('playwright'); const path = require('path');
 (async () => {
   const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' }).catch(() => chromium.launch());
@@ -19,8 +20,7 @@ const { chromium } = require('playwright'); const path = require('path');
         // 1. clipped: own text wider than the box when overflow is hidden/clip/auto (scrolling wrappers excluded)
         for (const el of all) {
           const cs = getComputedStyle(el);
-          if (el.closest('.md-table-wrap') && el.classList.contains('md-table-wrap')) continue;
-          if (['hidden','clip'].includes(cs.overflowX) && el.scrollWidth > el.clientWidth + 1 && el.textContent.trim() && cs.textOverflow !== 'ellipsis') res.push(`clipped ${desc(el)} (${el.scrollWidth}>${el.clientWidth})`);
+                    if (['hidden','clip'].includes(cs.overflowX) && el.scrollWidth > el.clientWidth + 1 && el.textContent.trim() && cs.textOverflow !== 'ellipsis') res.push(`clipped ${desc(el)} (${el.scrollWidth}>${el.clientWidth})`);
           if (cs.textOverflow === 'ellipsis' && el.scrollWidth > el.clientWidth + 1 && !el.classList.contains('mb-topbar-title')) res.push(`ellipsis ${desc(el)}`);
         }
         // 2. text leaf past its nearest clipping ancestor or past a sized parent (visible overflow)
@@ -28,7 +28,6 @@ const { chromium } = require('playwright'); const path = require('path');
         for (const el of leaves) {
           const r = el.getBoundingClientRect(); let a = el.parentElement;
           while (a && a !== document.body) { const ar = a.getBoundingClientRect(); const cs = getComputedStyle(a);
-            if (a.classList.contains('md-table-wrap')) break;
             if (ar.width > 0 && (r.right > ar.right + 1.5 || r.left < ar.left - 1.5)) { const k = desc(el) + '>' + desc(a); if (!seen.has(k)) { seen.add(k); res.push(`overflow ${desc(el)} past ${desc(a)} by ${Math.round(Math.max(r.right - ar.right, ar.left - r.left))}px`); } break; }
             if (cs.overflowX !== 'visible') break; a = a.parentElement; }
         }
