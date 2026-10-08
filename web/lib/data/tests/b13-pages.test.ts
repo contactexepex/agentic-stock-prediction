@@ -1,16 +1,19 @@
-// B13's page specs (Strategy lab, Track record): each reads its own rm table at the market's page `_` and is served
+// B13's page specs (Strategy lab, Rule vs AI, Track record): each reads its own rm table at the market's page `_` and is served
 // in page mode (cutoff, built_at and status.freshness added); a missing page is a 404.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { MARKET_PAGE_KEY } from "../constants.ts";
 import { readPage } from "../handler.ts";
+import { RULE_VS_AI_PAGE } from "../rule-vs-ai.ts";
 import { STRATEGY_LAB_PAGE } from "../strategy-lab.ts";
 import { TRACK_RECORD_PAGE } from "../track-record.ts";
 import { MemoryRowStore, NOW, row } from "./fakes.ts";
 
 const request = () => new Request("https://app.test/api/v1/markets/us/x");
 
-for (const [spec, table] of [[STRATEGY_LAB_PAGE, "strategies"], [TRACK_RECORD_PAGE, "track_record"]] as const) {
+for (const [spec, table] of [
+  [STRATEGY_LAB_PAGE, "strategies"], [RULE_VS_AI_PAGE, "compare"], [TRACK_RECORD_PAGE, "track_record"],
+] as const) {
   test(`${table}: one keyed read of rm.${table}/_, served as a page`, async () => {
     const store = new MemoryRowStore().put(table, row());
     const response = await readPage(request(), spec, "us", MARKET_PAGE_KEY, { store, now: () => NOW });

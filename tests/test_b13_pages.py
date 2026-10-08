@@ -19,10 +19,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from marketbrief.analytics import scoring  # noqa: E402
-from marketbrief.warehouse import rm_strategies, rm_track_record  # noqa: E402
+from marketbrief.core.schemas import SCHEMAS  # noqa: E402
+from marketbrief.warehouse import openapi_spec, rm_compare, rm_strategies, rm_track_record, schema_check  # noqa: E402
 from test_api_contract import CUTOFF, catalogue, example_context  # noqa: E402
 
 MARKETS = ("india", "us")
+REPO = Path(__file__).resolve().parents[1]
 EXAMPLE_AS_OF = "2026-10-06"  # the catalogue's scoreboard rows carry the examples' as-of date
 
 
@@ -142,3 +144,110 @@ def test_weekly_series_is_empty_without_scored_calls():
     con = calls_connection()
     con.execute("DELETE FROM track_record")
     assert rm_track_record.weekly_series(con, CUTOFF) == []
+
+
+# ---------- Rule vs AI (rm.compare) against the mockup, built from the catalogue's example kinds ----------
+KIND_FILES = {
+    "cost_views": "cost_view.json",
+    "head_to_head_picks": "head_to_head_pick.json",
+    "trade_reasons_ai": "reason_ai.json",
+    "eod_analyses": "eod_analysis.json",
+    "research_reviews": "research_review.json",
+}
+MOCKUP_06 = Path(__file__).resolve().parents[1] / "design/mockups/06-rule-vs-ai/data.json"
+
+
+def example_kinds(market: str):
+    """An in-memory DuckDB holding the catalogue's example rows of the lab kinds (columns of core/schemas.py)."""
+    con = duckdb.connect()
+    for kind, name in KIND_FILES.items():
+        columns = SCHEMAS[kind][1]
+        con.execute(f"CREATE TABLE {kind} ({', '.join(f'{c} {t}' for c, t in columns.items())})")
+        for record in catalogue(name):
+            if record["market"] == market:
+                values = [
+                    json.dumps(record[c]) if t == "JSON" and record[c] is not None else record[c]
+                    for c, t in columns.items()
+                ]
+                con.execute(f"INSERT INTO {kind} VALUES ({', '.join('?' * len(columns))})", values)
+    return con
+
+
+def compare_context(market: str):
+    ctx = lab_context(market)
+    ctx.con = example_kinds(market)
+    ctx.__dict__["collected"] = frozenset(c["ticker"] for c in catalogue("company.json") if c["market"] == market)
+    return ctx
+
+
+def zulu(value):
+    """Times as ISO UTC with a Z (the page's form; the mockup copies some as +00:00)."""
+    return json.loads(json.dumps(value).replace("+00:00", "Z"))
+
+
+@pytest.mark.parametrize("market", MARKETS)
+def test_rule_vs_ai_records_are_the_mockups(market):
+    ctx = compare_context(market)
+    mockup = json.loads(MOCKUP_06.read_text())["markets"][market]
+    built = {
+        "trades": rm_compare.head_to_head_trades(ctx),
+        "your_costs": rm_compare.your_costs(ctx),
+        "picks": rm_compare.picks(ctx),
+        "reasons": rm_compare.reasons(ctx),
+        "eod": rm_compare.eod_analyses(ctx),
+        "reviews": rm_compare.reviews(ctx),
+        "rows": rm_compare.head_to_head_rows(ctx),
+    }
+    for key, records in built.items():
+        assert canonical(records) == canonical(zulu(mockup[key])), key
+    assert [r["created_at"] for r in built["reasons"]] == sorted(
+        (r["created_at"] for r in built["reasons"]), reverse=True
+    )
+    # the W41 reviews (written 10 Oct) are after the cut-off and never read
+    assert [r["iso_week"] for r in built["reviews"]] == ["2026-W40"]
+    assert (
+        rm_compare.review_due(ctx, built["reviews"])
+        == mockup["review_due"]
+        == {
+            "date": "2026-10-10",
+            "iso_week": "2026-W41",
+        }
+    )
+
+
+def test_review_due_moves_past_a_week_already_reviewed():
+    ctx = compare_context("us")
+    ctx.cutoff_time = datetime.fromisoformat("2026-10-10T18:00:00+00:00")  # Saturday, after the W41 review
+    assert rm_compare.review_due(ctx, [{"iso_week": "2026-W41"}]) == {"date": "2026-10-17", "iso_week": "2026-W42"}
+    assert rm_compare.review_due(ctx, []) == {"date": "2026-10-10", "iso_week": "2026-W41"}
+
+
+# ---------- populated records against the contract (the stored data has no settled trade yet) ----------
+def schema_errors(records: list[dict], name: str) -> list[str]:
+    document = openapi_spec.spec()
+    return [
+        e for record in records for e in schema_check.errors(record, {"$ref": f"#/components/schemas/{name}"}, document)
+    ]
+
+
+@pytest.mark.parametrize("market", MARKETS)
+def test_example_records_validate_against_the_page_schemas(market):
+    lab = lab_context(market)
+    ctx = compare_context(market)
+    checks = {
+        "ScoreboardRow": rm_strategies.scoreboard_rows(lab),
+        "HeatmapCell": rm_strategies.heatmaps(lab)["cells"],
+        "CumulativeLine": rm_strategies.heatmaps(lab)["lines"],
+        "HeadToHeadTrade": rm_compare.head_to_head_trades(ctx),
+        "YourCostRow": rm_compare.your_costs(ctx),
+        "HeadToHeadPick": rm_compare.picks(ctx),
+        "AiReason": rm_compare.reasons(ctx),
+        "EodAnalysis": rm_compare.eod_analyses(ctx),
+        "ResearchReview": rm_compare.reviews(ctx),
+    }
+    for name, records in checks.items():
+        assert records, name
+        assert schema_errors(records, name) == [], name
+    body = json.loads((REPO / "design/catalogue/scoreboard_backtest_row.json").read_text())
+    backtest = [rm_strategies.backtest_row(r) for r in body["records"] if r["market"] == market]
+    assert backtest and schema_errors(backtest, "ScoreboardRow") == []
