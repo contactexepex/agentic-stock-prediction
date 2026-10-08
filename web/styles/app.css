@@ -70,3 +70,10 @@
 .mb-notfound .card{max-width:480px}
 .mb-notfound h1{font:700 22px/1.2 var(--md-ref-typeface-plain);margin:0 0 8px}
 .mb-pending-h1{font:700 24px/1.2 var(--md-ref-typeface-plain);margin:0 0 14px}
+
+/* filter chips and the pager (the News mockup's) */
+.mb-chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.mb-chips .md-chip.filter{cursor:pointer}
+.pager{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:12px;font-size:13px;color:var(--md-sys-color-on-surface-variant)}
+.pager .pg{display:flex;gap:4px;flex-wrap:wrap}
+.pager .pg button[aria-current="page"]{background:var(--md-sys-color-primary);color:var(--md-sys-color-on-primary);border-color:transparent}
