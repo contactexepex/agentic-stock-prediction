@@ -30,9 +30,9 @@ director say about why. The page answers top-down in that order and never turns 
 4. **Match by match**: one row per company, entry session and pick rule from the settled head-to-head trades, the
    rule result and the AI result (net after the selected cost, strategy, horizon, return, target reached and error),
    and who won (a draw when both picked the same horizon and therefore the same trade; "waiting" while the other
-   side's pick is still open, shown as "open · N+k"; "no match" when that family had no candidate that day, or when
-   no pick of that family is stored for the day, "no pick stored"). The head totals the matches and names the cost
-   view.
+   side's pick is still open, shown as "open · N+k"; the winner cell says "no match" when the other side is "no
+   candidate" (that family had no strategy buying the company that day) or "no pick stored" (no pick of that family
+   is stored for the day)). The head totals the matches and names the cost view.
 5. **Gain-pick vs probability-pick, and by regime** (F7.1, F2.6): the pick-rule rows and the regime rows of the
    head-to-head view, each with trades, profit, win rate, target error and the luck test.
 6. **Per company**: rule vs AI per company summed from the settled head-to-head trades after the selected cost (the
@@ -74,7 +74,8 @@ earlier sessions' picks are now in the payload), the review card's wording read 
 cut-off (now computed from the cut-off date), two rationale claims (Paper tags added to the picks, matches and
 per-company cards; the review data request recorded in this page's `_data_requests`), and the matches and
 per-company tables ignoring the cost switch (now per-trade your-cost figures from the cost views, labelled). Round 2
-found the Paper claim still short of two cards (the slices and the EOD analyst); both carry the tag now.
+found the Paper claim still short of two cards (the slices and the EOD analyst); both carry the tag now. Round 3
+found the matches' help text silent on "no pick stored" and this item naming the labels wrongly; both corrected.
 
 ## Decisions taken for the owner (reported to the orchestrator)
 - The page opens with a two-sided scorecard and a one-word verdict, with the luck test drawn, rather than a table:
