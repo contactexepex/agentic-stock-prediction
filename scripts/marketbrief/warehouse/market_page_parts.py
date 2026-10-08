@@ -50,3 +50,8 @@ def companies(ctx: BuildContext, fields: tuple) -> list[dict]:
     """B4's Company records (rm_common.companies: active and inactive, with agreement_n1 and open_trades) with
     `fields`."""
     return [pick(company, fields) for company in rm_common.companies(ctx)]
+
+
+def trade_checks(ctx: BuildContext) -> list[dict]:
+    """B12's latest intraday trade checks by the cut-off (full Intraday trade check records)."""
+    raise NotImplementedError("waiting for B12's ctx-first trade checks")  # replaced when B12 names its function

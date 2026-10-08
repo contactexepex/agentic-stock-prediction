@@ -17,6 +17,8 @@ NEWS_MAX_ITEMS = 50
 NEWS_MIN_MARKET_RELEVANCE = 0.4
 # Home's news card: the same window as the News page (design/mockups/01-home/notes.md)
 HOME_NEWS_WINDOW_DAYS = NEWS_WINDOW_DAYS
+# Home's agreement card: the active companies' top 5 per horizon (design/mockups/01-home/notes.md)
+HOME_AGREEMENT_TOP = 5
 # the News page's calendar: the session being predicted to 7 days after it
 NEWS_CALENDAR_DAYS = 7
 SCOPE_COMPANY = "company"

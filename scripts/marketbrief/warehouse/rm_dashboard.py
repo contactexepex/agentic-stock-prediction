@@ -1,6 +1,7 @@
-"""The 1.0 pages (WS1, docs/ws/ws1.md): rm.overview, rm.watchlist, rm.stock, rm.bars and rm.track_record, sliced
-from the dashboard's data as of the cut-off (warehouse/read_models.page_payloads) and served verbatim. Their
-payload schemas are the 1.0 components of api/openapi.yaml (Overview, Watchlist, StockDetail, Bars, TrackRecord)."""
+"""The 1.0 pages (WS1, docs/ws/ws1.md): rm.overview, rm.stock, rm.bars and rm.track_record, sliced from the
+dashboard's data as of the cut-off (warehouse/read_models.page_payloads) and served verbatim (rm.watchlist is B11's
+2.0 page, warehouse/rm_watchlist.py). Their payload schemas are the 1.0 components of api/openapi.yaml (Overview,
+StockDetail, Bars, TrackRecord)."""
 
 from __future__ import annotations
 
@@ -9,7 +10,6 @@ from marketbrief.constants.warehouse import (
     RM_OVERVIEW,
     RM_STOCK,
     RM_TRACK_RECORD,
-    RM_WATCHLIST,
     SERVE_VERBATIM,
 )
 from marketbrief.warehouse.read_models import page_payloads, upcoming_events
@@ -17,7 +17,6 @@ from marketbrief.warehouse.rm_registry import BuildContext, PageBuilder
 
 SCHEMAS = {
     RM_OVERVIEW: "Overview",
-    RM_WATCHLIST: "Watchlist",
     RM_STOCK: "StockDetail",
     RM_BARS: "Bars",
     RM_TRACK_RECORD: "TrackRecord",
@@ -25,7 +24,7 @@ SCHEMAS = {
 
 
 def dashboard_pages(ctx: BuildContext) -> dict[str, dict[str, dict]]:
-    """table -> page_key -> payload of the five 1.0 pages (computed once per build)."""
+    """table -> page_key -> payload of the 1.0 pages (computed once per build)."""
 
     def compute() -> dict[str, dict[str, dict]]:
         data = ctx.dashboard
