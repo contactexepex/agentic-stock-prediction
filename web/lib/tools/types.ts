@@ -171,6 +171,8 @@ export interface InboxStore {
   /** Inserts the request in one statement unless its inbox_id exists or the agent already has `limit` requests since
    * `sinceIso`. Not claimed: `existing` is the stored row of that key, or null when the day budget was the reason. */
   claimRequest(row: InboxRequest, budget: { sinceIso: string; limit: number }): Promise<{ claimed: boolean; existing: StoredRequest | null }>;
+  /** The stored request of an idempotency key in either inbox table, or null. */
+  findRequest(inboxId: string): Promise<StoredRequest | null>;
   appendCommand(row: CommandLogRow): Promise<void>;
   findCommand(id: string): Promise<CommandLogRow | null>;
 }

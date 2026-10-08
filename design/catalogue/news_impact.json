@@ -72,6 +72,52 @@
       ],
       "method_version": "ni-v1",
       "computed_at": "2026-10-10T14:00:00Z"
+    },
+    {
+      "id": "ni-india-2026-W41-ma-confirmed_primary-high-3",
+      "market": "india",
+      "iso_week": "2026-W41",
+      "as_of": "2026-10-10T04:30:00Z",
+      "event_type": "ma",
+      "status": "confirmed_primary",
+      "materiality": "high",
+      "horizon_days": 3,
+      "n_events": 12,
+      "mean_abnormal_pct": null,
+      "ci_low_pct": null,
+      "ci_high_pct": null,
+      "mean_benchmark_pct": null,
+      "mean_sector_pct": null,
+      "enough": false,
+      "news_ids": [
+        "nse-ann-7781203",
+        "nse-ann-7790412"
+      ],
+      "method_version": "ni-v1",
+      "computed_at": "2026-10-10T04:30:00Z"
+    },
+    {
+      "id": "ni-india-2026-W41-earnings-confirmed_primary-high-1",
+      "market": "india",
+      "iso_week": "2026-W41",
+      "as_of": "2026-10-10T04:30:00Z",
+      "event_type": "earnings",
+      "status": "confirmed_primary",
+      "materiality": "high",
+      "horizon_days": 1,
+      "n_events": 27,
+      "mean_abnormal_pct": 0.86,
+      "ci_low_pct": 0.05,
+      "ci_high_pct": 1.67,
+      "mean_benchmark_pct": -0.12,
+      "mean_sector_pct": 0.09,
+      "enough": true,
+      "news_ids": [
+        "nse-ann-7702219",
+        "nse-ann-7715530"
+      ],
+      "method_version": "ni-v1",
+      "computed_at": "2026-10-10T04:30:00Z"
     }
   ]
 }

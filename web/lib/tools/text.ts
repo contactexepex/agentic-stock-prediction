@@ -31,7 +31,8 @@ export function loggableArguments(args: unknown, secrets: string[]): unknown {
   return json.length <= 4000 ? out : { truncated: true };
 }
 
-/** Escapes text for Slack mrkdwn so user text cannot ping (<!channel>), link or format. */
+/** Escapes `&`, `<` and `>` for Slack mrkdwn, so user text cannot ping (<!channel>, <@U...>) or make a labelled link
+ * (<url|label>). Bare URLs still auto-link and `*_~` still format. */
 export function slackEscape(text: string): string {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }

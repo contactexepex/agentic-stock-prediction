@@ -223,9 +223,9 @@ test("Confirm posts a visible request in #market-brief and stores its channel an
   assert.equal(s.slack.edits.length, 0, "a pending request leaves the message as posted");
   await handleInteraction(click as never, s.deps);   // second click: the same key is a duplicate
   await s.settle();
-  assert.equal(s.slack.posts.length, 2);
-  assert.match(s.slack.edits.at(-1)?.text ?? "", /Already received/);
-  assert.equal(s.slack.edits.at(-1)?.ts, s.slack.posts[1].ts);
+  assert.equal(s.slack.posts.length, 1, "a key already in the inbox posts no second request message");
+  assert.equal(s.slack.edits.length, 0);
+  assert.match(String(s.slack.responses.at(-1)?.body.text ?? ""), /Already received/);
 });
 
 test("a refused confirm edits its request message; without the message the request is still sent", async () => {

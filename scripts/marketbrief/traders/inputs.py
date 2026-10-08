@@ -5,8 +5,10 @@ horizon (session B10's `contracts.horizons.ranges_asof` / `scores_asof`), the tr
 already stored. Tests build a GateInputs by hand from W1's example records; `load_inputs` reads stored data."""
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date, datetime
+from functools import lru_cache
 
 import pandas as pd
 
@@ -19,7 +21,7 @@ from marketbrief.traders import track_record
 from marketbrief.traders.constants import MSG_INPUTS
 
 FEATURES_SQL = """
-SELECT DISTINCT ON (ticker) ticker, as_of_date, quality, days_to_earnings FROM features
+SELECT DISTINCT ON (ticker) ticker, as_of_date, quality, days_to_earnings, computed_at FROM features
 WHERE computed_at <= ?::TIMESTAMPTZ ORDER BY ticker, as_of_date DESC, computed_at DESC"""
 REGIME_SQL = """
 SELECT DISTINCT ON (as_of_date) as_of_date, regime, computed_at FROM regime
@@ -63,6 +65,16 @@ class GateInputs:
     stored_predictions: set[str] = field(default_factory=set)
     stored_abstentions: set[str] = field(default_factory=set)
     amounts: dict[str, float | None] = field(default_factory=dict)
+    ranges_at: Callable[[datetime], dict[str, dict]] | None = None   # ranges as of a time (load_inputs: B10's
+    scores_at: Callable[[datetime], dict[str, dict]] | None = None   # ranges_asof / scores_asof at made_at)
+
+    def range_for(self, range_id: str, made: datetime) -> dict | None:
+        """The published range of the id as of made_at (a range published later does not exist yet)."""
+        return (self.ranges_at(made) if self.ranges_at else self.ranges).get(range_id)
+
+    def score_for(self, score_id: str, made: datetime) -> dict | None:
+        """The newest model score of the id computed by made_at (a later rescore is not used)."""
+        return (self.scores_at(made) if self.scores_at else self.scores).get(score_id)
 
     @property
     def market(self) -> str:
@@ -107,9 +119,10 @@ def as_date(value) -> date:
 def stored_features(con, now: datetime) -> dict[str, dict]:
     """Each ticker's newest indicator snapshot computed by `now`."""
     out = {}
-    for ticker, as_of, quality, days in con.execute(FEATURES_SQL, [now.isoformat()]).fetchall():
+    for ticker, as_of, quality, days, computed in con.execute(FEATURES_SQL, [now.isoformat()]).fetchall():
         out[ticker] = {"as_of_date": as_date(as_of), "quality": quality,
-                       "days_to_earnings": None if days is None or pd.isna(days) else int(days)}
+                       "days_to_earnings": None if days is None or pd.isna(days) else int(days),
+                       "computed_at": pd.Timestamp(computed).to_pydatetime()}
     return out
 
 
@@ -132,4 +145,13 @@ def load_inputs(cfg: dict, now: datetime, con=None) -> GateInputs:
         stored_predictions={row[0] for row in con.execute("SELECT id FROM strategy_predictions").fetchall()},
         stored_abstentions={row[0] for row in con.execute("SELECT id FROM strategy_abstentions").fetchall()},
         amounts={ticker: amount_of(market, ticker, now) for ticker in tickers},
+        ranges_at=as_of_lookup(market, horizons.ranges_asof), scores_at=as_of_lookup(market, horizons.scores_asof),
     )
+
+
+def as_of_lookup(market: str, read) -> Callable[[datetime], dict[str, dict]]:
+    """id -> record as of a time from one of B10's contract readers, cached per time (records share a made_at)."""
+    @lru_cache(maxsize=16)
+    def at(when: datetime) -> dict[str, dict]:
+        return {row["id"]: dict(row) for row in read(market, when)}
+    return at

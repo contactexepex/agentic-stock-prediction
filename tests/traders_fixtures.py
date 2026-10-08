@@ -99,3 +99,36 @@ def inputs(**changes) -> GateInputs:
     }
     base.update(changes)
     return GateInputs(**base)
+
+
+def agent_record_for(strategy_id: str, ticker: str, horizon: int) -> dict:
+    """agent_record for any example ticker (the catalogue's own made_at kept)."""
+    rec = {k: v for k, v in example(strategy_id, ticker, horizon).items() if k in AGENT_KEYS and v is not None}
+    rec["prompt_version"] = PROMPTS[strategy_id]
+    rec.pop("range_widen", None)
+    if strategy_id.startswith("ai.combined"):
+        rec["prob_up"] = round(rec["model_prob"] + rec["agent_adjustment"], 4)
+    return rec
+
+
+def inputs_for(market: str, ticker: str, now: datetime, regime: str = "TRENDING") -> GateInputs:
+    """GateInputs for one example ticker as of 2026-10-06 (ranges from the rule strategy's unwidened example
+    records, scores from the combined Sonnet trader's model_prob, every example news id corroborated)."""
+    news = {r["id"]: r for r in catalogue("news_item")}
+    ranges, scores = {}, {}
+    for horizon in (1, 3, 5):
+        rule = example("rule.model_news.v1", ticker, horizon)
+        rid = f"{AS_OF}-{ticker}-{horizon}d"
+        ranges[rid] = {"id": rid, "made_at": "2026-10-07T00:00:00Z", "base_close": rule["base_close"],
+                       "center": math.log(rule["target_price"] / rule["base_close"]), "lo50": rule["lo50"],
+                       "hi50": rule["hi50"], "lo80": rule["lo80"], "hi80": rule["hi80"],
+                       "entry_date": rule["session_date"], "exit_date": rule["exit_date"]}
+        scores[rid] = {"id": rid, "prob_up": example("ai.combined.sonnet.v1", ticker, horizon)["model_prob"],
+                       "computed_at": "2026-10-07T00:00:00Z"}
+    return GateInputs(
+        cfg={**load_market(market), "active_tickers": [ticker]}, now=now, active={ticker},
+        features={ticker: {"as_of_date": AS_OF, "quality": "OK", "days_to_earnings": 30}},
+        regimes={AS_OF: (regime, None)},
+        evidence={i: datetime.fromisoformat(r["published_at"].replace("Z", "+00:00")) for i, r in news.items()},
+        statuses=Statuses({i: "corroborated" for i in news}), ranges=ranges, scores=scores,
+        amounts={ticker: 100000.0 if market == "india" else 1000.0})

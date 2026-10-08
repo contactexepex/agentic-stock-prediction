@@ -56,7 +56,8 @@ INTRADAY_SCHEMAS: Schemas = {
         "session_date": "DATE", "ticker": "VARCHAR", "flags": "VARCHAR[]", "attribution": "VARCHAR",
         "text": "VARCHAR", "cited_ids": "VARCHAR[]", "prompt_version": "VARCHAR", "created_at": "TIMESTAMPTZ",
     }),
-    # B9: the measures of a trade check that W1's trade_checks columns do not hold, one row per trade_checks row
+    # B9: written until issue #78 (since then trade_checks holds these columns itself and this kind gets no new rows;
+    # the view trade_check_rows still reads older rows). The measures of a trade check, one row per trade_checks row
     # (same id = <check_id>-<trade_id>). quality ok | stale_quote | no_quote | no_entry_price (no measures then).
     # entry_source intraday_open (D is today) | stored_open (D's stored raw open). basis_factor = the split/bonus
     # factor from the prediction's as-of date to today's basis (adjustments detected by check_at); the *_adj
@@ -85,7 +86,8 @@ INTRADAY_SCHEMAS: Schemas = {
     # (one row per news id per ticker with an open trade, first alerted check only: id =
     # <check_id>-<ticker>-news-<news_id>). trades: JSON [{trade_id, strategy_id, view, horizon_days, flags, band,
     # ret_since_entry_pct, to_target_pct, target_reached}]; news_*: the item, its status and materiality as of
-    # check_at. check_row_id: the ticker's intraday_checks row (its explainer note joins on it). Never advice.
+    # check_at. check_row_id: the ticker's intraday_checks row (its explainer note joins on it); null for a ticker not
+    # on the watchlist, which has no such row (#74, #114). Never advice.
     KIND_INTRADAY_ALERTS: ("jsonl", {
         "id": "VARCHAR", "check_id": "VARCHAR", "check_at": "TIMESTAMPTZ", "session_date": "DATE",
         "market": "VARCHAR", "ticker": "VARCHAR", "alert_type": "VARCHAR", "check_row_id": "VARCHAR",

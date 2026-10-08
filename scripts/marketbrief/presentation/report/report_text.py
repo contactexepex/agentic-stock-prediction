@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from marketbrief.constants.report import DISCLAIMER
 from marketbrief.core.horizons import horizons
+from marketbrief.lifecycle.loader import active_sectors
 from marketbrief.presentation.report.formatting import data_stamp, md_link, review_line
 from marketbrief.presentation.report.report_parts import ReportParts
 from marketbrief.utils.markdown import markdown_table
-from marketbrief.lifecycle.loader import active_sectors
 
 
 def render_report(cfg: dict, day: dict, parts: ReportParts) -> str:
@@ -28,7 +28,8 @@ def render_report(cfg: dict, day: dict, parts: ReportParts) -> str:
     n_late = parts.n_late
     nh80 = parts.nh80
     one_day_count = parts.one_day_count
-    first, last = horizons()[0], horizons()[-1]   # the Today table's columns (N+k, B10)
+    listed = horizons()
+    first, last = listed[0], listed[-1]   # the Today table's columns (N+k, B10)
     partial = parts.partial
     reg = parts.reg
     regime_line = parts.regime_line

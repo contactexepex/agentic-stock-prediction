@@ -47,9 +47,9 @@ today's price basis (splits and bonus issues detected by the check applied to th
 whether the target has been reached so far (stored highs from D, then today's complete 5-minute bars), and
 three flags: outside_range (outside its 80% range), far_from_target (not reached and at least 2 sigma_1d
 scaled to the sessions left away) and against_prediction (the move since entry at least 1 sigma_1d scaled to
-the sessions held against the direction). A trade whose exit close is missing stays checked until it is settled
-(at most 5 sessions past its exit date). The checks feed the deviation explainer and an alerts feed
-(`intraday_alerts`) that the Slack alerts read. The schedules are unchanged.
+the sessions held against the direction). A trade with no settlement row after its exit date (for example, its
+exit close is missing) stays checked until it is settled (at most 5 sessions past its exit date). The checks feed
+the deviation explainer and an alerts feed (`intraday_alerts`) that the Slack alerts read. The schedules are unchanged.
 
 - Exchange holidays: post a one-line "market closed" message and skip predictions.
 - Session cut-off (issue #20): a session's bar counts as final 120 minutes after its close
