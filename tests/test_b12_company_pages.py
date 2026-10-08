@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 import common  # noqa: E402
 from marketbrief.core.database import connect  # noqa: E402
 from marketbrief.core.market_config import load_market  # noqa: E402
-from marketbrief.warehouse import rm_company  # noqa: E402
+from marketbrief.warehouse import company_payloads  # noqa: E402
 from marketbrief.warehouse.company_sources import read_sources  # noqa: E402
 from marketbrief.warehouse.rm_registry import BuildContext  # noqa: E402
 
@@ -91,8 +91,8 @@ def test_company_page_keys_equal_the_mockup(market):
     pages = company_mockup()[market]["pages"]
     for ticker, page in pages.items():
         blocks = {key: page[key] for key in ("company", "agreement", "open_trades", "news", "events")}
-        built = rm_company.stock_payload(sources, ticker, {}, blocks)
-        assert rm_company.trades_payload(sources, ticker, page["open_trades"])["settled"] == built["settled"]
+        built = company_payloads.stock_payload(sources, ticker, {}, blocks)
+        assert company_payloads.trades_payload(sources, ticker, page["open_trades"])["settled"] == built["settled"]
         for key in ("lifecycle", "head_to_head", "predictions", "open_trades", "trade_checks", "settled", "reasons",
                     "results", "events", "on_company"):
             assert built[key] == page[key], f"{market} {ticker} {key}"
@@ -103,7 +103,7 @@ def test_company_page_keys_equal_the_mockup(market):
 def test_stock_strategies_keys_equal_the_mockup(market):
     page = strategies_mockup()[market]
     blocks = {"company": page["company"], "agreement": page["agreement"]}
-    built = rm_company.stock_strategies_payload(sources_of(market), page["ticker"], {}, blocks)
+    built = company_payloads.stock_strategies_payload(sources_of(market), page["ticker"], {}, blocks)
     for key in ("predictions", "on_company", "overall"):
         assert built[key] == page[key], f"{market} {key}"
     # the mockup keeps the catalogue's order of picks; the read model orders them by family and pick rule
@@ -115,14 +115,14 @@ def test_stock_strategies_keys_equal_the_mockup(market):
 def test_market_trades_page_holds_every_open_trade_and_the_latest_check():
     for market in ("india", "us"):
         opened = [row for row in catalogue("open_trade")["records"] if row["market"] == market]
-        page = rm_company.market_trades_payload(sources_of(market), opened)
+        page = company_payloads.market_trades_payload(sources_of(market), opened)
         assert len(page["open_trades"]) == len(opened)
         checks = [row for row in catalogue("trade_check")["records"]
                   if row["market"] == market and row["check_at"] <= "2026-10-07T12:00:00Z"]
         newest = max((row["check_at"] for row in checks), default=None)
         assert {row["id"] for row in page["trade_checks"]} == {r["id"] for r in checks if r["check_at"] == newest}
-    assert len(rm_company.market_trades_payload(sources_of("india"), [])["trade_checks"]) > 0
-    assert rm_company.market_trades_payload(sources_of("us"), [])["trade_checks"] == []   # US checked at 16:27Z
+    assert len(company_payloads.market_trades_payload(sources_of("india"), [])["trade_checks"]) > 0
+    assert company_payloads.market_trades_payload(sources_of("us"), [])["trade_checks"] == []   # US checked at 16:27Z
 
 
 @pytest.mark.usefixtures("root")
@@ -147,9 +147,9 @@ def test_nothing_stored_after_the_cutoff_is_read():
         path.write_text(json.dumps(record) + "\n")
     for market in ("india", "us"):
         sources, tickers = sources_of(market), load_market(market)["tickers"]
-        text = json.dumps([rm_company.trades_payload(sources, t, []) for t in tickers], default=str)
-        stock = json.dumps([rm_company.stock_payload(sources, t, {}, EMPTY_BLOCKS) for t in tickers], default=str)
-        life = json.dumps([rm_company.bars_payload(sources, t) for t in tickers], default=str)
+        text = json.dumps([company_payloads.trades_payload(sources, t, []) for t in tickers], default=str)
+        stock = json.dumps([company_payloads.stock_payload(sources, t, {}, EMPTY_BLOCKS) for t in tickers], default=str)
+        life = json.dumps([company_payloads.bars_payload(sources, t) for t in tickers], default=str)
         for record_id in ("late-pick", "late-pred", "late-trade", "late-check", "late-reason", "late-digest",
                           "late-event"):
             assert record_id not in text + stock + life
@@ -176,10 +176,10 @@ def test_bars_apply_only_the_splits_known_by_the_cutoff(tmp_path, monkeypatch):
     path = tmp_path / "data" / "us" / "adjustments" / "2026" / "10" / "2026-10-02.jsonl"
     path.parent.mkdir(parents=True)
     path.write_text(json.dumps(split) + "\n")
-    before = rm_company.bars_payload(sources_of("us", datetime(2026, 10, 2, 21, 15, tzinfo=timezone.utc),
+    before = company_payloads.bars_payload(sources_of("us", datetime(2026, 10, 2, 21, 15, tzinfo=timezone.utc),
                                                 "2026-10-02", "2026-10-05"), "AAPL")
     assert [(b["date"], b["close"], b["adjusted"]) for b in before["bars"]] == [
         ("2026-10-01", 200.0, False), ("2026-10-02", 100.0, False)]
-    after = rm_company.bars_payload(sources_of("us"), "AAPL")
+    after = company_payloads.bars_payload(sources_of("us"), "AAPL")
     assert [(b["date"], b["close"], b["adjusted"]) for b in after["bars"]] == [
         ("2026-10-01", 100.0, True), ("2026-10-02", 100.0, False), ("2026-10-05", 101.0, False)]
