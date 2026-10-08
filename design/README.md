@@ -37,7 +37,7 @@ implements the mockups as React components on the design system.
 | 6 | Rule vs AI | `mockups/06-rule-vs-ai/` | built on the owner's delegated authority (2026-10-08); judge PASS round 4 at e0d2b7d and, rebuilt on W1's W40 research reviews, round 7 at 821298d; on main; cosmetic issues #179-#189 |
 | 7 | Paper portfolios | `mockups/07-paper-portfolios/` | built on the owner's delegated authority (2026-10-08); judge PASS round 2 at 5d22863; on main; cosmetic issues #190-#193 |
 | 8 | Track record | `mockups/08-track-record/` | built on W1's `track_record` entity (2026-10-08); judge PASS round 2 at 17c5c6f; on main; cosmetic issues #213-#216 |
-| 9 | News | `mockups/09-news/` | built on the owner's rules of 2026-10-08 (the last 3 days, the market movers first, every story linking to its article, the calendar and the companies in a rail) and W1's data request 8; with the judge |
+| 9 | News | `mockups/09-news/` | built on the owner's rules of 2026-10-08 (the last 3 days, the market movers first, every story linking to its article, the calendar and the companies in a rail) and W1's data request 8; judge PASS round 2 at 163963a; on main; cosmetic issues #225-#226 |
 | 10 | Companies | `mockups/10-companies/` | built on the owner's delegated authority (2026-10-08); judge PASS round 2 at 23c56a4; on main; cosmetic issues #194-#196 |
 | 11 | Assistant | `mockups/11-assistant/` | built on W1's `assistant_answer` entity (2026-10-08); judge PASS round 2 at 656b699 and, rebuilt on W1's data request 7 (answers asked before the cut-off), round 3 at 437a891; on main; cosmetic issues #217-#218 |
 | 12 | Help | `mockups/12-help/` | built on the owner's delegated authority (2026-10-08); judge PASS round 3 at 962b8dc; on main; cosmetic issues #208-#212 |
