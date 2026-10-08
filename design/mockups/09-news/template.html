@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Market brief · News</title>
+<meta name="description" content="News page of the personal stock cockpit: the market movers of the last three days first, then every story of the window newest first with its verification status, each with a link to the original article; the coming week's calendar and the news per company beside it. Research only.">
+<!--@@SYSTEM_CSS@@-->
+<!--@@SHARED_CSS@@-->
+<style>
+/* News mockup (design track, SPEC section 6 page 9; the owner's rules of 2026-10-08). Page-local layout only; every colour is a token. */
+.mv{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.mv .it{display:grid;grid-template-columns:auto 1fr;gap:10px;padding:10px 12px;border-radius:10px;background:var(--md-sys-color-surface-container-low);min-width:0}
+.mv .rk{font:700 13px/1 var(--md-ref-typeface-plain);color:var(--md-sys-color-on-surface-variant);width:22px;height:22px;border-radius:50%;background:var(--md-sys-color-surface-container-highest);display:flex;align-items:center;justify-content:center}
+.ni{min-width:0}
+.ni .kind{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;letter-spacing:.3px;text-transform:uppercase;color:var(--md-sys-color-on-surface-variant);margin-right:6px}
+.ni .kind.mkt{color:var(--md-sys-color-primary)}
+.ni h3{font-size:14.5px;line-height:1.35;margin:2px 0 3px;font-weight:600}
+.ni h3 a{color:inherit;text-decoration:none} .ni h3 a:hover,.ni h3 a:focus-visible{text-decoration:underline}
+.ni .sum{font-size:13px;line-height:1.5;color:var(--md-sys-color-on-surface-variant);margin:0 0 4px}
+.ni .meta{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;font-size:12px;color:var(--md-sys-color-on-surface-variant)}
+.ni .meta .tk{display:inline-block}
+.ni .go{display:inline-flex;align-items:center;gap:3px;font-weight:600;color:var(--md-sys-color-primary);text-decoration:none;white-space:nowrap}
+.ni .go:hover,.ni .go:focus-visible{text-decoration:underline}
+/* the feed */
+.feed{display:grid;gap:0}
+.day{position:sticky;top:0;z-index:1;background:var(--md-sys-color-surface);padding:10px 0 6px;font-size:12px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;color:var(--md-sys-color-on-surface-variant);border-bottom:1px solid var(--md-sys-color-outline-variant)}
+.day b{color:var(--md-sys-color-on-surface)}
+.row{display:grid;grid-template-columns:58px auto 1fr;gap:10px;padding:10px 0;border-bottom:1px solid var(--md-sys-color-outline-variant);align-items:start;min-width:0}
+.row .tm{font-size:12px;color:var(--md-sys-color-on-surface-variant);font-variant-numeric:tabular-nums;padding-top:2px}
+.row .mb-dir{margin-top:1px}
+.pager{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:12px;font-size:13px;color:var(--md-sys-color-on-surface-variant)}
+.pager .pg{display:flex;gap:4px;flex-wrap:wrap}
+.pager .pg button[aria-current="page"]{background:var(--md-sys-color-primary);color:var(--md-sys-color-on-primary);border-color:transparent}
+/* the rail */
+.cal{display:grid;gap:8px}
+.cal .ev{display:grid;grid-template-columns:52px 1fr;gap:10px;align-items:start;min-width:0}
+.cal .d{font-size:12px;line-height:1.2;color:var(--md-sys-color-on-surface-variant);text-align:center;background:var(--md-sys-color-surface-container-low);border-radius:8px;padding:5px 0}
+.cal .d b{display:block;font-size:15px;color:var(--md-sys-color-on-surface)}
+.cal .ev.major .d{background:var(--mb-color-warn-container)}
+.cal .nm{font-size:13.5px;line-height:1.35} .cal .sub{font-size:12px;color:var(--md-sys-color-on-surface-variant);display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:2px}
+.cos{display:grid;gap:6px}
+.cos .co{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--md-sys-color-outline-variant);min-width:0}
+.cos .co:last-child{border-bottom:0}
+.cos .co .nm{font-size:13px;min-width:0} .cos .co .nm small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:12px;line-height:1.35;margin-top:2px}
+.cos .mix{display:flex;height:8px;width:64px;border-radius:4px;overflow:hidden;background:var(--md-sys-color-surface-container-highest)}
+.cos .mix i{display:block;height:100%} .cos .mix i.up{background:var(--mb-color-up)} .cos .mix i.dn{background:var(--mb-color-down)} .cos .mix i.flat{background:var(--mb-chart-axis)}
+.cos .ct{font-weight:700;font-variant-numeric:tabular-nums;font-size:13px}
+.empty{font-size:13.5px;color:var(--md-sys-color-on-surface-variant);line-height:1.5}
+.grid.news{grid-template-columns:minmax(0,8fr) minmax(0,4fr)}
+@media (max-width:1000px){ .grid.news{grid-template-columns:minmax(0,1fr)} }
+@media (max-width:760px){ .mv{grid-template-columns:1fr} }
+@media (max-width:599px){ .row{grid-template-columns:auto 1fr} .row .tm{grid-column:1 / -1;padding-top:0} }
+</style>
+</head>
+<body>
+<!--@@ICONS@@-->
+<div id="tip" class="md-tooltip" role="tooltip"></div>
+
+<div class="mb-app">
+  <nav class="mb-sidebar" aria-label="Pages" id="sidebar"></nav>
+  <div class="mb-scrim" id="scrim"></div>
+  <header class="mb-topbar" id="topbar">
+    <button class="md-icon-btn mb-menu-btn" type="button" id="menu-btn" aria-label="Open the menu" aria-controls="sidebar" aria-expanded="false"><svg class="ms"><use href="#ms-menu"/></svg></button>
+    <div class="mb-topbar-title" id="title">News</div>
+    <div class="mb-topbar-actions">
+      <div class="md-segmented dense light" role="group" aria-label="Market" id="market-seg"></div>
+      <a class="md-btn filled" href="../11-assistant/page.html" data-tip="Ask the assistant (page 11): answers cite ids and as-of times, read-only." aria-label="Ask the assistant"><svg class="ms"><use href="#ms-bolt"/></svg><span class="ask-l">Ask</span></a>
+    </div>
+  </header>
+  <main class="mb-content"><div class="mb-content-inner" id="page"></div></main>
+  <nav class="mb-navbar" aria-label="Pages" id="navbar"></nav>
+</div>
+
+<script>const D = /*__DATA__*/null;</script>
+<!--@@SHARED_JS@@-->
+<script>
+let filter = 'all', ticker = null, pageNo = 1;
+shell(PAGES.news, 'News', {bar: [NAV[0], NAV[1], NAV[6], NAV[9]]});
+onMarketChange = () => { filter = 'all'; ticker = null; pageNo = 1; render(); };
+
+/* words for the news analyst's event types (News item enrichment.event_type) */
+const KIND = {earnings: 'results', macro: 'rates & macro', product: 'product', legal: 'legal', sector: 'sector', analyst: 'analyst', ma: 'deal', flows: 'flows', commodity: 'commodities', geopolitics: 'geopolitics', index: 'index move', regulation: 'regulation', other: 'other'};
+const MAT = {high: 3, medium: 2, low: 1};
+const scopeOf = n => n.scope;          /* the catalogue's scope: market-wide when the tagger found no primary watchlist company */
+const hoursBefore = (p, iso) => (dt2(p.cutoff) - dt2(iso)) / 36e5;
+const dt2 = iso => new Date(iso).getTime();
+const ago = (p, iso) => { const h = hoursBefore(p, iso); return h < 1 ? 'under an hour before the cut-off' : h < NEWS_RECENT_HOURS ? `${Math.floor(h)} h before the cut-off` : `${Math.floor(h / NEWS_RECENT_HOURS)} day${h < 2 * NEWS_RECENT_HOURS ? '' : 's'} before the cut-off`; };
+const dayKey = (iso, m) => fmtLocal(iso, m, true).replace(/\s\d{1,2}:\d{2}.*$/, '');   /* the local date part of the shell's local time */
+const canCarry = n => CAN_CARRY.includes(n.status);
+
+/* the market movers: the engine's market_moving flag first (W1's rule: high materiality and market-wide or results), then the page's own order to fill the band: market-wide first, watchlist results next, then materiality, then newest */
+function movers(p) {
+  const score = n => (n.market_moving ? 1000 : 0) + (scopeOf(n) === 'market' ? 100 : 0) + (n.enrichment.event_type === 'earnings' ? 50 : 0) + (MAT[n.enrichment.materiality] || 0) * 10 + (canCarry(n) ? 5 : 0);
+  return p.news.filter(n => n.market_moving || n.enrichment.materiality === 'high' || scopeOf(n) === 'market' || n.enrichment.event_type === 'earnings')
+    .sort((a, b) => score(b) - score(a) || b.first_seen_at.localeCompare(a.first_seen_at))
+    .filter((n, i, arr) => arr.findIndex(x => x.title === n.title) === i)   /* the same headline stored twice (two feeds) shows once in the band */
+    .slice(0, NEWS_MOVERS_MAX);
+}
+
+function itemBody(p, n) {
+  const m = market, mkt = scopeOf(n) === 'market', kind = mkt && n.category && n.category !== 'company' && n.category !== 'general' ? n.category : (KIND[n.enrichment.event_type] || n.enrichment.event_type);
+  const body = el('div', {class:'ni'});
+  const head = el('div', {}, el('span', {class:'kind' + (mkt ? ' mkt' : ''), 'data-tip': mkt ? 'A market-wide story: no single company, it moves the whole market.' : `A company story (${n.tickers.join(', ')}).`}, icon(mkt ? 'ms-public' : 'ms-apartment'), mkt ? 'market · ' + kind : kind));
+  body.append(head, el('h3', {}, el('a', {href: n.url, rel:'noopener', target:'_blank', 'data-tip': `Opens the article at ${n.source_domain} in a new tab. Stored here: the headline, its scores and status, never the text.`}, n.title)));
+  if (n.summary) body.append(el('p', {class:'sum'}, n.summary));
+  const meta = el('div', {class:'meta'});
+  meta.append(el('span', {'data-tip': `Published by ${n.source} ${fmtLocal(n.published_at, m, true)}; first stored here ${fmtLocal(n.first_seen_at, m, true)}.`}, `${n.source} · published ${ago(p, n.published_at)}`));
+  meta.append(n.status ? statusBadge(n.status) : el('span', {class:'mb-label neutral', 'data-tip':'Market-wide stories carry no verification status: verification is per company (DESIGN 3b).'}, 'not verified per company'), el('span', {'data-tip': 'The news analyst’s materiality: how much the story can move the price.'}, `${n.enrichment.materiality} materiality`));
+  if (n.market_moving) meta.append(el('span', {class:'mb-label warn', 'data-tip':'The engine’s market-moving flag: high materiality and market-wide or a results item.'}, icon('ms-warning'), 'market moving'));
+  if (n.enrichment.geopolitical) meta.append(el('span', {class:'mb-label neutral', 'data-tip':'The news analyst marked it geopolitical.'}, 'geopolitical'));
+  if (n.independent_origins > 1) meta.append(el('span', {'data-tip':'Independent vetted outlets carrying the same story (copies of one agency story count once).'}, `${n.independent_origins} outlets`));
+  for (const t of n.primary_tickers) meta.append(el('a', {class:'tk', href: companyPage(t), 'data-tip': `${(companyOf(m, t) || {name: t}).name}: open the company page`}, t));
+  meta.append(el('a', {class:'go', href: n.url, rel:'noopener', target:'_blank'}, 'Open article', icon('ms-open_in_new')));
+  body.append(meta);
+  return body;
+}
+
+function moversCard(p) {
+  const list = movers(p), card = el('section', {class:'card', 'aria-label':'Market movers'});
+  card.append(el('div', {class:'head'}, el('h2', {}, `Market movers · last ${p.window.days} days`, help(`At most ${NEWS_MOVERS_MAX} stories that can move the whole market or a watchlist company's price. First the stories the engine flags as market moving (high materiality and market-wide or a results item), then, to fill the band, market-wide stories (rates, inflation and jobs, commodities, geopolitics, an index moving sharply anywhere), the watchlist's results and anything scored high materiality, newest first within each rank. The verification status says how far a story can be trusted; the Help page explains each status.`)), el('span', {class:'mb-tag paper end'}, 'paper')));
+  if (!list.length) { card.append(el('div', {class:'empty'}, `No market-moving story in the last ${p.window.days} days: ${p.news.length} stor${p.news.length === 1 ? 'y' : 'ies'} stored in the window, none flagged, market-wide, results or high materiality.`)); return card; }
+  const g = el('div', {class:'mv'});
+  list.forEach((n, i) => g.append(el('div', {class:'it'}, el('span', {class:'rk', 'aria-label': `rank ${i + 1}`}, String(i + 1)), itemBody(p, n))));
+  card.append(g);
+  return card;
+}
+
+function feedCard(p) {
+  const m = market, card = el('section', {class:'card', 'aria-label':'All stories of the window'});
+  const last24 = p.news.filter(n => hoursBefore(p, n.published_at) < NEWS_RECENT_HOURS).length;   /* the owner's decision: the last 24 h by the outlet's publish time */
+  card.append(el('div', {class:'head'}, el('h2', {}, `Last ${p.window.days} days`, help(`Every story first seen in the ${p.window.days} days before the cut-off, the latest stored first (the time shown is the outlet's publish time; the day groups follow the day the story was stored), ${NEWS_PAGE_SIZE} a page and at most ${p.window.max_items} in all (the owner's rule: a short trading window needs no older news). Older stories stay in the data; the Company page shows every stored story about a company. Filters: published in the last ${NEWS_RECENT_HOURS} hours, market-wide, the engine's market-moving flag, one company, or only stories that can carry a call (confirmed or corroborated).`)), el('span', {class:'end muted'}, `${p.news.length} stor${p.news.length === 1 ? 'y' : 'ies'} · ${last24} in the last ${NEWS_RECENT_HOURS} h`)));
+  const bar = el('div', {class:'toolbar'});
+  const chip = (key, label, tipText) => { const b = el('button', {type:'button', class:'md-chip filter', 'aria-pressed': String(filter === key && !ticker), 'data-tip': tipText}, label); b.addEventListener('click', () => { filter = key; ticker = null; pageNo = 1; render(); }); return b; };
+  bar.append(chip('all', 'All', 'Every story of the window.'), chip('24h', `Last ${NEWS_RECENT_HOURS} h`, `Published in the ${NEWS_RECENT_HOURS} hours before the cut-off.`), chip('market', 'Market-wide', 'Stories about no single company.'), chip('moving', 'Market moving', 'The engine’s flag: high materiality and market-wide or a results item.'), chip('carry', 'Can carry a call', 'Confirmed by a filing or corroborated by independent outlets: the only statuses that may be the main evidence of a call.'));
+  const withNews = p.companies.filter(c => p.news.some(n => n.tickers.includes(c.ticker)));
+  if (withNews.length) { const sel = el('select', {'aria-label':'Company'}); sel.append(el('option', {value:''}, 'Company…')); for (const c of withNews) sel.append(el('option', {value: c.ticker, selected: ticker === c.ticker ? 'selected' : null}, `${c.ticker} · ${c.name}`)); sel.addEventListener('change', () => { ticker = sel.value || null; filter = ticker ? 'company' : 'all'; pageNo = 1; render(); }); bar.append(sel); }
+  card.append(bar);
+  const noSummary = p.news.filter(n => !n.summary).length; if (noSummary > p.news.length / 2) card.append(el('p', {class:'note', style:'margin:8px 0 0'}, `${noSummary} of the ${p.news.length} stories have no summary line yet (the analyst’s summaries were templated), so they show the headline alone; the article is one click away.`));
+  let items = p.news;
+  if (filter === '24h') items = items.filter(n => hoursBefore(p, n.published_at) < NEWS_RECENT_HOURS);
+  else if (filter === 'market') items = items.filter(n => scopeOf(n) === 'market');
+  else if (filter === 'moving') items = items.filter(n => n.market_moving);
+  else if (filter === 'carry') items = items.filter(canCarry);
+  else if (filter === 'company' && ticker) items = items.filter(n => n.tickers.includes(ticker));
+  if (!items.length) { card.append(el('div', {class:'empty', style:'margin-top:12px'}, p.news.length ? (filter === 'carry' ? 'No story in the window is confirmed by a filing or corroborated by independent outlets yet: the stored statuses so far are unverified, single source, rumour and promotional. Such stories lower a call’s confidence and never carry it.' : 'No story matches this filter in the window.') : `No story first seen in the last ${p.window.days} days in the example data (${p.window.older_hidden} older stor${p.window.older_hidden === 1 ? 'y is' : 'ies are'} hidden by the window; the Company page shows them).`)); return card; }
+  const pages = Math.ceil(items.length / NEWS_PAGE_SIZE); if (pageNo > pages) pageNo = pages;
+  const slice = items.slice((pageNo - 1) * NEWS_PAGE_SIZE, pageNo * NEWS_PAGE_SIZE);
+  const feed = el('div', {class:'feed'}); let lastDay = null;
+  const sessionDay = dayKey(p.cutoff, m);
+  for (const n of slice) {
+    const dk = dayKey(n.first_seen_at, m);
+    if (dk !== lastDay) { lastDay = dk; const count = items.filter(x => dayKey(x.first_seen_at, m) === dk).length; feed.append(el('div', {class:'day'}, el('b', {}, dk === sessionDay ? 'Today' : dk), ` · ${count} stor${count === 1 ? 'y' : 'ies'}`)); }
+    feed.append(el('div', {class:'row'}, el('span', {class:'tm', 'data-tip': `Published ${fmtLocal(n.published_at, m, true)}; first stored here ${fmtLocal(n.first_seen_at, m, true)} (the order of the feed).`}, fmtLocal(n.published_at, m, dayKey(n.published_at, m) !== dayKey(n.first_seen_at, m))), sentSquare(n.enrichment.sentiment), itemBody(p, n)));
+  }
+  card.append(feed);
+  const pager = el('div', {class:'pager'}); pager.append(el('span', {}, `Page ${pageNo} of ${pages} · ${items.length} stor${items.length === 1 ? 'y' : 'ies'}, ${NEWS_PAGE_SIZE} a page`));
+  const pg = el('div', {class:'pg', role:'group', 'aria-label':'Pages'});
+  const btn = (label, to, cur) => { const b = el('button', {type:'button', class:'md-btn outlined small', 'aria-current': cur ? 'page' : null, disabled: to == null ? 'disabled' : null}, label); if (to != null) b.addEventListener('click', () => { pageNo = to; render(); document.querySelector('.card[aria-label="All stories of the window"]').scrollIntoView({block:'start'}); }); return b; };
+  pg.append(btn('Previous', pageNo > 1 ? pageNo - 1 : null)); for (let i = 1; i <= pages; i++) pg.append(btn(String(i), i, i === pageNo)); pg.append(btn('Next', pageNo < pages ? pageNo + 1 : null));
+  pager.append(pg); card.append(pager);
+  return card;
+}
+
+function calendarCard(p) {
+  const m = market, card = el('section', {class:'card', 'aria-label':'Coming up'});
+  card.append(el('div', {class:'head'}, el('h2', {}, `Coming up · ${p.calendar_days} days`, help('Scheduled events from the session being predicted: the market’s own (policy decisions, inflation and jobs prints, expiries, holidays) and the active companies’ results and ex-dividend dates. A major market event raises the regime to EVENT_HEAVY within two days before it and widens every range whose window contains it; a company’s results widen its own ranges and block a new call within a day.'))));
+  if (!p.calendar.length) { card.append(el('div', {class:'empty'}, `Nothing scheduled in the next ${p.calendar_days} days.`)); return card; }
+  const list = el('div', {class:'cal'});
+  for (const e of p.calendar) {
+    const d = dt(e.date);
+    const sub = el('div', {class:'sub'});
+    if (e.major) sub.append(el('span', {class:'mb-label warn', 'data-tip':'Major: widens every range of this market whose window contains it (F2, major_event_factor).'}, icon('ms-warning'), 'major'));
+    if (e.widens === 'company') sub.append(el('span', {class:'mb-label neutral', 'data-tip':'Widens this company’s ranges; no new call within a day of it.'}, 'widens its ranges'));
+    if (e.ticker) sub.append(el('a', {class:'tk', href: companyPage(e.ticker)}, e.ticker));
+    if (e.release) sub.append(el('span', {}, `release ${e.release}`));
+    if (e.provisional) sub.append(el('span', {class:'mb-label neutral'}, 'date provisional'));
+    sub.append(el('span', {class:'muted', 'data-tip': `Source: ${e.source}.`}, e.type.replace(/_/g, ' ')));
+    list.append(el('div', {class:'ev' + (e.major ? ' major' : '')}, el('div', {class:'d'}, DOW[d.getUTCDay()], el('b', {}, String(d.getUTCDate())), MON[d.getUTCMonth()]), el('div', {}, el('div', {class:'nm'}, e.name), sub)));
+  }
+  card.append(list);
+  return card;
+}
+
+function companiesCard(p) {
+  const m = market, card = el('section', {class:'card', 'aria-label':'By company'});
+  card.append(el('div', {class:'head'}, el('h2', {}, `By company · ${p.window.days} days`, help('Each watchlist company with a story in the window: how many, the tone mix of the news analyst’s sentiment (green up, red down, grey flat), its open paper trades, and the latest headline. Click the ticker for the company page, the count to filter the feed.'))));
+  const rows = p.companies.map(c => ({c, items: p.news.filter(n => n.tickers.includes(c.ticker))})).filter(x => x.items.length).sort((a, b) => b.items.length - a.items.length || a.c.ticker.localeCompare(b.c.ticker));
+  if (!rows.length) { card.append(el('div', {class:'empty'}, 'No watchlist company has a story in the window.')); return card; }
+  const list = el('div', {class:'cos'});
+  for (const {c, items} of rows) {
+    const up = items.filter(n => n.enrichment.sentiment > SENTIMENT_FLAT_BAND).length, dn = items.filter(n => n.enrichment.sentiment < -SENTIMENT_FLAT_BAND).length, flat = items.length - up - dn;
+    const mix = el('span', {class:'mix', 'data-tip': `${up} positive, ${flat} neutral, ${dn} negative by the news analyst’s sentiment.`, role:'img', 'aria-label': `${up} positive, ${flat} neutral, ${dn} negative`});
+    for (const [k, v] of [['up', up], ['flat', flat], ['dn', dn]]) if (v) mix.append(el('i', {class: k, style: `width:${v / items.length * 100}%`}));
+    const b = el('button', {type:'button', class:'md-btn text small ct', 'data-tip': 'Show only this company in the feed.'}, String(items.length)); b.addEventListener('click', () => { ticker = c.ticker; filter = 'company'; pageNo = 1; render(); document.querySelector('.card[aria-label="All stories of the window"]').scrollIntoView({block:'start'}); });
+    list.append(el('div', {class:'co'}, el('a', {class:'tk', href: companyPage(c.ticker), 'data-tip': c.name}, c.ticker), el('div', {class:'nm'}, el('div', {style:'display:flex;gap:8px;align-items:center;flex-wrap:wrap'}, mix, c.open_trades ? el('span', {class:'mb-label paper', 'data-tip': `${c.open_trades} open paper trade${c.open_trades === 1 ? '' : 's'} on this company.`}, `${c.open_trades} open`) : null, c.state !== 'active' ? el('span', {class:'mb-label neutral'}, c.state) : null), el('small', {}, items[0].title)), b));
+  }
+  card.append(list);
+  return card;
+}
+
+function legend(p) {
+  return el('div', {class:'legend2'}, el('span', {}, el('span', {class:'mb-tag paper'}, 'paper'), ' news informs paper calls; nothing here is advice'),
+    el('span', {}, 'Statuses: ', ...CAN_CARRY.map(s => statusBadge(s)), ' can carry a call; the others (single source, unverified, rumour, promotional, contradicted) cannot (', el('a', {href: PAGES.help + '#news'}, 'Help'), ')'),
+    el('span', {}, el('b', {}, 'Open article'), ' opens the outlet’s page in a new tab; the cockpit stores headlines, scores and statuses, never the text'),
+    el('span', {}, `Window: ${fmtLocal(p.window.from, market, true)} to ${fmtLocal(p.window.to, market, true)}`));
+}
+
+function render() {
+  const p = P(market), page = $('#page'); page.innerHTML = '';
+  document.title = `Market brief · News · ${LABEL[market]}`; $('#title').textContent = 'News';
+  sideFoot(market); marketSeg(() => { filter = 'all'; ticker = null; pageNo = 1; render(); });
+  page.append(pageHead(market, 'News', `${p.name} · the last ${p.window.days} days, the market movers first, the newest first · every story links to its article · research only`));
+  page.append(moversCard(p));
+  const g = el('div', {class:'grid news'}); g.append(feedCard(p), el('div', {class:'col'}, calendarCard(p), companiesCard(p))); page.append(g);
+  page.append(legend(p), footer(market, D.endpoint));
+  makeFocusable(page);
+}
+render();
+</script>
+</body>
+</html>

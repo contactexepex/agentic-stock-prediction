@@ -1717,7 +1717,140 @@
        "created_at": "2026-10-06T12:40:00Z"
       }
      ],
-     "news": [],
+     "news": [
+      {
+       "id": "4870b84adcf5293f",
+       "market": "india",
+       "tickers": [
+        "HDFCBANK"
+       ],
+       "primary_tickers": [
+        "HDFCBANK"
+       ],
+       "title": "Can a new CEO solve HDFC Bank's problems?",
+       "source": "Finshots",
+       "source_domain": "finshots.in",
+       "url": "https://news.google.com/rss/articles/CBMid0FVX3lxTE1HY0FwV0JqLWpKQ1BlbUFMNFQxM0trbzdOdDRMNWVEVzhybUh4TWhRbmRlTUdBYzF1ZTZVZVEtNmZlVjR1d05STWNFU1MyYnZKamp1ZkRNazNjTkoweXcwbG0zR1FSLWVHc0k0dElDdmNubXQwMFU4?oc=5",
+       "published_at": "2026-10-07T01:31:38Z",
+       "first_seen_at": "2026-10-07T05:00:49Z",
+       "enrichment": {
+        "event_type": "other",
+        "materiality": "medium",
+        "sentiment": -0.2,
+        "relevance": 0.8,
+        "novelty": 0.3,
+        "urgency": "medium",
+        "priced_in": true,
+        "geopolitical": false,
+        "analyzed_at": "2026-10-07T05:10:26Z"
+       },
+       "status": "unverified",
+       "status_as_of": "2026-10-07T05:07:01Z",
+       "cluster_id": "HDFCBANK-4870b84adcf5293f",
+       "independent_origins": 0,
+       "primary_ids": [],
+       "headline_history": []
+      },
+      {
+       "id": "e38399f1f2545d7d",
+       "market": "india",
+       "tickers": [
+        "HDFCBANK"
+       ],
+       "primary_tickers": [
+        "HDFCBANK"
+       ],
+       "title": "HDFC Bank Shares Dip; Anup Bagchi Named New CEO",
+       "source": "Rediff MoneyWiz",
+       "source_domain": NaN,
+       "url": "https://news.google.com/rss/articles/CBMipAFBVV95cUxONmIyNUxfZnhjUngzWjRpS1o3MWRkbmtGS2VwQXpVODdhWDF3ZDFkZWdQdjlqQlkyZHRiSmNNcmhOWW1NcEhiUkJkTXRSNWN5SkNUSkFLQzVsX2FjU1h0MDRERUhRMWhPWXdIQzdQQndjWDUtRGFGa2VUUkxuSmVHNW13SDRHUWdKWUxleXM3dkVIblhzbkFVTzJ2RnVZc3dVcjlFNNIBpAFBVV95cUxONmIyNUxfZnhjUngzWjRpS1o3MWRkbmtGS2VwQXpVODdhWDF3ZDFkZWdQdjlqQlkyZHRiSmNNcmhOWW1NcEhiUkJkTXRSNWN5SkNUSkFLQzVsX2FjU1h0MDRERUhRMWhPWXdIQzdQQndjWDUtRGFGa2VUUkxuSmVHNW13SDRHUWdKWUxleXM3dkVIblhzbkFVTzJ2RnVZc3dVcjlFNA?oc=5",
+       "published_at": "2026-10-05T13:13:26Z",
+       "first_seen_at": "2026-10-05T14:39:42Z",
+       "enrichment": {
+        "event_type": "other",
+        "materiality": "high",
+        "sentiment": -0.2,
+        "relevance": 0.85,
+        "novelty": 0.2,
+        "urgency": "medium",
+        "priced_in": true,
+        "geopolitical": false,
+        "analyzed_at": "2026-10-05T14:48:14Z"
+       },
+       "status": "unverified",
+       "status_as_of": "2026-10-07T05:07:01Z",
+       "cluster_id": "HDFCBANK-226f3fae8e003993",
+       "independent_origins": 0,
+       "primary_ids": [],
+       "headline_history": []
+      },
+      {
+       "id": "0460ef28fc31829c",
+       "market": "india",
+       "tickers": [
+        "HDFCBANK"
+       ],
+       "primary_tickers": [
+        "HDFCBANK"
+       ],
+       "title": "HDFC Bank: Anup Bagchi at helm lifts overhang; brokerages share outlook",
+       "source": "IndiaIPO",
+       "source_domain": NaN,
+       "url": "https://news.google.com/rss/articles/CBMiqAFBVV95cUxQV0hzcGk2VTJERm1fSWhFNVhrclpjY2hwQVJvSnNFMV9uYWhLNFd4VGF4Z0hCU3ZOOHBjWFQ0enYycThkMUdKMVptWlktWmxzdXFFb3hKQXhSQzd6Vm5RWUZNbHlCRDQ0YUZReldEenRnMDY5aUZMYWFWaHVfUEU0eGdpYzZaak9zSUpleWo5U1B6WE5pWFVvU1JtQVcxN0lnYnR5aHBIODY?oc=5",
+       "published_at": "2026-10-05T06:46:43Z",
+       "first_seen_at": "2026-10-05T14:27:54Z",
+       "enrichment": {
+        "event_type": "analyst",
+        "materiality": "high",
+        "sentiment": 0.4,
+        "relevance": 0.85,
+        "novelty": 0.3,
+        "urgency": "medium",
+        "priced_in": true,
+        "geopolitical": false,
+        "analyzed_at": "2026-10-05T14:48:14Z"
+       },
+       "status": "unverified",
+       "status_as_of": "2026-10-07T05:07:01Z",
+       "cluster_id": "HDFCBANK-cf75cbaa061317c3",
+       "independent_origins": 0,
+       "primary_ids": [],
+       "headline_history": []
+      },
+      {
+       "id": "ba14ee8a9b2558de",
+       "market": "india",
+       "tickers": [
+        "HDFCBANK"
+       ],
+       "primary_tickers": [
+        "HDFCBANK"
+       ],
+       "title": "India's HDFC Bank falls as investors weigh impact of outsider CEO pick",
+       "source": "Reuters",
+       "source_domain": NaN,
+       "url": "https://news.google.com/rss/articles/CBMilwFBVV95cUxPVkZYNmhMbXM5RHNKLV82M0VUWTBsVlZ5RVdWRXFGclB4ejl5clB4ci1iRE9vbHNyRVhXSUZmc1cxRktFcUpBLUM1WGtiRFZBbG1MM3k5QlN6WmlWQXI0UjFPU0tiNEtsQmhIbDJ1VGRDRWpSMTdOX2pZTEpuWDktTUFkR3ZkSldQY09iX1g3eFFsdkZaSy1j?oc=5",
+       "published_at": "2026-10-05T03:59:00Z",
+       "first_seen_at": "2026-10-05T14:27:54Z",
+       "enrichment": {
+        "event_type": "other",
+        "materiality": "high",
+        "sentiment": -0.2,
+        "relevance": 0.9,
+        "novelty": 0.6,
+        "urgency": "medium",
+        "priced_in": true,
+        "geopolitical": false,
+        "analyzed_at": "2026-10-05T14:48:14Z"
+       },
+       "status": "single_source",
+       "status_as_of": "2026-10-07T05:07:01Z",
+       "cluster_id": "HDFCBANK-ba14ee8a9b2558de",
+       "independent_origins": 1,
+       "primary_ids": [],
+       "headline_history": []
+      }
+     ],
      "results": [
       {
        "id": "HDFCBANK-results-2026-06-30",
@@ -7407,6 +7540,169 @@
      ],
      "news": [
       {
+       "id": "54b044f3247966cd",
+       "market": "india",
+       "tickers": [
+        "RELIANCE"
+       ],
+       "primary_tickers": [],
+       "title": "Not just RIL, Jio's ₹11 trn IPO could benefit Airtel investors; here's why",
+       "source": "Business Standard Markets",
+       "source_domain": NaN,
+       "url": "https://www.business-standard.com/markets/news/jio-ipo-not-just-ril-jio-s-11-trn-ipo-could-benefit-airtel-investors-here-s-why-126100700129_1.html",
+       "published_at": "2026-10-07T03:32:30Z",
+       "first_seen_at": "2026-10-07T05:00:49Z",
+       "enrichment": {
+        "event_type": "other",
+        "materiality": "high",
+        "sentiment": 0.5,
+        "relevance": 0.85,
+        "novelty": 0.2,
+        "urgency": "high",
+        "priced_in": false,
+        "geopolitical": false,
+        "analyzed_at": "2026-10-07T05:10:26Z"
+       },
+       "status": null,
+       "status_as_of": null,
+       "cluster_id": null,
+       "independent_origins": null,
+       "primary_ids": [],
+       "headline_history": []
+      },
+      {
+       "id": "09b69c083d8a726b",
+       "market": "india",
+       "tickers": [
+        "RELIANCE"
+       ],
+       "primary_tickers": [
+        "RELIANCE"
+       ],
+       "title": "Reliance Industries shares gain 3% as JIO IPO inches closer; Jefferies increases weight in conglomerate",
+       "source": "The Economic Times",
+       "source_domain": "m.economictimes.com",
+       "url": "https://news.google.com/rss/articles/CBMihgJBVV95cUxPQ2xlLUZ5Wmg4SFFSMWdOZUFlaFYyYUV0OFpjOF9leG9xaWxMcmh0ZTVHQ0YwYnBVOVRGZUk1ME11TUl1U042a3lKM3dpNExCaHlNSUFLMlRBSzJBVEJObkRFTmlNYVBLOTNxS3djaTB6MUVheV9aZzh3WWJFYXJ2WEV5UlgyUlNudlV5NmN6Qml6dWViT3lxWExzT09KLU1QeVByNXlyLVhEZklXVHIyc0FZandyamNCc0NvSHJ0VWRFc21ZU09EczJUem9UT0J1YmxjVmhETlVHZE9hanIzRDdyVWpCU3VTOWhVeHp1NnctbkswZFRHR1djWllydmVjYWpKN1Rn0gGLAkFVX3lxTE5hSUpkUXdHckdXODJlWm4wMk9Sa1pJY1VHMVJwR0dwOUVzS2lnejc0ZEhEcFpUckdwVmJtTGpYT0hiSXg5WmQwRVNlSk5DVkt2a1hsb3JXZXNnMTJBdmFlQjRuMnNhdnpxUlk3LWY2VWxxNTZXS1A2d1NlY1VrM0F0WklfMFUxSWpSaklDN3VKYmRaNzZjZm0zV0pKeFdaTzE0TXhRYTRvS253VW1mQW00QVdUSjZHVmhaTGtyTkprY1VYWkh3VmhsSndpRmNOTWdRcHNKSWhlQ0tRdnlIV1lsZWM4VVozSWhVbGI2Q3dYbTZNRmlWN0lBdm5NRlZ3MWZ3Sk43UEdFeFFsRQ?oc=5",
+       "published_at": "2026-10-06T11:26:33Z",
+       "first_seen_at": "2026-10-07T05:00:49Z",
+       "enrichment": {
+        "event_type": "other",
+        "materiality": "high",
+        "sentiment": 0.5,
+        "relevance": 0.85,
+        "novelty": 0.2,
+        "urgency": "high",
+        "priced_in": true,
+        "geopolitical": false,
+        "analyzed_at": "2026-10-07T05:10:26Z"
+       },
+       "status": "single_source",
+       "status_as_of": "2026-10-07T05:07:01Z",
+       "cluster_id": "RELIANCE-09b69c083d8a726b",
+       "independent_origins": 1,
+       "primary_ids": [],
+       "headline_history": []
+      },
+      {
+       "id": "7fd4d207703fcca0",
+       "market": "india",
+       "tickers": [
+        "RELIANCE"
+       ],
+       "primary_tickers": [
+        "RELIANCE"
+       ],
+       "title": "Jio Platforms plans IPO. Reliance Industries stock sits 24.42 percent below its high",
+       "source": "AD HOC NEWS",
+       "source_domain": "ad-hoc-news.de",
+       "url": "https://news.google.com/rss/articles/CBMi3wFBVV95cUxOa3RobVRHRzd0bWZxbmdVSm5md2prU05jVmlTay1uMVRpd2h6NUI4RU9wTm9qMVNRT3FWQmFmNVJPa3pmRHZ5Rk56S0gwQkQzZUs0R2NRWl9NQ1haczlZZE55cXg0X1dOOFJQOWV4YzJBNGI1d1U4MUMxY3Z3Z2swLThwMXdjMTl6RUw3NkxUMDNBVFhxcFN6STF1OUNsUTAtSUktNjF6bkhOMEpPNzNjQ0xQZnRYeWpOd0JlSi1DZXBLN180U0JoMHpDQmlwWGNsRnI5dFgwM3FMWExCZ2k0?oc=5",
+       "published_at": "2026-10-06T10:32:28Z",
+       "first_seen_at": "2026-10-07T05:00:49Z",
+       "enrichment": {
+        "event_type": "other",
+        "materiality": "low",
+        "sentiment": 0.5,
+        "relevance": 0.85,
+        "novelty": 0.2,
+        "urgency": "high",
+        "priced_in": false,
+        "geopolitical": false,
+        "analyzed_at": "2026-10-07T05:10:26Z"
+       },
+       "status": "promotional",
+       "status_as_of": "2026-10-07T05:07:01Z",
+       "cluster_id": "RELIANCE-7fd4d207703fcca0",
+       "independent_origins": 0,
+       "primary_ids": [],
+       "headline_history": []
+      },
+      {
+       "id": "04c1032c6aec8f19",
+       "market": "india",
+       "tickers": [
+        "RELIANCE"
+       ],
+       "primary_tickers": [
+        "RELIANCE"
+       ],
+       "title": "Jio Platforms IPO likely to raise $3.8 billion",
+       "source": "The Indian EYE",
+       "source_domain": NaN,
+       "url": "https://news.google.com/rss/articles/CBMiigFBVV95cUxPVmtMWGsxNUJLclR3VE9qS0djd3UzMndSLTl2VXZmazFfdFVkN3BNNzdtbWtfMi1qWXFLa0hDZzdzU3FDSE5yNHZEX1JFQVNZeDlxRjFxYnUwelB5NzBFMlZWcFlBU1BZa2ktaHpLbVdtbW9kSTgwMUhBWkRDdWhBQU5HeHRjVUp3Tnc?oc=5",
+       "published_at": "2026-10-05T12:29:58Z",
+       "first_seen_at": "2026-10-05T14:27:54Z",
+       "enrichment": {
+        "event_type": "ma",
+        "materiality": "high",
+        "sentiment": 0.3,
+        "relevance": 0.8,
+        "novelty": 0.4,
+        "urgency": "medium",
+        "priced_in": false,
+        "geopolitical": false,
+        "analyzed_at": "2026-10-05T14:48:14Z"
+       },
+       "status": "rumour",
+       "status_as_of": "2026-10-07T05:07:01Z",
+       "cluster_id": "RELIANCE-4aab9063ef1d7c42",
+       "independent_origins": 1,
+       "primary_ids": [],
+       "headline_history": []
+      },
+      {
+       "id": "86259bfed07df0b7",
+       "market": "india",
+       "tickers": [
+        "RELIANCE"
+       ],
+       "primary_tickers": [
+        "RELIANCE"
+       ],
+       "title": "Jio Platforms to launch $3.8 billion IPO on October 21, set to be India’s biggest listing: Report",
+       "source": "Livemint",
+       "source_domain": NaN,
+       "url": "https://news.google.com/rss/articles/CBMi_AFBVV95cUxQdG96OTRyX3d0YUZYV25iMFBLcHBVN1pySVh0MjVtX1JnYzQ1SnNIdmw5SUNOdno0NVdEaWFDNkRjWjlfVVgtUEtfUGRHcENYM0FUUGFEX0xVbUhhTG1UQ2NJX0E2R0Q4Qm9hd0NNcm5DV1FhTTd2QlRuUEYxOHMtelhKLTVfSHZOMkpweGRiZ0tIOVVhTm1DLTVYV2Z4VUR5UnREbDNXOExhenZQRGFvLUpiQ04wRHE5dy1qdXdnOEt0Q1c5SmF0QVRNMkNyNk1oNzJyWlJLT2FMUG8wVnRxMHMxWkRFZkh6NksxTzBVaWpIQnVPZzdNWnBYa0HSAfwBQVVfeXFMUHRvejk0cl93dGFGWFduYjBQS3BwVTdacklYdDI1bV9SZ2M0NUpzSHZsOUlDTnZ6NDVXRGlhQzZEY1o5X1VYLVBLX1BkR3BDWDNBVFBhRF9MVW1IYUxtVENjSV9BNkdEOEJvYXdDTXJuQ1dRYU03dkJUblBGMThzLXpYSi01X0h2TjJKcHhkYmdLSDlVYU5tQy01WFdmeFVEeVJ0RGwzVzhMYXp2UERhby1KYkNOMERxOXctanV3ZzhLdENXOUphdEFUTTJDcjZNaDcyclpSS09hTFBvMFZ0cTBzMVpERWZIejZLMU8wVWlqSEJ1T2c3TVpwWGtB?oc=5",
+       "published_at": "2026-10-05T10:53:45Z",
+       "first_seen_at": "2026-10-05T14:27:54Z",
+       "enrichment": {
+        "event_type": "ma",
+        "materiality": "high",
+        "sentiment": 0.3,
+        "relevance": 0.85,
+        "novelty": 0.5,
+        "urgency": "medium",
+        "priced_in": false,
+        "geopolitical": false,
+        "analyzed_at": "2026-10-05T14:48:14Z"
+       },
+       "status": "rumour",
+       "status_as_of": "2026-10-07T05:07:01Z",
+       "cluster_id": "RELIANCE-4aab9063ef1d7c42",
+       "independent_origins": 1,
+       "primary_ids": [],
+       "headline_history": []
+      },
+      {
        "id": "nse-ann-7790412",
        "market": "india",
        "tickers": [
@@ -7438,6 +7734,72 @@
        "primary_ids": [
         "nse-ann-7790412"
        ],
+       "headline_history": []
+      },
+      {
+       "id": "4aab9063ef1d7c42",
+       "market": "india",
+       "tickers": [
+        "RELIANCE"
+       ],
+       "primary_tickers": [
+        "RELIANCE"
+       ],
+       "title": "Jio Platforms likely to launch IPO on October 21, seeks to raise $3.8 bn",
+       "source": "Business Standard Companies",
+       "source_domain": NaN,
+       "url": "https://www.business-standard.com/companies/news/jio-platforms-likely-to-launch-ipo-on-october-21-seeks-to-raise-3-8-bn-126100500424_1.html",
+       "published_at": "2026-10-05T08:36:26Z",
+       "first_seen_at": "2026-10-07T05:00:49Z",
+       "enrichment": {
+        "event_type": "other",
+        "materiality": "high",
+        "sentiment": 0.5,
+        "relevance": 0.85,
+        "novelty": 0.2,
+        "urgency": "high",
+        "priced_in": true,
+        "geopolitical": false,
+        "analyzed_at": "2026-10-07T05:10:26Z"
+       },
+       "status": "rumour",
+       "status_as_of": "2026-10-07T05:07:01Z",
+       "cluster_id": "RELIANCE-4aab9063ef1d7c42",
+       "independent_origins": 1,
+       "primary_ids": [],
+       "headline_history": []
+      },
+      {
+       "id": "4cbdf14aa0151b79",
+       "market": "india",
+       "tickers": [
+        "RELIANCE"
+       ],
+       "primary_tickers": [
+        "RELIANCE"
+       ],
+       "title": "Jio Platforms IPO likely by Oct end at enterprise valuation of $143-146 bn",
+       "source": "bfsi.economictimes.indiatimes.com",
+       "source_domain": NaN,
+       "url": "https://news.google.com/rss/articles/CBMi1AFBVV95cUxNemxkOHc3M1VVOVNHV2ZoVHJwN0E0aXRwb29TUE8tcEptMGY3ZEt1eUxaOUVlNGU2bTJyWXpiblRoQVYya1l4M1JWNHdnTWNJMXVYRHM2eERyblBqVVlVeXJmWWlWdTJicWs4akpSSHpGTlg3UG5xbjNiSE5zOUMtUWdXME53OEVtd2VDTEVYajNsVGVGZkJscXFFRVNhUGRqRjlxZUkyd0pFWldTV0FzcFAzZl9kTnhZWkNnaUNwQ2lGX2w3MjZQaHpkTFBTX0VoMVR5VQ?oc=5",
+       "published_at": "2026-10-05T02:43:14Z",
+       "first_seen_at": "2026-10-05T14:27:54Z",
+       "enrichment": {
+        "event_type": "ma",
+        "materiality": "high",
+        "sentiment": 0.3,
+        "relevance": 0.8,
+        "novelty": 0.4,
+        "urgency": "medium",
+        "priced_in": false,
+        "geopolitical": false,
+        "analyzed_at": "2026-10-05T14:48:14Z"
+       },
+       "status": "rumour",
+       "status_as_of": "2026-10-07T05:07:01Z",
+       "cluster_id": "RELIANCE-4cbdf14aa0151b79",
+       "independent_origins": 1,
+       "primary_ids": [],
        "headline_history": []
       },
       {
@@ -9699,7 +10061,74 @@
        "created_at": "2026-10-06T22:40:00Z"
       }
      ],
-     "news": [],
+     "news": [
+      {
+       "id": "391e11d583bb9b08",
+       "market": "us",
+       "tickers": [
+        "AAPL"
+       ],
+       "primary_tickers": [
+        "AAPL"
+       ],
+       "title": "UBS reiterates Apple stock neutral on slowing App Store growth By Investing.com",
+       "source": "Investing.com Nigeria",
+       "source_domain": "ng.investing.com",
+       "url": "https://news.google.com/rss/articles/CBMiwAFBVV95cUxNbzJVNEc0SEh3VEtPSUVtTEs5ZEQ4bTUtZ05MM1hGdC02UlVUeFR0TVVPdFZvUldPSHJVWjJYczk0aVgyZkt1Z0REYzNrYkRUdWdLNXllSFFad1JqQXpmRm15b05pQzY5YnRBdGdlRFc4cGNGTVNNOEFwZ0dieGdVanZyN0tySGVBeEZBNGVwOHFGM00wODZ2VWFWSzFaYkhsRTdSNklhdzRzOEtuQmU0eGRaaEl5a0JVbllTUGpnNlk?oc=5",
+       "published_at": "2026-10-06T14:22:36Z",
+       "first_seen_at": "2026-10-07T04:32:15Z",
+       "enrichment": {
+        "event_type": "analyst",
+        "materiality": "medium",
+        "sentiment": 0.25,
+        "relevance": 0.7,
+        "novelty": 0.55,
+        "urgency": "medium",
+        "priced_in": false,
+        "geopolitical": false,
+        "analyzed_at": "2026-10-07T04:42:07Z"
+       },
+       "status": "unverified",
+       "status_as_of": "2026-10-07T04:40:07Z",
+       "cluster_id": "AAPL-391e11d583bb9b08",
+       "independent_origins": 0,
+       "primary_ids": [],
+       "headline_history": []
+      },
+      {
+       "id": "7e02963c5575112d",
+       "market": "us",
+       "tickers": [
+        "AAPL"
+       ],
+       "primary_tickers": [
+        "AAPL"
+       ],
+       "title": "Morgan Stanley cuts target for Apple stock from USD 360 to USD 355",
+       "source": "AD HOC NEWS",
+       "source_domain": "ad-hoc-news.de",
+       "url": "https://news.google.com/rss/articles/CBMiyAFBVV95cUxQZ2JqanhUa0s1dlN2N01hTHpwSWNOakRxT3N4X2JqQUpCUW41NnBsRnZEVUJhNXI3QUdYYnEwY2VpdEdpUGM4MUxVZFRxeFRpa08xekpNTmo2Q21MRjNWZEpZbmRkVDlWaHhmcEdBQUF6czcwSEZUUHdkRmpXdHIwVjNWUVRzejlqNzl5SmpmWlhVZnRXRDY1bTE2ZkNSWUp4ZHNkT2JHSnRTX19ZMHItM3NEaGp4S0lMMmpUSzh2aEp1YkNJNUdRbA?oc=5",
+       "published_at": "2026-10-06T08:55:18Z",
+       "first_seen_at": "2026-10-07T04:32:15Z",
+       "enrichment": {
+        "event_type": "analyst",
+        "materiality": "medium",
+        "sentiment": -0.25,
+        "relevance": 0.7,
+        "novelty": 0.55,
+        "urgency": "medium",
+        "priced_in": false,
+        "geopolitical": false,
+        "analyzed_at": "2026-10-07T04:42:07Z"
+       },
+       "status": "promotional",
+       "status_as_of": "2026-10-07T04:40:07Z",
+       "cluster_id": "AAPL-9d6f7a0f6ec9c0c5",
+       "independent_origins": 0,
+       "primary_ids": [],
+       "headline_history": []
+      }
+     ],
      "results": [],
      "events": [
       {
@@ -15647,6 +16076,137 @@
       }
      ],
      "news": [
+      {
+       "id": "1b5f50285fa39a2c",
+       "market": "us",
+       "tickers": [
+        "NVDA"
+       ],
+       "primary_tickers": [
+        "NVDA"
+       ],
+       "title": "SpaceX seeks $40 billion financing led by Apollo to buy Nvidia chips, FT reports",
+       "source": "KSL News",
+       "source_domain": "ksl.com",
+       "url": "https://news.google.com/rss/articles/CBMilgFBVV95cUxNdWNlSmVNY0kwaUlSbGc5bTNBYXN3RS1JdE1aMmk5T21wblJTU0xNZER4djFoX28wM0daT0N0QXdsenc2NXBXdzNEZVZRV1Zyc3cyWnBJTnRIcEszeElVUy1DUTJ0anJaX2VkNVAwdEpZeklBLWFDaTE4WTFkTWJ3dlNPSjA0Rl9WT2lQVmNmQVJGOFpTMWc?oc=5",
+       "published_at": "2026-10-07T00:33:45Z",
+       "first_seen_at": "2026-10-07T04:32:15Z",
+       "enrichment": {
+        "event_type": "other",
+        "materiality": "high",
+        "sentiment": 0.3,
+        "relevance": 0.85,
+        "novelty": 0.2,
+        "urgency": "high",
+        "priced_in": true,
+        "geopolitical": false,
+        "analyzed_at": "2026-10-07T04:42:07Z"
+       },
+       "status": "unverified",
+       "status_as_of": "2026-10-07T04:40:07Z",
+       "cluster_id": "NVDA-ab389b7d388dcec8",
+       "independent_origins": 1,
+       "primary_ids": [],
+       "headline_history": []
+      },
+      {
+       "id": "60c328c71638471f",
+       "market": "us",
+       "tickers": [
+        "NVDA"
+       ],
+       "primary_tickers": [
+        "NVDA"
+       ],
+       "title": "SPCX Stock Slips After-Hours As SpaceX Reportedly Seeks $40B For Nvidia Chips",
+       "source": "Yahoo Finance",
+       "source_domain": "finance.yahoo.com",
+       "url": "https://news.google.com/rss/articles/CBMimgFBVV95cUxQVXBBWFdGdERkRHZ5WHRaU3I0S3NYaWVzejBJYWtaU1Z4UjJiVl8tdm05cU5tSzVLUzRETGtVZ2oxbHdVa3l6QmtrVG1ZczMycmZhc0NUV1pMbnQ4WVBTTXk2NlExVjRLQzhTZGFheHZ5YzRBck4xT3djVTRoenhOaGoyOFE0WWlYbUU0djI3VEoxYXdjVXBDMWtR?oc=5",
+       "published_at": "2026-10-06T23:48:23Z",
+       "first_seen_at": "2026-10-07T04:32:15Z",
+       "enrichment": {
+        "event_type": "product",
+        "materiality": "high",
+        "sentiment": 0.0,
+        "relevance": 0.85,
+        "novelty": 0.7,
+        "urgency": "high",
+        "priced_in": false,
+        "geopolitical": false,
+        "analyzed_at": "2026-10-07T04:42:07Z"
+       },
+       "status": "single_source",
+       "status_as_of": "2026-10-07T04:40:07Z",
+       "cluster_id": "NVDA-ab389b7d388dcec8",
+       "independent_origins": 1,
+       "primary_ids": [],
+       "headline_history": []
+      },
+      {
+       "id": "dd984ab092c2d64d",
+       "market": "us",
+       "tickers": [
+        "NVDA"
+       ],
+       "primary_tickers": [
+        "NVDA"
+       ],
+       "title": "Nvidia share price jumps nearly 30 per cent in 2026 as world's most valuable company heads for USD 6 trill",
+       "source": "The Economic Times",
+       "source_domain": "m.economictimes.com",
+       "url": "https://news.google.com/rss/articles/CBMiqAJBVV95cUxQcm4wcTRxOTRfa2Q3UGVZLU84RE91QW1EY3lkNmtSelJBNmNoVHk3SVZRTHc1YkpnSGNjeFRZQmZZTHczNnp2ZE03MFFkYmN6REZGMnhzOFdVdE9hZktQM3VrMzJZSjRFS0phaTBBYm1sSWlNcGZidXRHb3BqSldNRTV6Vzl1WnR0RG1QRF9ZY3pkV1lqTXBQV3hDNngybGxVVVpGNUFhNHI2Rm53NV9wb2ZpclhTZ0hSZVZ0YkxXTnFZLW00dlA5VU5yZ2lpVnVsdThwamZ4WUdnSm9JRGFLaDdxdjNtZ2pYNUZFZUltLWU5WHRhM29QS1dJajRFV0FsNUc0aVdSUy1RN2ZQT2pkandjSEd3Z191M3liOHZKTHprbGs3UVZZNdIBqAJBVV95cUxQcm4wcTRxOTRfa2Q3UGVZLU84RE91QW1EY3lkNmtSelJBNmNoVHk3SVZRTHc1YkpnSGNjeFRZQmZZTHczNnp2ZE03MFFkYmN6REZGMnhzOFdVdE9hZktQM3VrMzJZSjRFS0phaTBBYm1sSWlNcGZidXRHb3BqSldNRTV6Vzl1WnR0RG1QRF9ZY3pkV1lqTXBQV3hDNngybGxVVVpGNUFhNHI2Rm53NV9wb2ZpclhTZ0hSZVZ0YkxXTnFZLW00dlA5VU5yZ2lpVnVsdThwamZ4WUdnSm9JRGFLaDdxdjNtZ2pYNUZFZUltLWU5WHRhM29QS1dJajRFV0FsNUc0aVdSUy1RN2ZQT2pkandjSEd3Z191M3liOHZKTHprbGs3UVZZNQ?oc=5",
+       "published_at": "2026-10-06T23:43:00Z",
+       "first_seen_at": "2026-10-07T04:32:15Z",
+       "enrichment": {
+        "event_type": "other",
+        "materiality": "low",
+        "sentiment": 0.25,
+        "relevance": 0.55,
+        "novelty": 0.7,
+        "urgency": "low",
+        "priced_in": false,
+        "geopolitical": false,
+        "analyzed_at": "2026-10-07T04:42:07Z"
+       },
+       "status": "rumour",
+       "status_as_of": "2026-10-07T04:40:07Z",
+       "cluster_id": "NVDA-dd984ab092c2d64d",
+       "independent_origins": 1,
+       "primary_ids": [],
+       "headline_history": []
+      },
+      {
+       "id": "cf2212081cb4395a",
+       "market": "us",
+       "tickers": [
+        "META",
+        "NVDA"
+       ],
+       "primary_tickers": [],
+       "title": "Here are Tuesday's biggest analyst calls of the day: Nvidia, AMD, Procter & Gamble, Meta & more",
+       "source": "CNBC",
+       "source_domain": "cnbc.com",
+       "url": "https://news.google.com/rss/articles/CBMihAFBVV95cUxPWjVIZ0pjYkNPdXl1VFJ1TmQ0U2RhWUI1WXdnSG9OQXA0U2tHOXFrc183SUNDV0dSdjVFSEg2ZUdnYzBONm56U2JPeTdtTW54clNfc1BvWGJsQzd2NjNHRG5FWnNHRTVYRFNyNm1PbGZra09sNV9tMjZfWWQyR3B3TTNQQmk?oc=5",
+       "published_at": "2026-10-06T12:27:47Z",
+       "first_seen_at": "2026-10-07T04:32:15Z",
+       "enrichment": {
+        "event_type": "analyst",
+        "materiality": "medium",
+        "sentiment": 0.0,
+        "relevance": 0.4,
+        "novelty": 0.45,
+        "urgency": "medium",
+        "priced_in": false,
+        "geopolitical": false,
+        "analyzed_at": "2026-10-07T04:42:07Z"
+       },
+       "status": null,
+       "status_as_of": null,
+       "cluster_id": null,
+       "independent_origins": null,
+       "primary_ids": [],
+       "headline_history": []
+      },
       {
        "id": "d93b1f5e7c2a4b60",
        "market": "us",

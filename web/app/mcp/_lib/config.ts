@@ -1,5 +1,5 @@
 // Settings of /mcp and its OAuth routes (docs/ws/b5.md lists every variable). The gateway's URL is fixed
-// (https://market-brief-gateway.vercel.app), never taken from the Host header.
+// (https://omenix-gateway.vercel.app), never taken from the Host header.
 import { type Env, value } from "../../../lib/tools/env.ts";
 import { ALLOWED_REDIRECTS, GATEWAY_URL } from "../../../lib/tools/constants.ts";
 

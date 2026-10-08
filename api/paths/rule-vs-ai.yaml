@@ -1,0 +1,19 @@
+# B13: the Rule vs AI page (design/mockups/06-rule-vs-ai; docs/ws/b13.md)
+/api/v1/markets/{market}/compare:
+  get:
+    tags: [record]
+    operationId: getRuleVsAi
+    summary: Rule strategies against AI traders in the head-to-head view, with picks, reasons, end-of-day analyses and research reviews
+    x-read-model: rm.compare
+    parameters:
+      - $ref: '#/components/parameters/Market'
+    responses:
+      '200':
+        description: The Rule vs AI read model
+        headers:
+          ETag: {$ref: '#/components/headers/ETag'}
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RuleVsAiResponse'}
+      '404': {$ref: '#/components/responses/NotFound'}
+      '503': {$ref: '#/components/responses/Unavailable'}

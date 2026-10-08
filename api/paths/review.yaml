@@ -1,0 +1,19 @@
+# B13: the weekly research reviews and news impact (rm.review; SPEC section 5; read by B5's compare_rule_vs_ai and get_news)
+/api/v1/markets/{market}/review:
+  get:
+    tags: [record]
+    operationId: getResearchReview
+    summary: Weekly research reviews (proposals never applied), the next review due and the newest news-impact week
+    x-read-model: rm.review
+    parameters:
+      - $ref: '#/components/parameters/Market'
+    responses:
+      '200':
+        description: The research-review read model
+        headers:
+          ETag: {$ref: '#/components/headers/ETag'}
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ResearchReviewPageResponse'}
+      '404': {$ref: '#/components/responses/NotFound'}
+      '503': {$ref: '#/components/responses/Unavailable'}

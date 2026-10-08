@@ -691,3 +691,30 @@ def test_log_command_keeps_returning_the_id():
     row = command_row("us", received, {"idempotency_key": "trade-key-001", "channel": "slack"}, "accepted")
     first, second = log_command("us", row), log_command("us", row)
     assert isinstance(first, str) and second == first + "-2"
+
+
+def test_open_inbox_loads_the_extension_before_setting_the_token(monkeypatch):
+    """Today's India run failed: `motherduck_token` was passed to duckdb.connect before the extension existed.
+    The token is now set after WS1's loader ran, as a bound parameter (never in SQL text), and errors are masked."""
+    import marketbrief.lifecycle.inbox as inbox_module
+
+    steps = []
+
+    class FakeConnection:
+        def execute(self, sql, params=None):
+            steps.append((sql, params))
+            if sql.startswith("ATTACH"):
+                raise inbox_module.duckdb.IOException("not authenticated: md-secret-789")
+            return self
+
+    monkeypatch.setenv("MOTHERDUCK_INBOX_TOKEN", "md-secret-789")
+    monkeypatch.setattr(inbox_module.duckdb, "connect", lambda *_args, **kwargs: (
+        steps.append(("connect", kwargs)), FakeConnection())[1])
+    monkeypatch.setattr(inbox_module, "load_motherduck", lambda _con, _cfg: steps.append(("load", None)))
+    with pytest.raises(SystemExit) as raised:
+        inbox_module.open_inbox(None)
+    assert steps[0] == ("connect", {}) and steps[1] == ("load", None)
+    assert steps[2] == ("SET motherduck_token = ?", ["md-secret-789"])
+    assert steps[3][0].startswith("ATTACH 'md:market_brief_inbox'")
+    assert all("md-secret-789" not in sql for sql, _params in steps)
+    assert "md-secret-789" not in str(raised.value) and "***" in str(raised.value)

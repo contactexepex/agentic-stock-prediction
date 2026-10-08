@@ -1,13 +1,14 @@
 """The per-page read models (docs/ARCHITECTURE.md section 4; payload schemas in api/openapi.yaml): one JSON
 payload per (market, page_key) that the app reads with one keyed SELECT. Every payload is sliced from the
 dashboard's own data (presentation/dashboard/assemble.gather_dashboard, as of the run's clock); nothing is
-recomputed here. The upcoming company events of the stock page are read with the dashboard's as-of rule.
+recomputed here.
 
   rm.overview      page_key _        Overview: header, session plan, skill verdict, market overview tiles
   rm.watchlist     page_key _        Watchlist: one row per stock (last session, P(up), calls, ranges)
-  rm.stock         page_key ticker   StockDetail: the dashboard's stock data without bars, plus events
-  rm.bars          page_key ticker   Bars: split-adjusted OHLC bars and the published ranges
-  rm.track_record  page_key _        TrackRecord: calls per scoring basis, ranges, replay, backtest
+
+`build_rows` runs every registered builder (warehouse/rm_registry.py; these two 1.0 pages are rm_dashboard.py's) and
+checks each payload against its schema in api/openapi.yaml before it is written. The 1.0 rm.stock and rm.bars pages
+were replaced in 2.0 by the company page's (B12, warehouse/rm_company.py).
 
 A payload carries no cut-off time (the envelope's `cutoff` does), so a rebuild that finds the same data
 produces the same payload and hash (section 4.4)."""
@@ -21,21 +22,15 @@ from datetime import datetime
 import pandas as pd
 
 from marketbrief.constants.warehouse import (
-    BAR_COLUMNS,
     MARKET_PAGE_KEY,
-    READ_MODEL_SCHEMA_VERSION,
-    REQUIRED_KEYS,
-    RM_BARS,
     RM_OVERVIEW,
-    RM_STOCK,
-    RM_TRACK_RECORD,
     RM_WATCHLIST,
-    WATCHLIST_ROW_REQUIRED,
 )
 from marketbrief.presentation.dashboard import reads
-from marketbrief.presentation.dashboard.assemble import gather_dashboard
 from marketbrief.presentation.dashboard.stock import iso_day
 from marketbrief.utils.numbers import json_safe_float
+from marketbrief.warehouse import openapi_spec, rm_registry, schema_check
+from marketbrief.warehouse.rm_registry import BuildContext, PageBuilder
 
 READ_MODEL_COLUMNS = {
     "market": "VARCHAR",
@@ -48,7 +43,8 @@ READ_MODEL_COLUMNS = {
     "payload_sha256": "VARCHAR",
     "payload": "JSON",
 }
-# the stock page's upcoming company events: the company_events rule as of the cut-off, dated after the as-of date
+# upcoming company events as of the cut-off, dated after the as-of date (no longer a page of its own in 2.0; W1's
+# catalogue build, design/catalogue/catalogue_calendar.py, reads them)
 EVENTS_SQL = f"""SELECT ticker, id, date, type, name, source, timing, amount FROM ({reads.COMPANY_EVENTS_ASOF_SQL})
 WHERE date > $as_of ORDER BY ticker, date, type, id"""
 WATCHLIST_COMPANY_FIELDS = ("ticker", "name", "sector", "last", "calls", "ranges", "earnings")
@@ -86,33 +82,7 @@ def watchlist_row(company: dict) -> dict:
     }
 
 
-def stock_payload(data: dict, company: dict, events: list[dict]) -> dict:
-    """The stock page: the dashboard's stock data without bars, the fits behind its scores and its events."""
-    model_ids = {score["model_id"] for score in company["model"]}
-    return {
-        **{key: value for key, value in company.items() if key != "bars"},
-        "as_of": data["as_of"],
-        "plan": data["plan"],
-        "skill": data["skill"],
-        "models": [version for version in data.get("models") or [] if version.get("id") in model_ids],
-        "events": events,
-    }
-
-
-def bars_payload(data: dict, company: dict) -> dict:
-    """The chart page: the stock's split-adjusted bars and published ranges."""
-    return {
-        "ticker": company["ticker"],
-        "as_of": data["as_of"],
-        "columns": BAR_COLUMNS,
-        "bars": company["bars"],
-        "ranges": company["ranges"],
-        "spans": data["spans"],
-        "default_span": data["default_span"],
-    }
-
-
-def page_payloads(data: dict, events: dict[str, list[dict]]) -> dict[str, dict[str, dict]]:
+def page_payloads(data: dict) -> dict[str, dict[str, dict]]:
     """table -> page_key -> payload for one market's dashboard data."""
     header = {key: data.get(key) for key in HEADER}
     page_basics = {"market": data["market"], "as_of": data["as_of"], "plan": data["plan"], "skill": data["skill"]}
@@ -120,21 +90,7 @@ def page_payloads(data: dict, events: dict[str, list[dict]]) -> dict[str, dict[s
     return {
         RM_OVERVIEW: {MARKET_PAGE_KEY: {**header, "overview": data["overview"]}},
         RM_WATCHLIST: {MARKET_PAGE_KEY: {**page_basics, "rows": [watchlist_row(company) for company in companies]}},
-        RM_STOCK: {
-            company["ticker"]: stock_payload(data, company, events.get(company["ticker"], [])) for company in companies
-        },
-        RM_BARS: {company["ticker"]: bars_payload(data, company) for company in companies},
-        RM_TRACK_RECORD: {MARKET_PAGE_KEY: {"skill": data["skill"], **data["track"], "backtest": data["backtest"]}},
     }
-
-
-def missing_keys(table: str, payload: dict) -> list[str]:
-    """Required keys (api/openapi.yaml) the payload lacks; watchlist rows are checked too."""
-    missing = [key for key in REQUIRED_KEYS[table] if key not in payload]
-    if table == RM_WATCHLIST:
-        for position, row in enumerate(payload.get("rows") or []):
-            missing += [f"rows[{position}].{key}" for key in WATCHLIST_ROW_REQUIRED if key not in row]
-    return missing
 
 
 def canonical(payload: dict) -> str:
@@ -153,30 +109,34 @@ def page_row(envelope: dict, page_key: str, payload: dict) -> dict:
     }
 
 
+def page_problems(builder: PageBuilder, payload: dict, document: dict) -> list[str]:
+    """The payload's problems against its schema in the bundled contract (empty = valid)."""
+    return schema_check.errors(payload, {"$ref": f"#/components/schemas/{builder.schema}"}, document)
+
+
 def build_rows(
     cfg: dict, con, cutoff_time: datetime, source_commit: str, built_at: str
 ) -> tuple[dict, list[tuple[str, str, list[str]]]]:
-    """(table -> page_key -> row, invalid pages) of a market as of the cut-off. A row has READ_MODEL_COLUMNS
-    with the payload as canonical JSON text; a page missing a required key is left out and listed as
-    (table, page_key, missing keys)."""
-    data = gather_dashboard(cfg, con, cutoff_time)
-    cutoff = pd.Timestamp(cutoff_time).isoformat()
-    events = upcoming_events(con, data["as_of"], cutoff) if data["as_of"] else {}
+    """(table -> page_key -> row, invalid pages) of a market as of the cut-off, from every registered builder
+    (rm_registry). A row has READ_MODEL_COLUMNS with the payload as canonical JSON text; a page that fails its
+    schema in api/openapi.yaml is left out and listed as (table, page_key, problems)."""
+    ctx = BuildContext(cfg, con, cutoff_time)
+    document = openapi_spec.spec()
     envelope = {
         "market": cfg["market"],
-        "as_of": data["as_of"],
-        "cutoff": cutoff,
+        "as_of": ctx.as_of,
+        "cutoff": ctx.cutoff,
         "built_at": built_at,
-        "schema_version": READ_MODEL_SCHEMA_VERSION,
+        "schema_version": openapi_spec.version(document),
         "source_commit": source_commit,
     }
     rows, invalid = {}, []
-    for table, pages in page_payloads(data, events).items():
-        rows[table] = {}
-        for page_key, payload in pages.items():
-            missing = missing_keys(table, payload)
-            if missing:
-                invalid.append((table, page_key, missing))
+    for builder in rm_registry.builders():
+        rows[builder.table] = {}
+        for page_key, payload in builder.build(ctx).items():
+            problems = page_problems(builder, payload, document)
+            if problems:
+                invalid.append((builder.table, page_key, problems))
             else:
-                rows[table][page_key] = page_row(envelope, page_key, payload)
+                rows[builder.table][page_key] = page_row(envelope, page_key, payload)
     return rows, invalid

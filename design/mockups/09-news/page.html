@@ -1,0 +1,982 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Market brief · News</title>
+<meta name="description" content="News page of the personal stock cockpit: the market movers of the last three days first, then every story of the window newest first with its verification status, each with a link to the original article; the coming week's calendar and the news per company beside it. Research only.">
+<style>
+/* market-brief cockpit: design tokens, scheme v2 "modern admin light" (2026-10-08).
+   The owner asked for the look of modern admin templates (Pixinvent Materialize with its semi-dark vertical
+   menu, Aurora) applied to a broker-style cockpit: a soft light-grey page, white cards lifted by a faint shadow
+   (no hairline borders), one periwinkle-indigo accent, a dark navy sidebar with labels, icon tiles on the KPI
+   cards, gradient area charts, generous spacing. Token names keep the Material role vocabulary
+   (--md-sys-color-*) so components.css and every page need no renaming; the previous scheme ("terminal
+   light") used the same names with other values.
+   Verdict rule (owner): NO is red; YES is green, darker green for a strong signal, lighter green for an okay
+   one. Up/down/hit/miss always carry a glyph and a word. Text tones are AA on white (figures in the comments);
+   the vivid template tones live on fills and tints with a dark ink on them.
+   Self-contained: no @import, no font files, system font stack. */
+:root {
+  color-scheme: light;
+
+  /* ---- Colour roles --------------------------------------------------------------------- */
+  --md-sys-color-primary: #5a5ee6;                 /* periwinkle indigo (5.0:1 on white) */
+  --md-sys-color-on-primary: #ffffff;
+  --md-sys-color-primary-container: #e9eaff;       /* accent tint: selected segment, icon tiles */
+  --md-sys-color-on-primary-container: #3a3db8;    /* 7.0:1 on the tint */
+  --md-sys-color-secondary: #65708a;
+  --md-sys-color-on-secondary: #ffffff;
+  --md-sys-color-secondary-container: #eef0f5;
+  --md-sys-color-on-secondary-container: #3f4756;
+  --md-sys-color-tertiary: #7c3aed;
+  --md-sys-color-on-tertiary: #ffffff;
+  --md-sys-color-tertiary-container: #f1ebff;      /* Paper tag */
+  --md-sys-color-on-tertiary-container: #5b21b6;
+  --md-sys-color-error: #dc2626;
+  --md-sys-color-on-error: #ffffff;
+  --md-sys-color-error-container: #fde8e8;
+  --md-sys-color-on-error-container: #991b1b;
+  --md-sys-color-surface: #ffffff;
+  --md-sys-color-on-surface: #4b465c;              /* ink, 9.0:1 on white */
+  --md-sys-color-surface-variant: #f3f4f8;
+  --md-sys-color-on-surface-variant: #65708a;      /* muted labels, 5.0:1 on white */
+  --md-sys-color-surface-dim: #e4e6ee;
+  --md-sys-color-surface-bright: #ffffff;
+  --md-sys-color-surface-container-lowest: #ffffff; /* cards */
+  --md-sys-color-surface-container-low: #f7f7f9;    /* the page */
+  --md-sys-color-surface-container: #f3f4f8;        /* tiles, table heads, inputs */
+  --md-sys-color-surface-container-high: #eceef3;   /* table rules, dividers */
+  --md-sys-color-surface-container-highest: #e4e6ee;
+  --md-sys-color-outline: #a3a9b8;
+  --md-sys-color-outline-variant: #e7e9ef;          /* control borders */
+  --md-sys-color-inverse-surface: #2f3349;          /* tooltips, the sidebar */
+  --md-sys-color-inverse-on-surface: #f4f5fa;
+  --md-sys-color-inverse-primary: #b4b6ff;
+  --md-sys-color-surface-tint: #5a5ee6;
+  --md-sys-color-background: #f7f7f9;
+  --md-sys-color-on-background: #4b465c;
+  --md-sys-color-scrim: #000000;
+  --md-sys-color-shadow: #2f3349;
+
+  /* ---- Sidebar (semi-dark vertical menu) -------------------------------------------------- */
+  --mb-sidebar-bg: #2f3349;
+  --mb-sidebar-ink: #d7d8e5;         /* 8.8:1 on the sidebar */
+  --mb-sidebar-muted: #9fa2b7;       /* 4.9:1 */
+  --mb-sidebar-active: linear-gradient(72deg, #5a5ee6 0%, #7a7df0 100%);
+  --mb-sidebar-active-shadow: 0 4px 12px rgba(90, 94, 230, .45);
+
+  /* ---- Semantic tokens (finance) --------------------------------------------------------
+     up/hit = green, down/miss = red; text tones 5.0:1 / 4.8:1 on white. The tints are fresher than
+     before (template "label" badges): ink on tint 6.4:1 / 7.1:1 / 4.6:1. */
+  --mb-color-up: #15803d;
+  --mb-color-on-up: #ffffff;
+  --mb-color-up-container: #e3f8e9;
+  --mb-color-on-up-container: #166534;
+  --mb-color-down: #dc2626;
+  --mb-color-on-down: #ffffff;
+  --mb-color-down-container: #fde8e8;
+  --mb-color-on-down-container: #991b1b;
+  --mb-color-neutral: #65708a;
+  --mb-color-on-neutral: #ffffff;
+  --mb-color-neutral-container: #eef0f5;
+  --mb-color-on-neutral-container: #3f4756;
+  --mb-color-warn: #e07b00;               /* "direction unclear", flags (icons and fills) */
+  --mb-color-on-warn: #ffffff;
+  --mb-color-warn-container: #fff3e0;
+  --mb-color-on-warn-container: #b45309;  /* 4.6:1 on the tint, 5.0:1 on white */
+  --mb-color-info: #0b8fa6;
+  --mb-color-info-container: #e0f7fb;
+  --mb-color-on-info-container: #0c5d6b;
+  --mb-color-hit: var(--mb-color-up);
+  --mb-color-hit-container: var(--mb-color-up-container);
+  --mb-color-on-hit-container: var(--mb-color-on-up-container);
+  --mb-color-miss: var(--mb-color-down);
+  --mb-color-miss-container: var(--mb-color-down-container);
+  --mb-color-on-miss-container: var(--mb-color-on-down-container);
+  /* Verdict (decision header) */
+  --mb-verdict-no-bg: #fde8e8;        --mb-verdict-no-box: #dc2626;    --mb-verdict-no-ink: #991b1b;
+  --mb-verdict-strong-bg: #bff0cf;    --mb-verdict-strong-box: #166534; --mb-verdict-strong-ink: #14532d;
+  --mb-verdict-ok-bg: #e3f8e9;        --mb-verdict-ok-box: #15803d;    --mb-verdict-ok-ink: #166534;
+  /* Provenance labels: Live (green tint), Back-test (hatched accent tint), Mock (dashed), Paper (violet tint).
+     Each has a texture or border style besides its colour. */
+  --mb-color-live: var(--mb-color-up);
+  --mb-color-live-container: var(--mb-color-up-container);
+  --mb-color-on-live-container: var(--mb-color-on-up-container);
+  --mb-color-backtest: var(--md-sys-color-primary);
+  --mb-color-backtest-container: repeating-linear-gradient(135deg, rgba(90,94,230,.14) 0 3px, transparent 3px 6px);
+  --mb-color-on-backtest-container: var(--md-sys-color-on-primary-container);
+  --mb-color-mock: var(--md-sys-color-outline);
+  --mb-color-on-mock-container: var(--md-sys-color-on-surface-variant);
+  --mb-color-paper: var(--md-sys-color-tertiary);
+  --mb-color-paper-container: var(--md-sys-color-tertiary-container);
+  --mb-color-on-paper-container: var(--md-sys-color-on-tertiary-container);
+
+  /* ---- Chart tokens (dataviz skill) ------------------------------------------------------- */
+  --mb-chart-surface: var(--md-sys-color-surface-container-lowest);
+  --mb-chart-1: #5a5ee6;   /* series 1 = the accent: ranges, model, rule strategies, everything "ours" */
+  --mb-chart-2: #e07b00;   /* series 2 (orange; 3.0:1 on white: shapes with direct labels) */
+  --mb-chart-3: #0b8fa6;   /* series 3 (teal, 3.8:1) */
+  --mb-chart-4: #d6338f;   /* series 4 (pink, 4.4:1) */
+  --mb-chart-1-fill: rgba(90,94,230,.28);     /* gradient top of an area chart, fades to 0 */
+  --mb-chart-2-fill: rgba(224,123,0,.22);
+  --mb-chart-3-fill: rgba(11,143,166,.22);
+  --mb-chart-band-50: rgba(90,94,230,.30);   /* inner band, series 1 */
+  --mb-chart-band-80: rgba(90,94,230,.12);   /* outer band */
+  --mb-chart-fan: rgba(90,94,230,.10);
+  --mb-chart-ink: var(--md-sys-color-on-surface);           /* the actual line */
+  --mb-chart-grid: var(--md-sys-color-surface-container-high);
+  --mb-chart-axis: var(--md-sys-color-outline-variant);
+  --mb-chart-label: var(--md-sys-color-on-surface-variant);
+  --mb-chart-future: var(--md-sys-color-surface-container-low);
+
+  /* ---- Typography: M3 type scale on the system sans ------------------------------------ */
+  --md-ref-typeface-plain: "Inter", "Public Sans", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  --md-ref-typeface-brand: var(--md-ref-typeface-plain);
+  --md-ref-typeface-mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --md-sys-typescale-display-large: 400 57px/64px var(--md-ref-typeface-brand);
+  --md-sys-typescale-display-medium: 400 45px/52px var(--md-ref-typeface-brand);
+  --md-sys-typescale-display-small: 400 36px/44px var(--md-ref-typeface-brand);
+  --md-sys-typescale-headline-large: 600 32px/40px var(--md-ref-typeface-brand);
+  --md-sys-typescale-headline-medium: 600 28px/36px var(--md-ref-typeface-brand);
+  --md-sys-typescale-headline-small: 600 24px/32px var(--md-ref-typeface-brand);
+  --md-sys-typescale-title-large: 600 22px/28px var(--md-ref-typeface-brand);
+  --md-sys-typescale-title-medium: 600 16px/24px var(--md-ref-typeface-plain);
+  --md-sys-typescale-title-small: 600 14px/20px var(--md-ref-typeface-plain);
+  --md-sys-typescale-body-large: 400 16px/24px var(--md-ref-typeface-plain);
+  --md-sys-typescale-body-medium: 400 14px/22px var(--md-ref-typeface-plain);
+  --md-sys-typescale-body-small: 400 12.5px/18px var(--md-ref-typeface-plain);
+  --md-sys-typescale-label-large: 500 14px/20px var(--md-ref-typeface-plain);
+  --md-sys-typescale-label-medium: 500 12.5px/16px var(--md-ref-typeface-plain);
+  --md-sys-typescale-label-small: 500 11px/16px var(--md-ref-typeface-plain);
+  --md-sys-typescale-label-large-tracking: 0.1px;
+  --md-sys-typescale-label-medium-tracking: 0.3px;
+  --md-sys-typescale-label-small-tracking: 0.4px;
+  --md-sys-typescale-title-medium-tracking: 0.1px;
+  --md-sys-typescale-body-medium-tracking: 0.15px;
+  --md-sys-typescale-body-small-tracking: 0.3px;
+
+  /* ---- Shape ---------------------------------------------------------------------------- */
+  --md-sys-shape-corner-none: 0;
+  --md-sys-shape-corner-extra-small: 6px;
+  --md-sys-shape-corner-small: 8px;
+  --md-sys-shape-corner-medium: 12px;
+  --md-sys-shape-corner-large: 16px;
+  --md-sys-shape-corner-extra-large: 28px;
+  --md-sys-shape-corner-full: 9999px;
+  --mb-card-radius: 12px;        /* cards */
+  --mb-panel-radius: 10px;       /* tiles and columns inside a card */
+  --mb-card-border: 1px solid transparent;   /* cards are lifted by a shadow, not a hairline */
+  --mb-card-shadow: 0 2px 8px rgba(47, 51, 73, .08), 0 0 1px rgba(47, 51, 73, .14);
+  --mb-card-shadow-hover: 0 6px 18px rgba(47, 51, 73, .12), 0 0 1px rgba(47, 51, 73, .14);
+
+  /* ---- Elevation (soft, template-like) --------------------------------------------------- */
+  --md-sys-elevation-0: none;
+  --md-sys-elevation-1: var(--mb-card-shadow);
+  --md-sys-elevation-2: 0 4px 14px rgba(47, 51, 73, .12), 0 0 1px rgba(47, 51, 73, .16);
+  --md-sys-elevation-3: 0 8px 24px rgba(47, 51, 73, .16), 0 0 1px rgba(47, 51, 73, .18);
+  --md-sys-elevation-4: 0 12px 32px rgba(47, 51, 73, .18);
+  --md-sys-elevation-5: 0 16px 40px rgba(47, 51, 73, .22);
+
+  /* ---- State layers --------------------------------------------------------------------- */
+  --md-sys-state-hover-opacity: .08;
+  --md-sys-state-focus-opacity: .10;
+  --md-sys-state-pressed-opacity: .10;
+  --md-sys-state-dragged-opacity: .16;
+  --md-sys-state-disabled-opacity: .38;
+  --md-sys-state-disabled-container-opacity: .12;
+
+  /* ---- Spacing (4px grid) and layout ---------------------------------------------------- */
+  --mb-space-1: 4px; --mb-space-2: 8px; --mb-space-3: 12px; --mb-space-4: 16px; --mb-space-5: 20px;
+  --mb-space-6: 24px; --mb-space-8: 32px; --mb-space-10: 40px; --mb-space-12: 48px;
+  --mb-gutter: 16px;            /* phone side gutter (never less) */
+  --mb-gutter-desktop: 24px;
+  --mb-content-max: 1240px;
+  --mb-sidebar-width: 256px;    /* vertical menu with labels (>= 1200px) */
+  --mb-rail-width: 76px;        /* collapsed menu, icons only (600-1199px) */
+  --mb-navbar-height: 72px;     /* navigation bar (phone) */
+  --mb-topbar-height: 64px;
+
+  /* ---- Motion --------------------------------------------------------------------------- */
+  --md-sys-motion-duration-short: 120ms;
+  --md-sys-motion-duration-medium: 250ms;
+  --md-sys-motion-easing-standard: cubic-bezier(.2, 0, 0, 1);
+
+  /* ---- Focus ring ----------------------------------------------------------------------- */
+  --mb-focus-ring: 0 0 0 2px var(--md-sys-color-surface), 0 0 0 4px var(--md-sys-color-primary);
+}
+
+/* Type role utility classes (apply to any element) */
+.md-display-large { font: var(--md-sys-typescale-display-large); letter-spacing: -0.25px; }
+.md-display-medium { font: var(--md-sys-typescale-display-medium); }
+.md-display-small { font: var(--md-sys-typescale-display-small); }
+.md-headline-large { font: var(--md-sys-typescale-headline-large); }
+.md-headline-medium { font: var(--md-sys-typescale-headline-medium); }
+.md-headline-small { font: var(--md-sys-typescale-headline-small); }
+.md-title-large { font: var(--md-sys-typescale-title-large); }
+.md-title-medium { font: var(--md-sys-typescale-title-medium); letter-spacing: var(--md-sys-typescale-title-medium-tracking); }
+.md-title-small { font: var(--md-sys-typescale-title-small); letter-spacing: 0.1px; }
+.md-body-large { font: var(--md-sys-typescale-body-large); letter-spacing: 0.3px; }
+.md-body-medium { font: var(--md-sys-typescale-body-medium); letter-spacing: var(--md-sys-typescale-body-medium-tracking); }
+.md-body-small { font: var(--md-sys-typescale-body-small); letter-spacing: var(--md-sys-typescale-body-small-tracking); }
+.md-label-large { font: var(--md-sys-typescale-label-large); letter-spacing: var(--md-sys-typescale-label-large-tracking); }
+.md-label-medium { font: var(--md-sys-typescale-label-medium); letter-spacing: var(--md-sys-typescale-label-medium-tracking); }
+.md-label-small { font: var(--md-sys-typescale-label-small); letter-spacing: var(--md-sys-typescale-label-small-tracking); }
+.md-numeric { font-variant-numeric: tabular-nums; }
+.md-micro { font: 500 11px/16px var(--md-ref-typeface-plain); letter-spacing: .06em; text-transform: uppercase; color: var(--md-sys-color-on-surface-variant); }
+
+/* market-brief cockpit: components on tokens.css, scheme v2 "modern admin light". Plain CSS, no JS
+   required (the tooltip and the phone drawer need the page's own small script, see README).
+   Prefix: md- for M3 components, mb- for the cockpit's own (app shell, provenance tags, odds meter,
+   KPI card, labels). Load after tokens.css. */
+
+/* ---- Base ----------------------------------------------------------------------------- */
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; background: var(--md-sys-color-surface-container-low); color: var(--md-sys-color-on-surface); -webkit-text-size-adjust: 100%; }
+body { font: var(--md-sys-typescale-body-medium); letter-spacing: var(--md-sys-typescale-body-medium-tracking); font-family: var(--md-ref-typeface-plain); }
+a { color: var(--md-sys-color-primary); }
+button { font: inherit; color: inherit; letter-spacing: inherit; }
+:focus-visible { outline: none; box-shadow: var(--mb-focus-ring); border-radius: var(--md-sys-shape-corner-extra-small); }
+.vh { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* ---- Icons (Material Symbols Outlined, inlined from icons.svg) ------------------------- */
+.ms { width: 1em; height: 1em; display: inline-block; vertical-align: -0.15em; fill: currentColor; flex: none; }
+.ms-20 { width: 20px; height: 20px; } .ms-24 { width: 24px; height: 24px; } .ms-40 { width: 40px; height: 40px; }
+
+/* ---- App shell: semi-dark sidebar (>= 1200px), collapsed rail (600-1199px), phone bar + drawer ---- */
+.mb-app { min-height: 100vh; display: grid; grid-template-columns: var(--mb-sidebar-width) minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+.mb-sidebar, .mb-rail { grid-row: 1 / span 2; background: var(--mb-sidebar-bg); color: var(--mb-sidebar-ink); display: flex; flex-direction: column; gap: 2px; padding: var(--mb-space-4) var(--mb-space-3); position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+.mb-sidebar-brand, .mb-rail-brand { display: flex; align-items: center; gap: 10px; height: 48px; padding: 0 var(--mb-space-2); margin-bottom: var(--mb-space-4); color: #fff; font: var(--md-sys-typescale-title-medium); letter-spacing: .2px; }
+.mb-sidebar-brand .mb-brand-mark, .mb-rail-brand .mb-brand-mark { width: 36px; height: 36px; border-radius: 10px; background: var(--mb-sidebar-active); box-shadow: var(--mb-sidebar-active-shadow); display: grid; place-items: center; font: 700 13px/1 var(--md-ref-typeface-plain); color: #fff; flex: none; }
+.mb-sidebar-brand small { display: block; font: var(--md-sys-typescale-label-small); color: var(--mb-sidebar-muted); letter-spacing: .3px; }
+.mb-sidebar-section { font: var(--md-sys-typescale-label-small); letter-spacing: .08em; text-transform: uppercase; color: var(--mb-sidebar-muted); padding: var(--mb-space-4) var(--mb-space-3) var(--mb-space-1); }
+.mb-nav-item { display: flex; align-items: center; gap: 12px; height: 42px; padding: 0 var(--mb-space-3); border: 0; border-radius: var(--md-sys-shape-corner-small); background: none; color: var(--mb-sidebar-ink); text-decoration: none; cursor: pointer; font: var(--md-sys-typescale-label-large); letter-spacing: var(--md-sys-typescale-label-large-tracking); white-space: nowrap; transition: background var(--md-sys-motion-duration-short); }
+.mb-nav-item .mb-nav-ind { width: 24px; height: 24px; display: grid; place-items: center; flex: none; }
+.mb-nav-item .ms { width: 22px; height: 22px; }
+.mb-nav-item:hover { background: rgba(255,255,255,.07); color: #fff; }
+.mb-nav-item[aria-current="page"] { background: var(--mb-sidebar-active); color: #fff; box-shadow: var(--mb-sidebar-active-shadow); }
+.mb-nav-item.coming { color: var(--mb-sidebar-muted); cursor: help; }
+.mb-nav-item.coming::after { content: "soon"; margin-left: auto; font: var(--md-sys-typescale-label-small); letter-spacing: 0; padding: 0 6px; border-radius: var(--md-sys-shape-corner-full); background: rgba(255,255,255,.1); color: var(--mb-sidebar-muted); }
+.mb-sidebar-foot { margin-top: auto; padding: var(--mb-space-3); border-radius: var(--md-sys-shape-corner-small); background: rgba(255,255,255,.06); color: var(--mb-sidebar-muted); font: var(--md-sys-typescale-body-small); }
+.mb-sidebar-foot b { color: var(--mb-sidebar-ink); }
+.mb-navbar { display: none; }
+.mb-menu-btn { display: none; }
+.mb-scrim { display: none; position: fixed; inset: 0; background: rgba(47,51,73,.45); z-index: 29; }
+.mb-topbar { grid-column: 2; position: sticky; top: 0; z-index: 20; height: var(--mb-topbar-height); background: var(--md-sys-color-surface); box-shadow: 0 1px 0 var(--md-sys-color-surface-container-high); display: flex; align-items: center; gap: var(--mb-space-3); padding: 0 var(--mb-gutter-desktop); }
+.mb-topbar.scrolled { box-shadow: var(--md-sys-elevation-2); }
+.mb-topbar .mb-topbar-title { font: var(--md-sys-typescale-title-medium); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mb-topbar .mb-topbar-actions { margin-left: auto; display: flex; align-items: center; gap: var(--mb-space-3); }
+.mb-search { display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 14px; border-radius: var(--md-sys-shape-corner-full); background: var(--md-sys-color-surface-container); color: var(--md-sys-color-on-surface-variant); font: var(--md-sys-typescale-body-small); text-decoration: none; min-width: 200px; }
+.mb-search .ms { width: 18px; height: 18px; }
+.mb-content { grid-column: 2; min-width: 0; padding: 0 var(--mb-gutter-desktop) var(--mb-space-12); }
+.mb-content-inner { max-width: var(--mb-content-max); margin: 0 auto; }
+@media (max-width: 1199px) {
+  .mb-app { grid-template-columns: var(--mb-rail-width) minmax(0, 1fr); }
+  .mb-sidebar, .mb-rail { padding: var(--mb-space-4) var(--mb-space-2); align-items: center; }
+  .mb-sidebar-brand span, .mb-sidebar-section, .mb-sidebar-foot, .mb-nav-item .mb-nav-label { display: none; }
+  .mb-sidebar-brand { padding: 0; justify-content: center; }
+  .mb-nav-item { width: 56px; justify-content: center; padding: 0; }
+  .mb-nav-item.coming::after { display: none; }
+}
+@media (max-width: 599px) {
+  .mb-app { grid-template-columns: minmax(0, 1fr); }
+  .mb-sidebar, .mb-rail { position: fixed; left: 0; top: 0; bottom: 0; width: var(--mb-sidebar-width); z-index: 30; transform: translateX(-100%); transition: transform var(--md-sys-motion-duration-medium) var(--md-sys-motion-easing-standard); padding: var(--mb-space-4) var(--mb-space-3); align-items: stretch; box-shadow: var(--md-sys-elevation-3); }
+  .mb-sidebar.open, .mb-rail.open { transform: none; }
+  .mb-sidebar.open ~ .mb-scrim { display: block; }
+  .mb-sidebar-brand span, .mb-sidebar-section, .mb-sidebar-foot, .mb-nav-item .mb-nav-label { display: revert; }
+  .mb-sidebar .mb-nav-item { width: auto; justify-content: flex-start; padding: 0 var(--mb-space-3); }
+  .mb-sidebar-brand { padding: 0 var(--mb-space-2); justify-content: flex-start; }
+  .mb-menu-btn { display: inline-grid; }
+  .mb-topbar, .mb-content { grid-column: 1; }
+  .mb-topbar { padding: 0 var(--mb-gutter); gap: var(--mb-space-2); }
+  .mb-search { min-width: 0; width: 38px; padding: 0; justify-content: center; }
+  .mb-search span { display: none; }
+  .mb-content { padding: 0 var(--mb-gutter) calc(var(--mb-navbar-height) + var(--mb-space-6)); }
+  .mb-navbar { display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; height: var(--mb-navbar-height); background: var(--md-sys-color-surface); box-shadow: 0 -1px 0 var(--md-sys-color-surface-container-high), var(--md-sys-elevation-2); justify-content: space-around; align-items: center; padding: 0 var(--mb-space-2); }
+  .mb-navbar .mb-nav-item { flex-direction: column; gap: 2px; height: auto; width: auto; flex: 1 1 0; min-width: 0; padding: 6px 0; color: var(--md-sys-color-on-surface-variant); background: none; box-shadow: none; font: var(--md-sys-typescale-label-small); }
+  .mb-navbar .mb-nav-item .mb-nav-ind { width: 48px; height: 28px; border-radius: var(--md-sys-shape-corner-full); }
+  .mb-navbar .mb-nav-item[aria-current="page"] { color: var(--md-sys-color-primary); }
+  .mb-navbar .mb-nav-item[aria-current="page"] .mb-nav-ind { background: var(--md-sys-color-primary-container); }
+}
+
+/* ---- Cards ---------------------------------------------------------------------------- */
+.md-card { border-radius: var(--mb-card-radius); padding: var(--mb-space-5) var(--mb-space-6); background: var(--md-sys-color-surface-container-lowest); box-shadow: var(--mb-card-shadow); color: var(--md-sys-color-on-surface); }
+.md-card.elevated { box-shadow: var(--md-sys-elevation-2); }
+.md-card.filled { background: var(--md-sys-color-surface-container); box-shadow: none; }
+.md-card.outlined { background: var(--md-sys-color-surface-container-lowest); box-shadow: none; border: 1px solid var(--md-sys-color-outline-variant); }
+.md-card > h2:first-child, .md-card > h3:first-child { margin-top: 0; }
+.mb-card-head { display: flex; align-items: center; gap: var(--mb-space-2); flex-wrap: wrap; margin-bottom: var(--mb-space-4); }
+.mb-card-head h2 { font: var(--md-sys-typescale-title-medium); margin: 0; }
+.mb-card-head .mb-card-sub { font: var(--md-sys-typescale-body-small); color: var(--md-sys-color-on-surface-variant); width: 100%; margin-top: -4px; }
+.mb-card-head .mb-card-end { margin-left: auto; display: inline-flex; align-items: center; gap: var(--mb-space-2); font: var(--md-sys-typescale-body-small); color: var(--md-sys-color-on-surface-variant); }
+/* Icon tile (avatar): a tinted rounded square with an icon, the admin-template KPI signature */
+.mb-avatar { width: 42px; height: 42px; border-radius: 10px; display: grid; place-items: center; flex: none; background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); }
+.mb-avatar .ms { width: 22px; height: 22px; }
+.mb-avatar.success { background: var(--mb-color-up-container); color: var(--mb-color-on-up-container); }
+.mb-avatar.danger { background: var(--mb-color-down-container); color: var(--mb-color-on-down-container); }
+.mb-avatar.warn { background: var(--mb-color-warn-container); color: var(--mb-color-on-warn-container); }
+.mb-avatar.info { background: var(--mb-color-info-container); color: var(--mb-color-on-info-container); }
+.mb-avatar.neutral { background: var(--mb-color-neutral-container); color: var(--mb-color-on-neutral-container); }
+.mb-avatar.paper { background: var(--mb-color-paper-container); color: var(--mb-color-on-paper-container); }
+.mb-avatar.sm { width: 34px; height: 34px; border-radius: 8px; } .mb-avatar.sm .ms { width: 18px; height: 18px; }
+.mb-avatar.lg { width: 52px; height: 52px; border-radius: 12px; } .mb-avatar.lg .ms { width: 28px; height: 28px; }
+
+/* ---- Buttons -------------------------------------------------------------------------- */
+.md-btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--mb-space-2); height: 38px; padding: 0 var(--mb-space-4); border-radius: var(--md-sys-shape-corner-small); border: 0; cursor: pointer; font: var(--md-sys-typescale-label-large); letter-spacing: var(--md-sys-typescale-label-large-tracking); text-decoration: none; white-space: nowrap; position: relative; background: transparent; color: var(--md-sys-color-primary); }
+.md-btn .ms { width: 18px; height: 18px; margin-left: -6px; }
+.md-btn::before { content: ""; position: absolute; inset: 0; border-radius: inherit; background: currentColor; opacity: 0; transition: opacity var(--md-sys-motion-duration-short); }
+.md-btn:hover::before { opacity: var(--md-sys-state-hover-opacity); }
+.md-btn:active::before { opacity: var(--md-sys-state-pressed-opacity); }
+.md-btn.filled { background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); box-shadow: 0 2px 6px rgba(90,94,230,.35); }
+.md-btn.tonal { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); }
+.md-btn.outlined { border: 1px solid var(--md-sys-color-outline-variant); color: var(--md-sys-color-on-surface); background: var(--md-sys-color-surface); }
+.md-btn.text { padding: 0 var(--mb-space-3); }
+.md-btn.small { height: 32px; padding: 0 var(--mb-space-3); font: var(--md-sys-typescale-label-medium); }
+.md-btn:disabled, .md-btn[aria-disabled="true"] { cursor: not-allowed; color: color-mix(in srgb, var(--md-sys-color-on-surface) 38%, transparent); background: color-mix(in srgb, var(--md-sys-color-on-surface) 12%, transparent); border-color: transparent; box-shadow: none; }
+.md-btn.text:disabled { background: transparent; }
+.md-icon-btn { width: 40px; height: 40px; border-radius: var(--md-sys-shape-corner-full); border: 0; background: transparent; color: var(--md-sys-color-on-surface-variant); display: inline-grid; place-items: center; cursor: pointer; position: relative; padding: 0; }
+.md-icon-btn .ms { width: 24px; height: 24px; }
+.md-icon-btn::before { content: ""; position: absolute; inset: 0; border-radius: inherit; background: currentColor; opacity: 0; }
+.md-icon-btn:hover::before { opacity: var(--md-sys-state-hover-opacity); }
+.md-icon-btn.small { width: 28px; height: 28px; } .md-icon-btn.small .ms { width: 18px; height: 18px; }
+.md-icon-btn.outlined { border: 1px solid var(--md-sys-color-outline-variant); }
+.md-icon-btn.tonal { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); }
+
+/* Help affordance: a small outlined icon button that opens a tooltip (hover, focus or tap) */
+.md-help { appearance: none; width: 16px; height: 16px; border-radius: 50%; border: 1px solid var(--md-sys-color-outline-variant); background: var(--md-sys-color-surface); color: var(--md-sys-color-on-surface-variant); font: var(--md-sys-typescale-label-small); letter-spacing: 0; display: inline-grid; place-items: center; cursor: help; padding: 0; vertical-align: middle; margin-left: 4px; line-height: 1; }
+.md-help:hover, .md-help:focus-visible { border-color: var(--md-sys-color-primary); color: var(--md-sys-color-primary); }
+
+/* ---- Segmented buttons (pill tabs) ------------------------------------------------------ */
+.md-segmented { display: inline-flex; border-radius: var(--md-sys-shape-corner-full); background: var(--md-sys-color-surface-container); padding: 3px; gap: 2px; }
+.md-segmented > button, .md-segmented > a { border: 0; border-radius: var(--md-sys-shape-corner-full); background: transparent; color: var(--md-sys-color-on-surface-variant); font: var(--md-sys-typescale-label-large); letter-spacing: 0; height: 32px; padding: 0 var(--mb-space-4); cursor: pointer; display: inline-flex; align-items: center; gap: var(--mb-space-2); text-decoration: none; white-space: nowrap; transition: background var(--md-sys-motion-duration-short), color var(--md-sys-motion-duration-short); }
+.md-segmented > [aria-pressed="true"], .md-segmented > [aria-current="true"] { background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); box-shadow: 0 2px 6px rgba(90,94,230,.35); font-weight: 600; }
+.md-segmented > :disabled, .md-segmented > [aria-disabled="true"] { color: color-mix(in srgb, var(--md-sys-color-on-surface) 38%, transparent); cursor: not-allowed; }
+.md-segmented.dense > button, .md-segmented.dense > a { height: 28px; padding: 0 12px; font: var(--md-sys-typescale-label-medium); }
+.md-segmented.light > [aria-pressed="true"] { background: var(--md-sys-color-surface); color: var(--md-sys-color-on-surface); box-shadow: var(--mb-card-shadow); }
+
+/* ---- Chips ---------------------------------------------------------------------------- */
+.md-chip { display: inline-flex; align-items: center; gap: var(--mb-space-2); height: 30px; padding: 0 var(--mb-space-3); border-radius: var(--md-sys-shape-corner-full); border: 1px solid var(--md-sys-color-outline-variant); background: var(--md-sys-color-surface); color: var(--md-sys-color-on-surface-variant); font: var(--md-sys-typescale-label-medium); letter-spacing: var(--md-sys-typescale-label-medium-tracking); white-space: nowrap; cursor: default; }
+.md-chip .ms { width: 16px; height: 16px; margin-left: -4px; color: var(--md-sys-color-primary); }
+.md-chip.assist { cursor: pointer; }
+.md-chip.filter { cursor: pointer; }
+.md-chip.filter[aria-pressed="true"] { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); border-color: transparent; }
+.md-chip.small { height: 24px; padding: 0 var(--mb-space-2); font: var(--md-sys-typescale-label-small); } .md-chip.small .ms { width: 14px; height: 14px; margin-left: -2px; }
+.md-chip .sw { width: 10px; height: 10px; border-radius: 3px; display: inline-block; flex: none; }
+
+/* ---- Labels (template "label" badges: a tint with its ink, rounded) --------------------- */
+.mb-label { display: inline-flex; align-items: center; gap: 4px; font: 600 12px/18px var(--md-ref-typeface-plain); letter-spacing: .1px; border-radius: 6px; padding: 2px 8px; background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); white-space: nowrap; vertical-align: middle; }
+.mb-label .ms { width: 14px; height: 14px; }
+.mb-label.success, .mb-label.up { background: var(--mb-color-up-container); color: var(--mb-color-on-up-container); }
+.mb-label.danger, .mb-label.down { background: var(--mb-color-down-container); color: var(--mb-color-on-down-container); }
+.mb-label.warn { background: var(--mb-color-warn-container); color: var(--mb-color-on-warn-container); }
+.mb-label.info { background: var(--mb-color-info-container); color: var(--mb-color-on-info-container); }
+.mb-label.neutral { background: var(--mb-color-neutral-container); color: var(--mb-color-on-neutral-container); }
+.mb-label.paper { background: var(--mb-color-paper-container); color: var(--mb-color-on-paper-container); }
+
+/* ---- Provenance tags: Live / Back-test / Mock / Paper / Derived (texture + colour) ------ */
+.mb-tag { display: inline-flex; align-items: center; gap: 4px; font: 600 10.5px/1 var(--md-ref-typeface-plain); letter-spacing: .06em; text-transform: uppercase; border-radius: 6px; padding: 4px 7px; border: 1px solid var(--md-sys-color-outline-variant); color: var(--md-sys-color-on-surface-variant); background: var(--md-sys-color-surface-container-lowest); white-space: nowrap; vertical-align: middle; }
+.mb-tag .ms { width: 12px; height: 12px; }
+.mb-tag.live { border-color: transparent; color: var(--mb-color-on-live-container); background: var(--mb-color-live-container); }
+.mb-tag.bt, .mb-tag.backtest { background: var(--mb-color-backtest-container), var(--md-sys-color-surface-container-lowest); border-color: var(--mb-color-backtest); color: var(--mb-color-on-backtest-container); }
+.mb-tag.mock { border-style: dashed; border-color: var(--mb-color-mock); color: var(--mb-color-on-mock-container); }
+.mb-tag.derived { border-style: dotted; border-color: var(--mb-color-mock); color: var(--mb-color-on-mock-container); }
+.mb-tag.paper { border-color: transparent; color: var(--mb-color-on-paper-container); background: var(--mb-color-paper-container); }
+.mb-tag.coming { border-style: dashed; color: var(--md-sys-color-on-surface-variant); }
+.md-chip.live .sw { background: var(--mb-color-live); }
+.md-chip.bt .sw { background: repeating-linear-gradient(135deg, var(--mb-color-backtest) 0 2px, #fff 2px 4px); border: 1px solid var(--mb-color-backtest); }
+.md-chip.mock .sw { border: 1.5px dashed var(--mb-color-mock); background: transparent; }
+
+/* ---- Status badges (never colour alone: always an icon or glyph plus the word) ---------- */
+.md-badge { display: inline-flex; align-items: center; gap: 4px; font: 500 11.5px/16px var(--md-ref-typeface-plain); letter-spacing: .02em; border-radius: 6px; padding: 2px 7px; border: 1px solid transparent; color: var(--md-sys-color-on-surface-variant); background: var(--md-sys-color-surface-container); white-space: nowrap; vertical-align: middle; }
+.md-badge .ms { width: 13px; height: 13px; }
+.md-badge.dot { width: 6px; height: 6px; padding: 0; border: 0; border-radius: 50%; background: var(--md-sys-color-error); }
+.md-badge.count { min-width: 16px; height: 16px; padding: 0 4px; border: 0; border-radius: var(--md-sys-shape-corner-full); background: var(--md-sys-color-error); color: var(--md-sys-color-on-error); justify-content: center; }
+.mb-status { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; }
+.mb-status.up, .mb-status.hit { color: var(--mb-color-up); }
+.mb-status.down, .mb-status.miss { color: var(--mb-color-down); }
+.mb-status.neutral { color: var(--mb-color-neutral); }
+.mb-status.unknown { color: var(--mb-color-on-warn-container); }
+.md-badge.up, .md-badge.hit, .md-badge.confirmed_primary, .md-badge.corroborated { color: var(--mb-color-on-up-container); background: var(--mb-color-up-container); }
+.md-badge.down, .md-badge.miss, .md-badge.rumour, .md-badge.contradicted, .md-badge.promotional { color: var(--mb-color-on-down-container); background: var(--mb-color-down-container); }
+.md-badge.warn, .md-badge.single_source { color: var(--mb-color-on-warn-container); background: var(--mb-color-warn-container); }
+.md-badge.neutral, .md-badge.unverified { color: var(--mb-color-on-neutral-container); background: var(--mb-color-neutral-container); }
+/* Square direction / sentiment markers: container tone with an on-container glyph */
+.mb-dir { width: 22px; height: 22px; border-radius: 6px; display: inline-grid; place-items: center; flex: none; }
+.mb-dir .ms { width: 15px; height: 15px; }
+.mb-dir.up { background: var(--mb-color-up-container); color: var(--mb-color-on-up-container); }
+.mb-dir.dn, .mb-dir.down { background: var(--mb-color-down-container); color: var(--mb-color-on-down-container); }
+.mb-dir.flat, .mb-dir.neutral { background: var(--mb-color-neutral-container); color: var(--mb-color-on-neutral-container); }
+.mb-dir.unk { background: var(--mb-color-warn-container); color: var(--mb-color-on-warn-container); }
+/* Round outcome markers: solid tone with a white glyph (strong, for ticks and crosses) */
+.mb-mark { width: 20px; height: 20px; border-radius: 50%; display: inline-grid; place-items: center; color: #fff; flex: none; }
+.mb-mark .ms { width: 14px; height: 14px; }
+.mb-mark.ok, .mb-mark.hit { background: var(--mb-color-hit); }
+.mb-mark.no, .mb-mark.miss { background: var(--mb-color-miss); }
+.mb-mark.na { background: var(--mb-color-neutral); }
+
+/* ---- Tooltip (plain, M3: inverse surface) --------------------------------------------- */
+.md-tooltip { position: fixed; z-index: 50; max-width: min(320px, calc(100vw - 24px)); background: var(--md-sys-color-inverse-surface); color: var(--md-sys-color-inverse-on-surface); font: var(--md-sys-typescale-body-small); letter-spacing: var(--md-sys-typescale-body-small-tracking); padding: 8px 12px; border-radius: var(--md-sys-shape-corner-small); box-shadow: var(--md-sys-elevation-3); pointer-events: none; opacity: 0; transition: opacity var(--md-sys-motion-duration-short); }
+.md-tooltip.on { opacity: 1; }
+.md-tooltip b { color: var(--md-sys-color-inverse-on-surface); }
+.md-tooltip .row { display: flex; justify-content: space-between; gap: 14px; }
+.md-tooltip .row span:last-child { font-weight: 600; }
+.md-tooltip .dim { color: var(--mb-sidebar-muted); margin-top: 4px; }
+.md-tooltip-rich { background: var(--md-sys-color-surface); color: var(--md-sys-color-on-surface-variant); border-radius: var(--md-sys-shape-corner-medium); padding: var(--mb-space-3) var(--mb-space-4); box-shadow: var(--md-sys-elevation-2); max-width: 320px; font: var(--md-sys-typescale-body-medium); }
+.md-tooltip-rich .subhead { font: var(--md-sys-typescale-title-small); color: var(--md-sys-color-on-surface-variant); margin-bottom: 4px; }
+
+/* ---- Data tables ---------------------------------------------------------------------- */
+.md-table { width: 100%; border-collapse: collapse; font: var(--md-sys-typescale-body-medium); font-variant-numeric: tabular-nums; }
+.md-table th { font: 600 11px/16px var(--md-ref-typeface-plain); letter-spacing: .06em; text-transform: uppercase; color: var(--md-sys-color-on-surface-variant); text-align: left; padding: 10px 12px; background: var(--md-sys-color-surface-container); white-space: nowrap; }
+.md-table th:first-child { border-radius: 8px 0 0 8px; } .md-table th:last-child { border-radius: 0 8px 8px 0; }
+.md-table td { padding: 10px 12px; border-bottom: 1px solid var(--md-sys-color-surface-container-high); vertical-align: middle; }
+.md-table tr:last-child td { border-bottom: 0; }
+.md-table tr:hover td { background: color-mix(in srgb, var(--md-sys-color-primary) 4%, transparent); }
+.md-table td.num, .md-table th.num { text-align: right; }
+.md-table tr.muted td { color: var(--md-sys-color-on-surface-variant); background: var(--md-sys-color-surface-container-low); }
+.md-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+/* ---- Lists, key-value, dividers -------------------------------------------------------- */
+.md-divider { border: 0; border-top: 1px solid var(--md-sys-color-surface-container-high); margin: var(--mb-space-4) 0; }
+.md-kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; font: var(--md-sys-typescale-body-medium); margin: 0; }
+.md-kv dt { color: var(--md-sys-color-on-surface-variant); } .md-kv dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+code { font-family: var(--md-ref-typeface-mono); font-size: .92em; overflow-wrap: anywhere; }
+.md-list { list-style: none; margin: 0; padding: 0; }
+.md-list > li { display: grid; grid-template-columns: auto 1fr auto; gap: var(--mb-space-3); align-items: center; padding: var(--mb-space-3) 0; border-top: 1px solid var(--md-sys-color-surface-container-high); }
+.md-list > li:first-child { border-top: 0; }
+
+/* ---- Progress and the odds meter ------------------------------------------------------- */
+.md-progress { height: 6px; border-radius: var(--md-sys-shape-corner-full); background: var(--md-sys-color-surface-container-high); overflow: hidden; }
+.md-progress > i { display: block; height: 100%; background: var(--md-sys-color-primary); border-radius: inherit; }
+.mb-odds { display: inline-flex; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; }
+.mb-odds svg { width: 64px; height: 14px; display: block; }
+.mb-odds b { font-weight: 600; min-width: 30px; }
+.mb-odds .track { fill: var(--md-sys-color-surface-container-high); }
+.mb-odds .mid { stroke: var(--md-sys-color-outline); }
+.mb-odds .dot { stroke: #fff; stroke-width: 1.5; } .mb-odds .dot.up { fill: var(--mb-color-up); } .mb-odds .dot.dn { fill: var(--mb-color-down); }
+.mb-bar { height: 8px; background: var(--md-sys-color-surface-container-high); border-radius: 4px; position: relative; overflow: hidden; }
+.mb-bar i { position: absolute; top: 0; bottom: 0; border-radius: 4px; }
+.mb-bar i.up { background: var(--mb-color-up); left: 50%; } .mb-bar i.dn { background: var(--mb-color-down); right: 50%; } .mb-bar i.unk { background: var(--mb-color-warn); left: 50%; transform: translateX(-50%); }
+.mb-bar::after { content: ""; position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: var(--md-sys-color-outline-variant); }
+
+/* ---- KPI card (stat card with an icon tile, label, big number and a trend label) --------- */
+.mb-kpi { border-radius: var(--mb-card-radius); padding: var(--mb-space-5); background: var(--md-sys-color-surface-container-lowest); box-shadow: var(--mb-card-shadow); display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; align-items: start; min-width: 0; }
+.mb-kpi .l { font: var(--md-sys-typescale-body-small); color: var(--md-sys-color-on-surface-variant); }
+.mb-kpi .v { font: 700 26px/1.15 var(--md-ref-typeface-plain); letter-spacing: -.5px; color: var(--md-sys-color-on-surface); overflow-wrap: anywhere; }
+.mb-kpi .s { grid-column: 1 / span 2; font: var(--md-sys-typescale-body-small); color: var(--md-sys-color-on-surface-variant); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.mb-kpi .mb-avatar { grid-row: 1 / span 2; }
+.mb-kpi.accent { background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); box-shadow: 0 6px 18px rgba(90,94,230,.35); }
+.mb-kpi.accent .l, .mb-kpi.accent .s, .mb-kpi.accent .v { color: inherit; } .mb-kpi.accent .l { opacity: .85; }
+.mb-kpi.accent .mb-avatar { background: rgba(255,255,255,.18); color: #fff; }
+
+/* ---- Details / expansion -------------------------------------------------------------- */
+details.md-expansion { background: var(--md-sys-color-surface-container-lowest); box-shadow: var(--mb-card-shadow); border-radius: var(--mb-card-radius); padding: 0 var(--mb-space-6); }
+details.md-expansion summary { cursor: pointer; padding: 16px 0; font: var(--md-sys-typescale-title-small); list-style: none; display: flex; align-items: center; gap: var(--mb-space-2); }
+details.md-expansion summary::-webkit-details-marker { display: none; }
+details.md-expansion summary::before { content: ""; width: 8px; height: 8px; border-right: 2px solid var(--md-sys-color-on-surface-variant); border-bottom: 2px solid var(--md-sys-color-on-surface-variant); transform: rotate(-45deg); transition: transform .15s; margin-right: 4px; flex: none; }
+details.md-expansion[open] summary::before { transform: rotate(45deg); }
+details.md-expansion .inner { padding: 0 0 18px; }
+
+/* ---- Code / preformatted ---------------------------------------------------------------- */
+.md-pre { background: var(--md-sys-color-surface-container); border-radius: var(--md-sys-shape-corner-small); padding: 10px; font: 11.5px/1.45 var(--md-ref-typeface-mono); overflow: auto; max-height: 320px; margin: 0; }
+
+/* ---- Verdict header (decision pages): NO red; YES green, darker when strong, lighter when okay ---- */
+.mb-verdict { display: grid; grid-template-columns: auto 1fr; gap: 18px 22px; padding: 20px 22px; align-items: center; border-radius: var(--mb-card-radius); }
+.mb-verdict .mb-verdict-box { width: 64px; height: 64px; border-radius: var(--md-sys-shape-corner-medium); color: #fff; display: grid; place-items: center; }
+.mb-verdict .mb-verdict-box .ms { width: 40px; height: 40px; }
+.mb-verdict .mb-verdict-word { font-size: 52px; font-weight: 800; line-height: .95; letter-spacing: -1.5px; }
+.mb-verdict .mb-verdict-word small { display: block; font-size: 13px; font-weight: 600; letter-spacing: .02em; margin-top: 6px; }
+.mb-verdict.no { background: var(--mb-verdict-no-bg); color: var(--mb-verdict-no-ink); } .mb-verdict.no .mb-verdict-box { background: var(--mb-verdict-no-box); }
+.mb-verdict.yes-strong { background: var(--mb-verdict-strong-bg); color: var(--mb-verdict-strong-ink); } .mb-verdict.yes-strong .mb-verdict-box { background: var(--mb-verdict-strong-box); }
+.mb-verdict.yes-ok { background: var(--mb-verdict-ok-bg); color: var(--mb-verdict-ok-ink); } .mb-verdict.yes-ok .mb-verdict-box { background: var(--mb-verdict-ok-box); }
+/* Signed number: green/red with its sign (the sign is the glyph) */
+.mb-delta { font-variant-numeric: tabular-nums; font-weight: 600; } .mb-delta.up { color: var(--mb-color-up); } .mb-delta.down { color: var(--mb-color-down); } .mb-delta.flat { color: var(--md-sys-color-on-surface-variant); }
+/* Uppercase micro label (section eyebrows, table headers, stat labels) */
+.mb-micro { font: 500 11px/16px var(--md-ref-typeface-plain); letter-spacing: .06em; text-transform: uppercase; color: var(--md-sys-color-on-surface-variant); }
+
+/* ---- Alert band (template "alert": a tint with an icon, a title and a line of text) ------ */
+.mb-alert { display: grid; grid-template-columns: auto 1fr auto; gap: 14px; align-items: center; padding: 14px 18px; border-radius: var(--mb-card-radius); background: var(--mb-color-warn-container); color: var(--mb-color-on-warn-container); }
+.mb-alert.info { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); }
+.mb-alert.success { background: var(--mb-color-up-container); color: var(--mb-color-on-up-container); }
+.mb-alert.danger { background: var(--mb-color-down-container); color: var(--mb-color-on-down-container); }
+.mb-alert b.t { display: block; font: var(--md-sys-typescale-title-small); }
+.mb-alert .s { font: var(--md-sys-typescale-body-small); margin-top: 2px; opacity: .92; }
+.mb-alert .ms { width: 24px; height: 24px; }
+
+</style>
+<style>
+/* Shared page CSS of the design-track mockups (scheme v2 "modern admin light"): cards, card heads, labels, page
+   head, KPI row, two-column grid, legend, footer. Every colour is a token of design/system/tokens.css. */
+body{font-size:14px;line-height:1.5;font-variant-numeric:tabular-nums}
+.card{background:var(--md-sys-color-surface-container-lowest);border-radius:var(--mb-card-radius);box-shadow:var(--mb-card-shadow);padding:20px 22px;min-width:0}
+.muted{color:var(--md-sys-color-on-surface-variant)}
+.note{font-size:12.5px;color:var(--md-sys-color-on-surface-variant);margin:12px 0 0;overflow-wrap:anywhere}
+.tk{font-weight:700;color:var(--md-sys-color-primary);text-decoration:none} .tk:hover{text-decoration:underline}
+.quiet{font-size:13px;color:var(--md-sys-color-on-surface-variant);padding:12px 14px;border:1px dashed var(--md-sys-color-outline-variant);border-radius:var(--mb-panel-radius);background:var(--md-sys-color-surface-container-low)}
+.h-lab{font-weight:700;color:var(--md-sys-color-on-primary-container);background:var(--md-sys-color-primary-container);border-radius:6px;padding:1px 7px;font-size:12px;white-space:nowrap}
+.mb-odds svg{width:60px} .mb-odds b{min-width:0}
+.sw{width:9px;height:9px;border-radius:3px;display:inline-block;vertical-align:0;margin-right:4px}
+.sw.r,.ser-r{background:var(--mb-chart-1)} .sw.b,.ser-b{background:var(--mb-chart-2)} .sw.a,.ser-a{background:var(--mb-chart-3)} .sw.k,.ser-k{background:var(--mb-chart-4)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--mb-color-down);display:inline-block;flex:none} .dot.open{background:var(--mb-color-up)}
+
+/* page head: title, subtitle, chips */
+.phead{display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-top:22px}
+.phead h1{font:700 24px/1.2 var(--md-ref-typeface-plain);letter-spacing:-.4px;margin:0;overflow-wrap:anywhere}
+.phead .sub{font-size:13px;color:var(--md-sys-color-on-surface-variant);margin-top:4px}
+.phead .chips{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.phead .chips .md-chip b{color:var(--md-sys-color-on-surface);font-weight:600}
+.band{margin-top:16px}
+.band .ms{color:var(--mb-color-on-warn-container)}
+
+/* KPI row and layout */
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:16px}
+.mb-kpi .v .tk{font-size:inherit}
+.mb-kpi .labs{display:inline-flex;flex-wrap:wrap;gap:4px;align-items:center}
+.grid{display:grid;grid-template-columns:minmax(0,8fr) minmax(0,4fr);gap:16px;margin-top:16px;align-items:start}
+.grid.even{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.col{display:grid;gap:16px;min-width:0}
+.head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.head h2{font:600 16px/1.3 var(--md-ref-typeface-plain);margin:0}
+.head .end{margin-left:auto;display:inline-flex;align-items:center;gap:10px;font-size:12.5px;color:var(--md-sys-color-on-surface-variant);flex-wrap:wrap}
+.head .go{font-weight:600;font-size:13px;display:inline-flex;align-items:center;gap:2px;text-decoration:none}
+.head .go .ms{width:16px;height:16px}
+.sub2{font-size:12.5px;color:var(--md-sys-color-on-surface-variant);margin:-8px 0 12px}
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:16px 0 0}
+.toolbar .md-chip.filter{cursor:pointer}
+.toolbar input{height:36px;border-radius:var(--md-sys-shape-corner-full);border:1px solid var(--md-sys-color-outline-variant);padding:0 14px 0 36px;font:inherit;color:inherit;background:var(--md-sys-color-surface) no-repeat 12px center;min-width:200px}
+.toolbar .search{position:relative} .toolbar .search .ms{position:absolute;left:12px;top:9px;width:18px;height:18px;color:var(--md-sys-color-on-surface-variant)}
+.toolbar select{height:36px;border-radius:var(--md-sys-shape-corner-full);border:1px solid var(--md-sys-color-outline-variant);padding:0 12px;font:inherit;color:inherit;background:var(--md-sys-color-surface)}
+
+/* tables (page tables build on .md-table) */
+.tbl td.num,.tbl th.num{text-align:right;white-space:nowrap}
+.tbl tr.grp td{background:var(--md-sys-color-surface-container-low);font-weight:600;padding:8px 12px;font-size:13px}
+.tbl tr.grp td small{font-weight:500;color:var(--md-sys-color-on-surface-variant);margin-left:8px}
+.tbl .st{display:inline-flex;align-items:center;gap:4px} .tbl .st .ms{width:14px;height:14px}
+.tbl .st.flag{color:var(--mb-color-on-warn-container);font-weight:600} .tbl .st.ok{color:var(--mb-color-up)}
+.rng{display:inline-flex;align-items:center;gap:8px} .rng svg{width:100px;height:18px;display:block} .rng small{color:var(--md-sys-color-on-surface-variant);font-size:11px;white-space:nowrap}
+.hzb svg{width:96px;height:40px;display:block}
+.hzb rect.on{fill:var(--md-sys-color-primary)} .hzb rect.off{fill:var(--md-sys-color-surface-container-highest)} .hzb text{font-size:9px;fill:var(--md-sys-color-on-surface-variant)} .hzb text.on{fill:var(--md-sys-color-primary);font-weight:700}
+
+/* legend and footer */
+.legend2{display:flex;flex-wrap:wrap;gap:8px 16px;font-size:12.5px;color:var(--md-sys-color-on-surface-variant);margin-top:18px;align-items:center}
+footer{color:var(--md-sys-color-on-surface-variant);font-size:12px;text-align:center;padding:28px 0 8px} footer code{font-family:var(--md-ref-typeface-mono)}
+
+@media (max-width: 1199px){ .kpis{grid-template-columns:repeat(2,1fr)} }
+@media (max-width: 1000px){ .grid,.grid.even{grid-template-columns:1fr} }
+@media (max-width: 599px){
+  .card{padding:16px}
+  .phead{margin-top:16px} .phead h1{font-size:21px} .phead .chips{margin-left:0}
+  .kpis{gap:12px} .mb-kpi{padding:14px;grid-template-columns:1fr} .mb-kpi .mb-avatar{grid-row:auto} .mb-kpi .s{grid-column:1} .mb-kpi .v{font-size:22px}
+  .mb-alert{grid-template-columns:auto 1fr} .mb-alert .act{grid-column:1 / span 2}
+  .mb-kpi .labs .mb-label{white-space:normal;text-align:left}
+  .toolbar input{min-width:0;width:100%}
+}
+
+</style>
+<style>
+/* News mockup (design track, SPEC section 6 page 9; the owner's rules of 2026-10-08). Page-local layout only; every colour is a token. */
+.mv{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.mv .it{display:grid;grid-template-columns:auto 1fr;gap:10px;padding:10px 12px;border-radius:10px;background:var(--md-sys-color-surface-container-low);min-width:0}
+.mv .rk{font:700 13px/1 var(--md-ref-typeface-plain);color:var(--md-sys-color-on-surface-variant);width:22px;height:22px;border-radius:50%;background:var(--md-sys-color-surface-container-highest);display:flex;align-items:center;justify-content:center}
+.ni{min-width:0}
+.ni .kind{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;letter-spacing:.3px;text-transform:uppercase;color:var(--md-sys-color-on-surface-variant);margin-right:6px}
+.ni .kind.mkt{color:var(--md-sys-color-primary)}
+.ni h3{font-size:14.5px;line-height:1.35;margin:2px 0 3px;font-weight:600}
+.ni h3 a{color:inherit;text-decoration:none} .ni h3 a:hover,.ni h3 a:focus-visible{text-decoration:underline}
+.ni .sum{font-size:13px;line-height:1.5;color:var(--md-sys-color-on-surface-variant);margin:0 0 4px}
+.ni .meta{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;font-size:12px;color:var(--md-sys-color-on-surface-variant)}
+.ni .meta .tk{display:inline-block}
+.ni .go{display:inline-flex;align-items:center;gap:3px;font-weight:600;color:var(--md-sys-color-primary);text-decoration:none;white-space:nowrap}
+.ni .go:hover,.ni .go:focus-visible{text-decoration:underline}
+/* the feed */
+.feed{display:grid;gap:0}
+.day{position:sticky;top:0;z-index:1;background:var(--md-sys-color-surface);padding:10px 0 6px;font-size:12px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;color:var(--md-sys-color-on-surface-variant);border-bottom:1px solid var(--md-sys-color-outline-variant)}
+.day b{color:var(--md-sys-color-on-surface)}
+.row{display:grid;grid-template-columns:58px auto 1fr;gap:10px;padding:10px 0;border-bottom:1px solid var(--md-sys-color-outline-variant);align-items:start;min-width:0}
+.row .tm{font-size:12px;color:var(--md-sys-color-on-surface-variant);font-variant-numeric:tabular-nums;padding-top:2px}
+.row .mb-dir{margin-top:1px}
+.pager{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:12px;font-size:13px;color:var(--md-sys-color-on-surface-variant)}
+.pager .pg{display:flex;gap:4px;flex-wrap:wrap}
+.pager .pg button[aria-current="page"]{background:var(--md-sys-color-primary);color:var(--md-sys-color-on-primary);border-color:transparent}
+/* the rail */
+.cal{display:grid;gap:8px}
+.cal .ev{display:grid;grid-template-columns:52px 1fr;gap:10px;align-items:start;min-width:0}
+.cal .d{font-size:12px;line-height:1.2;color:var(--md-sys-color-on-surface-variant);text-align:center;background:var(--md-sys-color-surface-container-low);border-radius:8px;padding:5px 0}
+.cal .d b{display:block;font-size:15px;color:var(--md-sys-color-on-surface)}
+.cal .ev.major .d{background:var(--mb-color-warn-container)}
+.cal .nm{font-size:13.5px;line-height:1.35} .cal .sub{font-size:12px;color:var(--md-sys-color-on-surface-variant);display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:2px}
+.cos{display:grid;gap:6px}
+.cos .co{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--md-sys-color-outline-variant);min-width:0}
+.cos .co:last-child{border-bottom:0}
+.cos .co .nm{font-size:13px;min-width:0} .cos .co .nm small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:12px;line-height:1.35;margin-top:2px}
+.cos .mix{display:flex;height:8px;width:64px;border-radius:4px;overflow:hidden;background:var(--md-sys-color-surface-container-highest)}
+.cos .mix i{display:block;height:100%} .cos .mix i.up{background:var(--mb-color-up)} .cos .mix i.dn{background:var(--mb-color-down)} .cos .mix i.flat{background:var(--mb-chart-axis)}
+.cos .ct{font-weight:700;font-variant-numeric:tabular-nums;font-size:13px}
+.empty{font-size:13.5px;color:var(--md-sys-color-on-surface-variant);line-height:1.5}
+.grid.news{grid-template-columns:minmax(0,8fr) minmax(0,4fr)}
+@media (max-width:1000px){ .grid.news{grid-template-columns:minmax(0,1fr)} }
+@media (max-width:760px){ .mv{grid-template-columns:1fr} }
+@media (max-width:599px){ .row{grid-template-columns:auto 1fr} .row .tm{grid-column:1 / -1;padding-top:0} }
+</style>
+</head>
+<body>
+<svg xmlns="http://www.w3.org/2000/svg" width="0" height="0" style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true" focusable="false">
+  <!-- Material Symbols Outlined (weight 400, fill 0, grade 0, optical size 24), Apache License 2.0, Google LLC; see LICENSE-material-symbols.txt.
+       Use: <svg class="ms"><use href="#ms-NAME"/></svg>. The symbols are the 24px outlined glyphs copied unchanged from
+       github.com/google/material-design-icons (symbols/web/NAME/materialsymbolsoutlined/NAME_24px.svg). -->
+  <symbol id="ms-account_balance" viewBox="0 -960 960 960"><path d="M200-280v-280h80v280h-80Zm240 0v-280h80v280h-80ZM80-120v-80h800v80H80Zm600-160v-280h80v280h-80ZM80-640v-80l400-200 400 200v80H80Zm178-80h444-444Zm0 0h444L480-830 258-720Z"/></symbol>
+  <symbol id="ms-account_balance_wallet" viewBox="0 -960 960 960"><path d="M200-200v-560 560Zm0 80q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v100h-80v-100H200v560h560v-100h80v100q0 33-23.5 56.5T760-120H200Zm320-160q-33 0-56.5-23.5T440-360v-240q0-33 23.5-56.5T520-680h280q33 0 56.5 23.5T880-600v240q0 33-23.5 56.5T800-280H520Zm280-80v-240H520v240h280Zm-160-60q25 0 42.5-17.5T700-480q0-25-17.5-42.5T640-540q-25 0-42.5 17.5T580-480q0 25 17.5 42.5T640-420Z"/></symbol>
+  <symbol id="ms-apartment" viewBox="0 -960 960 960"><path d="M120-120v-560h160v-160h400v320h160v400H520v-160h-80v160H120Zm80-80h80v-80h-80v80Zm0-160h80v-80h-80v80Zm0-160h80v-80h-80v80Zm160 160h80v-80h-80v80Zm0-160h80v-80h-80v80Zm0-160h80v-80h-80v80Zm160 320h80v-80h-80v80Zm0-160h80v-80h-80v80Zm0-160h80v-80h-80v80Zm160 480h80v-80h-80v80Zm0-160h80v-80h-80v80Z"/></symbol>
+  <symbol id="ms-arrow_downward" viewBox="0 -960 960 960"><path d="M440-800v487L216-537l-56 57 320 320 320-320-56-57-224 224v-487h-80Z"/></symbol>
+  <symbol id="ms-arrow_upward" viewBox="0 -960 960 960"><path d="M440-160v-487L216-423l-56-57 320-320 320 320-56 57-224-224v487h-80Z"/></symbol>
+  <symbol id="ms-block" viewBox="0 -960 960 960"><path d="M480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q54 0 104-17.5t92-50.5L228-676q-33 42-50.5 92T160-480q0 134 93 227t227 93Zm252-124q33-42 50.5-92T800-480q0-134-93-227t-227-93q-54 0-104 17.5T284-732l448 448Z"/></symbol>
+  <symbol id="ms-bolt" viewBox="0 -960 960 960"><path d="m422-232 207-248H469l29-227-185 267h139l-30 208ZM320-80l40-280H160l360-520h80l-40 320h240L400-80h-80Zm151-390Z"/></symbol>
+  <symbol id="ms-calendar_month" viewBox="0 -960 960 960"><path d="M200-80q-33 0-56.5-23.5T120-160v-560q0-33 23.5-56.5T200-800h40v-80h80v80h320v-80h80v80h40q33 0 56.5 23.5T840-720v560q0 33-23.5 56.5T760-80H200Zm0-80h560v-400H200v400Zm0-480h560v-80H200v80Zm0 0v-80 80Zm280 240q-17 0-28.5-11.5T440-440q0-17 11.5-28.5T480-480q17 0 28.5 11.5T520-440q0 17-11.5 28.5T480-400Zm-160 0q-17 0-28.5-11.5T280-440q0-17 11.5-28.5T320-480q17 0 28.5 11.5T360-440q0 17-11.5 28.5T320-400Zm320 0q-17 0-28.5-11.5T600-440q0-17 11.5-28.5T640-480q17 0 28.5 11.5T680-440q0 17-11.5 28.5T640-400ZM480-240q-17 0-28.5-11.5T440-280q0-17 11.5-28.5T480-320q17 0 28.5 11.5T520-280q0 17-11.5 28.5T480-240Zm-160 0q-17 0-28.5-11.5T280-280q0-17 11.5-28.5T320-320q17 0 28.5 11.5T360-280q0 17-11.5 28.5T320-240Zm320 0q-17 0-28.5-11.5T600-280q0-17 11.5-28.5T640-320q17 0 28.5 11.5T680-280q0 17-11.5 28.5T640-240Z"/></symbol>
+  <symbol id="ms-check" viewBox="0 -960 960 960"><path d="M382-240 154-468l57-57 171 171 367-367 57 57-424 424Z"/></symbol>
+  <symbol id="ms-chevron_right" viewBox="0 -960 960 960"><path d="M504-480 320-664l56-56 240 240-240 240-56-56 184-184Z"/></symbol>
+  <symbol id="ms-close" viewBox="0 -960 960 960"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></symbol>
+  <symbol id="ms-construction" viewBox="0 -960 960 960"><path d="M756-120 537-339l84-84 219 219-84 84Zm-552 0-84-84 276-276-68-68-28 28-51-51v82l-28 28-121-121 28-28h82l-50-50 142-142q20-20 43-29t47-9q24 0 47 9t43 29l-92 92 50 50-28 28 68 68 90-90q-4-11-6.5-23t-2.5-24q0-59 40.5-99.5T701-841q15 0 28.5 3t27.5 9l-99 99 72 72 99-99q7 14 9.5 27.5T841-701q0 59-40.5 99.5T701-561q-12 0-24-2t-23-7L204-120Z"/></symbol>
+  <symbol id="ms-description" viewBox="0 -960 960 960"><path d="M320-240h320v-80H320v80Zm0-160h320v-80H320v80ZM240-80q-33 0-56.5-23.5T160-160v-640q0-33 23.5-56.5T240-880h320l240 240v480q0 33-23.5 56.5T720-80H240Zm280-520v-200H240v640h480v-440H520ZM240-800v200-200 640-640Z"/></symbol>
+  <symbol id="ms-event" viewBox="0 -960 960 960"><path d="M580-240q-42 0-71-29t-29-71q0-42 29-71t71-29q42 0 71 29t29 71q0 42-29 71t-71 29ZM200-80q-33 0-56.5-23.5T120-160v-560q0-33 23.5-56.5T200-800h40v-80h80v80h320v-80h80v80h40q33 0 56.5 23.5T840-720v560q0 33-23.5 56.5T760-80H200Zm0-80h560v-400H200v400Zm0-480h560v-80H200v80Zm0 0v-80 80Z"/></symbol>
+  <symbol id="ms-expand_more" viewBox="0 -960 960 960"><path d="M480-345 240-585l56-56 184 184 184-184 56 56-240 240Z"/></symbol>
+  <symbol id="ms-format_list_bulleted" viewBox="0 -960 960 960"><path d="M360-200v-80h480v80H360Zm0-240v-80h480v80H360Zm0-240v-80h480v80H360ZM200-160q-33 0-56.5-23.5T120-240q0-33 23.5-56.5T200-320q33 0 56.5 23.5T280-240q0 33-23.5 56.5T200-160Zm0-240q-33 0-56.5-23.5T120-480q0-33 23.5-56.5T200-560q33 0 56.5 23.5T280-480q0 33-23.5 56.5T200-400Zm0-240q-33 0-56.5-23.5T120-720q0-33 23.5-56.5T200-800q33 0 56.5 23.5T280-720q0 33-23.5 56.5T200-640Z"/></symbol>
+  <symbol id="ms-gavel" viewBox="0 -960 960 960"><path d="M160-120v-80h480v80H160Zm226-194L160-540l84-86 228 226-86 86Zm254-254L414-796l86-84 226 226-86 86Zm184 408L302-682l56-56 522 522-56 56Z"/></symbol>
+  <symbol id="ms-help" viewBox="0 -960 960 960"><path d="M478-240q21 0 35.5-14.5T528-290q0-21-14.5-35.5T478-340q-21 0-35.5 14.5T428-290q0 21 14.5 35.5T478-240Zm-36-154h74q0-33 7.5-52t42.5-52q26-26 41-49.5t15-56.5q0-56-41-86t-97-30q-57 0-92.5 30T342-618l66 26q5-18 22.5-39t53.5-21q32 0 48 17.5t16 38.5q0 20-12 37.5T506-526q-44 39-54 59t-10 73Zm38 314q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z"/></symbol>
+  <symbol id="ms-history" viewBox="0 -960 960 960"><path d="M480-120q-138 0-240.5-91.5T122-440h82q14 104 92.5 172T480-200q117 0 198.5-81.5T760-480q0-117-81.5-198.5T480-760q-69 0-129 32t-101 88h110v80H120v-240h80v94q51-64 124.5-99T480-840q75 0 140.5 28.5t114 77q48.5 48.5 77 114T840-480q0 75-28.5 140.5t-77 114q-48.5 48.5-114 77T480-120Zm112-192L440-464v-216h80v184l128 128-56 56Z"/></symbol>
+  <symbol id="ms-home" viewBox="0 -960 960 960"><path d="M240-200h120v-240h240v240h120v-360L480-740 240-560v360Zm-80 80v-480l320-240 320 240v480H520v-240h-80v240H160Zm320-350Z"/></symbol>
+  <symbol id="ms-info" viewBox="0 -960 960 960"><path d="M440-280h80v-240h-80v240Zm40-320q17 0 28.5-11.5T520-640q0-17-11.5-28.5T480-680q-17 0-28.5 11.5T440-640q0 17 11.5 28.5T480-600Zm0 520q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z"/></symbol>
+  <symbol id="ms-layers" viewBox="0 -960 960 960"><path d="M480-118 120-398l66-50 294 228 294-228 66 50-360 280Zm0-202L120-600l360-280 360 280-360 280Zm0-280Zm0 178 230-178-230-178-230 178 230 178Z"/></symbol>
+  <symbol id="ms-menu" viewBox="0 -960 960 960"><path d="M120-240v-80h720v80H120Zm0-200v-80h720v80H120Zm0-200v-80h720v80H120Z"/></symbol>
+  <symbol id="ms-newspaper" viewBox="0 -960 960 960"><path d="M160-120q-33 0-56.5-23.5T80-200v-640l67 67 66-67 67 67 67-67 66 67 67-67 67 67 66-67 67 67 67-67 66 67 67-67v640q0 33-23.5 56.5T800-120H160Zm0-80h280v-240H160v240Zm360 0h280v-80H520v80Zm0-160h280v-80H520v80ZM160-520h640v-120H160v120Z"/></symbol>
+  <symbol id="ms-open_in_new" viewBox="0 -960 960 960"><path d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h280v80H200v560h560v-280h80v280q0 33-23.5 56.5T760-120H200Zm188-212-56-56 372-372H560v-80h280v280h-80v-144L388-332Z"/></symbol>
+  <symbol id="ms-pending" viewBox="0 -960 960 960"><path d="M280-420q25 0 42.5-17.5T340-480q0-25-17.5-42.5T280-540q-25 0-42.5 17.5T220-480q0 25 17.5 42.5T280-420Zm200 0q25 0 42.5-17.5T540-480q0-25-17.5-42.5T480-540q-25 0-42.5 17.5T420-480q0 25 17.5 42.5T480-420Zm200 0q25 0 42.5-17.5T740-480q0-25-17.5-42.5T680-540q-25 0-42.5 17.5T620-480q0 25 17.5 42.5T680-420ZM480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z"/></symbol>
+  <symbol id="ms-public" viewBox="0 -960 960 960"><path d="M480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm-40-82v-78q-33 0-56.5-23.5T360-320v-40L168-552q-3 18-5.5 36t-2.5 36q0 121 79.5 212T440-162Zm276-102q20-22 36-47.5t26.5-53q10.5-27.5 16-56.5t5.5-59q0-98-54.5-179T600-776v16q0 33-23.5 56.5T520-680h-80v80q0 17-11.5 28.5T400-560h-80v80h240q17 0 28.5 11.5T600-440v120h40q26 0 47 15.5t29 40.5Z"/></symbol>
+  <symbol id="ms-query_stats" viewBox="0 -960 960 960"><path d="m105-233-65-47 200-320 120 140 160-260 109 163q-23 1-43.5 5.5T545-539l-22-33-152 247-121-141-145 233ZM863-40 738-165q-20 14-44.5 21t-50.5 7q-75 0-127.5-52.5T463-317q0-75 52.5-127.5T643-497q75 0 127.5 52.5T823-317q0 26-7 50.5T795-221L920-97l-57 57ZM643-217q42 0 71-29t29-71q0-42-29-71t-71-29q-42 0-71 29t-29 71q0 42 29 71t71 29Zm89-320q-19-8-39.5-13t-42.5-6l205-324 65 47-188 296Z"/></symbol>
+  <symbol id="ms-receipt_long" viewBox="0 -960 960 960"><path d="M240-80q-50 0-85-35t-35-85v-120h120v-560l60 60 60-60 60 60 60-60 60 60 60-60 60 60 60-60 60 60 60-60v680q0 50-35 85t-85 35H240Zm480-80q17 0 28.5-11.5T760-200v-560H320v440h360v120q0 17 11.5 28.5T720-160ZM360-600v-80h240v80H360Zm0 120v-80h240v80H360Zm320-120q-17 0-28.5-11.5T640-640q0-17 11.5-28.5T680-680q17 0 28.5 11.5T720-640q0 17-11.5 28.5T680-600Zm0 120q-17 0-28.5-11.5T640-520q0-17 11.5-28.5T680-560q17 0 28.5 11.5T720-520q0 17-11.5 28.5T680-480ZM240-160h360v-80H200v40q0 17 11.5 28.5T240-160Zm-40 0v-80 80Z"/></symbol>
+  <symbol id="ms-remove" viewBox="0 -960 960 960"><path d="M200-440v-80h560v80H200Z"/></symbol>
+  <symbol id="ms-schedule" viewBox="0 -960 960 960"><path d="m612-292 56-56-148-148v-184h-80v216l172 172ZM480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-400Zm0 320q133 0 226.5-93.5T800-480q0-133-93.5-226.5T480-800q-133 0-226.5 93.5T160-480q0 133 93.5 226.5T480-160Z"/></symbol>
+  <symbol id="ms-science" viewBox="0 -960 960 960"><path d="M200-120q-51 0-72.5-45.5T138-250l222-270v-240h-40q-17 0-28.5-11.5T280-800q0-17 11.5-28.5T320-840h320q17 0 28.5 11.5T680-800q0 17-11.5 28.5T640-760h-40v240l222 270q32 39 10.5 84.5T760-120H200Zm0-80h560L520-492v-268h-80v268L200-200Zm280-280Z"/></symbol>
+  <symbol id="ms-search" viewBox="0 -960 960 960"><path d="M784-120 532-372q-30 24-69 38t-83 14q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l252 252-56 56ZM380-400q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Z"/></symbol>
+  <symbol id="ms-sensors" viewBox="0 -960 960 960"><path d="M197-197q-54-55-85.5-127.5T80-480q0-84 31.5-156.5T197-763l57 57q-44 44-69 102t-25 124q0 67 25 125t69 101l-57 57Zm113-113q-32-33-51-76.5T240-480q0-51 19-94.5t51-75.5l57 57q-22 22-34.5 51T320-480q0 33 12.5 62t34.5 51l-57 57Zm170-90q-33 0-56.5-23.5T400-480q0-33 23.5-56.5T480-560q33 0 56.5 23.5T560-480q0 33-23.5 56.5T480-400Zm170 90-57-57q22-22 34.5-51t12.5-62q0-33-12.5-62T593-593l57-57q32 32 51 75.5t19 94.5q0 50-19 93.5T650-310Zm113 113-57-57q44-44 69-102t25-124q0-67-25-125t-69-101l57-57q54 54 85.5 126.5T880-480q0 83-31.5 155.5T763-197Z"/></symbol>
+  <symbol id="ms-settings" viewBox="0 -960 960 960"><path d="m370-80-16-128q-13-5-24.5-12T307-235l-119 50L78-375l103-78q-1-7-1-13.5v-27q0-6.5 1-13.5L78-585l110-190 119 50q11-8 23-15t24-12l16-128h220l16 128q13 5 24.5 12t22.5 15l119-50 110 190-103 78q1 7 1 13.5v27q0 6.5-2 13.5l103 78-110 190-118-50q-11 8-23 15t-24 12L590-80H370Zm70-80h79l14-106q31-8 57.5-23.5T639-327l99 41 39-68-86-65q5-14 7-29.5t2-31.5q0-16-2-31.5t-7-29.5l86-65-39-68-99 42q-22-23-48.5-38.5T533-694l-13-106h-79l-14 106q-31 8-57.5 23.5T321-633l-99-41-39 68 86 64q-5 15-7 30t-2 32q0 16 2 31t7 30l-86 65 39 68 99-42q22 23 48.5 38.5T427-266l13 106Zm42-180q58 0 99-41t41-99q0-58-41-99t-99-41q-59 0-99.5 41T342-480q0 58 40.5 99t99.5 41Zm-2-140Z"/></symbol>
+  <symbol id="ms-trending_down" viewBox="0 -960 960 960"><path d="M640-240v-80h104L536-526 376-366 80-664l56-56 240 240 160-160 264 264v-104h80v240H640Z"/></symbol>
+  <symbol id="ms-trending_flat" viewBox="0 -960 960 960"><path d="m700-300-57-56 84-84H120v-80h607l-83-84 57-56 179 180-180 180Z"/></symbol>
+  <symbol id="ms-trending_up" viewBox="0 -960 960 960"><path d="m136-240-56-56 296-298 160 160 208-206H640v-80h240v240h-80v-104L536-320 376-480 136-240Z"/></symbol>
+  <symbol id="ms-verified_user" viewBox="0 -960 960 960"><path d="m438-338 226-226-57-57-169 169-84-84-57 57 141 141Zm42 258q-139-35-229.5-159.5T160-516v-244l320-120 320 120v244q0 152-90.5 276.5T480-80Zm0-84q104-33 172-132t68-220v-189l-240-90-240 90v189q0 121 68 220t172 132Zm0-316Z"/></symbol>
+  <symbol id="ms-warning" viewBox="0 -960 960 960"><path d="m40-120 440-760 440 760H40Zm138-80h604L480-720 178-200Zm302-40q17 0 28.5-11.5T520-280q0-17-11.5-28.5T480-320q-17 0-28.5 11.5T440-280q0 17 11.5 28.5T480-240Zm-40-120h80v-200h-80v200Zm40-100Z"/></symbol>
+</svg>
+
+<div id="tip" class="md-tooltip" role="tooltip"></div>
+
+<div class="mb-app">
+  <nav class="mb-sidebar" aria-label="Pages" id="sidebar"></nav>
+  <div class="mb-scrim" id="scrim"></div>
+  <header class="mb-topbar" id="topbar">
+    <button class="md-icon-btn mb-menu-btn" type="button" id="menu-btn" aria-label="Open the menu" aria-controls="sidebar" aria-expanded="false"><svg class="ms"><use href="#ms-menu"/></svg></button>
+    <div class="mb-topbar-title" id="title">News</div>
+    <div class="mb-topbar-actions">
+      <div class="md-segmented dense light" role="group" aria-label="Market" id="market-seg"></div>
+      <a class="md-btn filled" href="../11-assistant/page.html" data-tip="Ask the assistant (page 11): answers cite ids and as-of times, read-only." aria-label="Ask the assistant"><svg class="ms"><use href="#ms-bolt"/></svg><span class="ask-l">Ask</span></a>
+    </div>
+  </header>
+  <main class="mb-content"><div class="mb-content-inner" id="page"></div></main>
+  <nav class="mb-navbar" aria-label="Pages" id="navbar"></nav>
+</div>
+
+<script>const D = {"_example": true, "_note": "EXAMPLE DATA for page design only: every value is copied from W1's example files in design/catalogue/ (docs/DATA_CATALOGUE.md). Predictions, trades, reasons and scores are invented there and consistent with each other. Not a forecast, not advice. Paper only.", "page": "news", "spec": "docs/SPEC.md section 6, page 9; owner's rules of 2026-10-08", "endpoint": "GET /api/v1/markets/{market}/news", "read_model": "rm.news", "sources": ["design/catalogue/market_status.json", "design/catalogue/scoreboard_row.json", "design/catalogue/news_item.json", "design/catalogue/calendar_event.json", "design/catalogue/company.json"], "as_of": "2026-10-06", "cutoff": "2026-10-07T12:00:00Z", "built_at": "2026-10-07T11:58:00Z", "markets": {"india": {"market": "india", "name": "India (NSE)", "currency": "INR", "as_of": "2026-10-06", "cutoff": "2026-10-07T12:00:00Z", "built_at": "2026-10-07T10:31:00Z", "status": {"market": "india", "name": "India (NSE)", "as_of": "2026-10-06", "currency": "INR", "session": {"local_time": "2026-10-07T17:30+05:30", "trading_day": true, "session_date": "2026-10-07", "previous_session": "2026-10-06", "calendar_covered": true, "session_open_utc": "2026-10-07T03:45:00+00:00", "session_close_utc": "2026-10-07T10:00:00+00:00", "in_session": false, "late_run": true}, "benchmark": {"symbol": "NIFTY50", "name": "Nifty 50", "close": 22776.0996, "close_date": "2026-10-06", "change_pct": 0.98, "change_5d_pct": -0.02}, "vol_index": {"symbol": "INDIAVIX", "name": "India VIX", "close": 13.61, "close_date": "2026-10-06", "change_pct": -7.92, "change_5d_pct": -0.22}, "regime": "EVENT_HEAVY", "runs": {"pre_open": {"at": "2026-10-07T02:10:00Z", "ok": true}, "intraday": [{"at": "2026-10-07T05:43:00Z", "ok": true}], "post_close": {"at": null, "ok": null, "next_at": "2026-10-07T12:15:00Z"}, "news": {"at": "2026-10-07T10:17:00Z", "ok": true, "new_items": 37}}, "freshness": {"state": "fresh", "built_at": "2026-10-07T10:31:00Z", "age_minutes": 29}, "paper_label": "Paper only - no proven edge yet"}, "horizons": [1, 2, 3, 4, 5], "default_horizon": 1, "go_live": {"proven": false, "months_forward": 0.2, "trades_needed": 294, "beats_best_baseline": false}, "window": {"days": 3, "from": "2026-10-04T12:00:00Z", "to": "2026-10-07T12:00:00Z", "max_items": 50, "stored_in_window": 29, "older_hidden": 1}, "news": [{"id": "dd36c953b69b691c", "market": "india", "tickers": ["ICICIBANK"], "primary_tickers": ["ICICIBANK"], "title": "ICICI Bank Q2 Results FY27: NII, NIM and Asset Quality in Focus Before Oct 17", "source": "NiftyTrader", "source_domain": "niftytrader.in", "url": "https://news.google.com/rss/articles/CBMieEFVX3lxTE81dzRrWkJwMHlhSG5FOWlqS05JaXYydEZlVUdoWkFWcVZwa3habnl6T2puZHktcko4WHY2REhGOVdEVFFJOVdvLVBXTkdsSWU3Yi1rZ1BCOUYwSlgweXVRbXR0MEpPeThXZ3ZyME0xWllkYkdXNm1KOQ?oc=5", "published_at": "2026-10-06T11:38:53Z", "first_seen_at": "2026-10-07T05:00:49Z", "status": "unverified", "status_as_of": "2026-10-07T05:07:01Z", "independent_origins": 0, "primary_ids": [], "cluster_id": "ICICIBANK-dd36c953b69b691c", "scope": "company", "category": "company", "feed": "gnews:\"ICICI Bank\" share", "summary": null, "summary_source": "none", "market_moving": false, "origin": "stored", "enrichment": {"event_type": "earnings", "materiality": "medium", "sentiment": 0.0, "relevance": 0.7, "novelty": 0.35, "urgency": "medium", "priced_in": false, "analyzed_at": "2026-10-07T05:10:26Z", "geopolitical": false}}, {"id": "dcf522eace770d6c", "market": "india", "tickers": ["DRREDDY"], "primary_tickers": ["DRREDDY"], "title": "Trade Idea of The Day - Dr. Reddy's Laboratories Ltd Target Rs.45 - Religare Broking Ltd", "source": "Investment Guru India", "source_domain": "investmentguruindia.com", "url": "https://news.google.com/rss/articles/CBMi0gFBVV95cUxQUGRFX1BnM2tQUUFHLWNaY3l3Y3NxaV94eE5HT0prNDd1ZXVGVlJraEhWczB2QWotYTNfYkE2dC15UzFYTjB4RnlYT3JOck5zRktQVHNqMkIzSkFPNW1EQVFvX3l3M0lmTkhsM0hhQzV5eXZpZjcwZ1plMkFBeEJ6V1JPc3FjVW9CbFdEdlVwRzNTZlNpaDYzOHo1ZktnLVZieVI4VWU4a2FGZGdkMmFZRU9oS0tvWmJ0VFhBZUdfQ2dQc055SWRsU0g0WDFMbFhUaFE?oc=5", "published_at": "2026-10-06T05:52:55Z", "first_seen_at": "2026-10-07T05:00:49Z", "status": "unverified", "status_as_of": "2026-10-07T05:07:01Z", "independent_origins": 0, "primary_ids": [], "cluster_id": "DRREDDY-dcf522eace770d6c", "scope": "company", "category": "company", "feed": "gnews:\"Dr Reddy's\" share", "summary": "(DRREDDY) General news item with little direct bearing on the watchlist or the broad market.", "summary_source": "analyst", "market_moving": false, "origin": "stored", "enrichment": {"event_type": "other", "materiality": "low", "sentiment": 0.0, "relevance": 0.37, "novelty": 0.4, "urgency": "low", "priced_in": false, "analyzed_at": "2026-10-07T05:10:26Z", "geopolitical": false}}, {"id": "caa76256c4ca07ba", "market": "india", "tickers": ["HDFCLIFE"], "primary_tickers": ["HDFCLIFE"], "title": "HDFC Life Insurance to host H1FY27 earnings call on Oct 15 at 4:15 pm", "source": "scanx.trade", "source_domain": "scanx.trade", "url": "https://news.google.com/rss/articles/CBMiuAFBVV95cUxPN3ZpOF9NRVFDeXUzdU1PS25YVUJoX3BfXzhSUDducWpHVmhrUzJ4RGtzaHp4NV9TWnlzel9vQmNDVTE1R1BGbDFEYmJWWEVyTXJoejB5eU1QQU9wSWpHeFhqUWlzV18yLUhCTDZEeDZibWIxQ2dyZjNxTEhSWUVRNXE1T3V5Qnh5MG1zOHZadVFOSENoWW1qdlJwc3JKTjFZOVJwb2ppNHV6Y2JhZ0E1QnpZcXc1akMx?oc=5", "published_at": "2026-10-06T11:59:25Z", "first_seen_at": "2026-10-07T05:00:49Z", "status": "unverified", "status_as_of": "2026-10-07T05:07:01Z", "independent_origins": 0, "primary_ids": [], "cluster_id": "HDFCLIFE-caa76256c4ca07ba", "scope": "company", "category": "company", "feed": "gnews:\"HDFC Life\" share", "summary": null, "summary_source": "none", "market_moving": false, "origin": "stored", "enrichment": {"event_type": "earnings", "materiality": "medium", "sentiment": 0.0, "relevance": 0.7, "novelty": 0.35, "urgency": "medium", "priced_in": false, "analyzed_at": "2026-10-07T05:10:26Z", "geopolitical": false}}, {"id": "924af206264d209e", "market": "india", "tickers": ["ONGC"], "primary_tickers": [], "title": "Oil India, BPCL, HPCL, IOCL, ONGC, Petronet LNG: Oil & Gas Q2 results preview", "source": "ET EnergyWorld", "source_domain": "energy.economictimes.indiatimes.com", "url": "https://news.google.com/rss/articles/CBMi1wFBVV95cUxPR3g5N1EteUgzQ19MaklicHpDSjd1NVFCY1ptUEVTLUhheFk2dXBFMjBDLVNTemZRVlNEV2dzUUZxdUJlenJwRncwRzhlTG9jOEozU3l1N2dJdkJ3YlBkM3lKUXBxTVZHSDN6TTFfb0stMmRpX1ZkZmxEOHAxMkV3ZS1fTUFqYUUzbE9CNW9CcE00Vm5tNkRhSG1PT1gzbzBYSng1eDRQZy1BV1l0ejNUUmxjQkUyUGVvX1dHd1ZJMlNZNjR5S2FVVTR2ODIyMXhhWmg4TzZVa9IB3AFBVV95cUxPMnBCemkyUzFxcnlhTFY5WFJJa2tGMHRFdUhXalRGRG51NnV5OXE1akktLWtCVHhfcktPWXpsOUpHZnNvVXEyanA4alZmRUgzRHhIak1fMXRNbEZDel8tWWpSU25tb0JndTY0cXJld3JNeDFUME13Qm1vQlRfOC1VNXhVd2w5SHJNOERTc25zNE5jMU5lZDBPVnNXdVI0SGtQOEZEQ3hyRmRfSFlVeXZBYTNSUDBENjNlS3hnQ2dnb0ZadEYxWEZSS05iWVpGOE1DdzJKdEtfZFY3NVV2?oc=5", "published_at": "2026-10-06T05:59:35Z", "first_seen_at": "2026-10-07T05:00:49Z", "status": null, "status_as_of": null, "independent_origins": null, "primary_ids": [], "cluster_id": null, "scope": "market", "category": "global", "feed": "gnews:crude oil prices India", "summary": null, "summary_source": "none", "market_moving": false, "origin": "stored", "enrichment": {"event_type": "earnings", "materiality": "medium", "sentiment": 0.0, "relevance": 0.7, "novelty": 0.35, "urgency": "medium", "priced_in": false, "analyzed_at": "2026-10-07T05:10:26Z", "geopolitical": false}}, {"id": "7fd4d207703fcca0", "market": "india", "tickers": ["RELIANCE"], "primary_tickers": ["RELIANCE"], "title": "Jio Platforms plans IPO. Reliance Industries stock sits 24.42 percent below its high", "source": "AD HOC NEWS", "source_domain": "ad-hoc-news.de", "url": "https://news.google.com/rss/articles/CBMi3wFBVV95cUxOa3RobVRHRzd0bWZxbmdVSm5md2prU05jVmlTay1uMVRpd2h6NUI4RU9wTm9qMVNRT3FWQmFmNVJPa3pmRHZ5Rk56S0gwQkQzZUs0R2NRWl9NQ1haczlZZE55cXg0X1dOOFJQOWV4YzJBNGI1d1U4MUMxY3Z3Z2swLThwMXdjMTl6RUw3NkxUMDNBVFhxcFN6STF1OUNsUTAtSUktNjF6bkhOMEpPNzNjQ0xQZnRYeWpOd0JlSi1DZXBLN180U0JoMHpDQmlwWGNsRnI5dFgwM3FMWExCZ2k0?oc=5", "published_at": "2026-10-06T10:32:28Z", "first_seen_at": "2026-10-07T05:00:49Z", "status": "promotional", "status_as_of": "2026-10-07T05:07:01Z", "independent_origins": 0, "primary_ids": [], "cluster_id": "RELIANCE-7fd4d207703fcca0", "scope": "company", "category": "company", "feed": "gnews:\"Reliance Industries\" share", "summary": "Jio Platforms IPO plans, reportedly around $114 billion valuation and a late-October launch, fuel value-unlocking hopes for Reliance.", "summary_source": "analyst", "market_moving": false, "origin": "stored", "enrichment": {"event_type": "other", "materiality": "low", "sentiment": 0.5, "relevance": 0.85, "novelty": 0.2, "urgency": "high", "priced_in": false, "analyzed_at": "2026-10-07T05:10:26Z", "geopolitical": false}}, {"id": "54b044f3247966cd", "market": "india", "tickers": ["RELIANCE"], "primary_tickers": [], "title": "Not just RIL, Jio's ₹11 trn IPO could benefit Airtel investors; here's why", "source": "Business Standard Markets", "source_domain": NaN, "url": "https://www.business-standard.com/markets/news/jio-ipo-not-just-ril-jio-s-11-trn-ipo-could-benefit-airtel-investors-here-s-why-126100700129_1.html", "published_at": "2026-10-07T03:32:30Z", "first_seen_at": "2026-10-07T05:00:49Z", "status": null, "status_as_of": null, "independent_origins": null, "primary_ids": [], "cluster_id": null, "scope": "market", "category": "general", "feed": "Business Standard Markets", "summary": "Jio Platforms IPO plans, reportedly around $114 billion valuation and a late-October launch, fuel value-unlocking hopes for Reliance.", "summary_source": "analyst", "market_moving": true, "origin": "stored", "enrichment": {"event_type": "other", "materiality": "high", "sentiment": 0.5, "relevance": 0.85, "novelty": 0.2, "urgency": "high", "priced_in": false, "analyzed_at": "2026-10-07T05:10:26Z", "geopolitical": false}}, {"id": "51d8aa2058736fcd", "market": "india", "tickers": [], "primary_tickers": [], "title": "Can strong Jio growth bring back momentum in Mukesh Ambani-led Reliance stock as Jio IPO buzz gathers pace?", "source": "ET Now", "source_domain": "etnownews.com", "url": "https://news.google.com/rss/articles/CBMi7wFBVV95cUxQeUVWLVl1eENtVEtJTFBCTUhTcFY3UXF4WERSMl82ZUNFel94SkxaaUNXa2RtZUZHUmJCSEl0ZWVYSzV2eGp0ZVVuQXdvaHhMdXpyc3A0dVFWcDhlaTV4QXg1a05lUGNwSEtYOERRZjlyMGRRdGVTd05MeXFMS3owdTMzV08yLWNPMGhCRDc5eTUzTHNzUlkwVzlIMzdfLUh5c01DSU9Oa1JjbzdzS2ZfbkEtWE5BM2ZocGp2V3JmMjh2M3FuNTQybHlCTmRTb3FJamNBdG1jTVMwOW9lb2dXN05qeFpxMXRwS2plODZVOA?oc=5", "published_at": "2026-10-06T08:50:16Z", "first_seen_at": "2026-10-07T05:00:49Z", "status": null, "status_as_of": null, "independent_origins": null, "primary_ids": [], "cluster_id": null, "scope": "market", "category": "company", "feed": "gnews:\"Reliance Industries\" share", "summary": "Jio Platforms IPO plans, reportedly around $114 billion valuation and a late-October launch, fuel value-unlocking hopes for Reliance.", "summary_source": "analyst", "market_moving": true, "origin": "stored", "enrichment": {"event_type": "other", "materiality": "high", "sentiment": 0.5, "relevance": 0.85, "novelty": 0.2, "urgency": "high", "priced_in": false, "analyzed_at": "2026-10-07T05:10:26Z", "geopolitical": false}}, {"id": "50386aab4a3b3edc", "market": "india", "tickers": ["LT"], "primary_tickers": ["LT"], "title": "L&T Secures Power Transmission Orders Across Saudi Arabia, UAE, India", "source": "Energetica India Magazine", "source_domain": "energetica-india.net", "url": "https://news.google.com/rss/articles/CBMiogFBVV95cUxOSFFDUXlCeVNWTEMwdEZiQ2swZjNaRUdJczJrdjZNeWRpZGF1OS1ZNjV0NTRtNGRSMmRYTU0td1hzLXVMM251T3BSX2RxcWRCV0IyU1hkdUtZYXRESTNqUm9oOFVfOXE1a3lXUkkwYjNFOWF2U1l4My0zc2lpRFJtSkZKSTNiaDhwOEhqM0tZbXVCNE5IZzBWYlVQTVdhbXJIb3c?oc=5", "published_at": "2026-10-06T05:52:45Z", "first_seen_at": "2026-10-07T05:00:49Z", "status": "unverified", "status_as_of": "2026-10-07T05:07:01Z", "independent_origins": 1, "primary_ids": [], "cluster_id": "LT-6a9777a0704ddaf0", "scope": "company", "category": "company", "feed": "gnews:\"Larsen & Toubro\" share", "summary": "L&T won large orders, including a 1,600 MW thermal plant and Rs 10,000-15,000 crore of transmission contracts in India and the Middle East.", "summary_source": "analyst", "market_moving": false, "origin": "stored", "enrichment": {"event_type": "other", "materiality": "high", "sentiment": 0.6, "relevance": 0.9, "novelty": 0.4, "urgency": "high", "priced_in": false, "analyzed_at": "2026-10-07T05:10:26Z", "geopolitical": false}}, {"id": "4aab9063ef1d7c42", "market": "india", "tickers": ["RELIANCE"], "primary_tickers": ["RELIANCE"], "title": "Jio Platforms likely to launch IPO on October 21, seeks to raise $3.8 bn", "source": "Business Standard Companies", "source_domain": NaN, "url": "https://www.business-standard.com/companies/news/jio-platforms-likely-to-launch-ipo-on-october-21-seeks-to-raise-3-8-bn-126100500424_1.html", "published_at": "2026-10-05T08:36:26Z", "first_seen_at": "2026-10-07T05:00:49Z", "status": "rumour", "status_as_of": "2026-10-07T05:07:01Z", "independent_origins": 1, "primary_ids": [], "cluster_id": "RELIANCE-4aab9063ef1d7c42", "scope": "company", "category": "company", "feed": "Business Standard Companies", "summary": "Indian billionaire Mukesh Ambani's Jio Platforms plans to launch its initial public offering on October 21, seeking to raise about $3.8 billion in what is set to be India's biggest listing, two sources familiar with the matter said. The shares are expected to list on October 28.", "summary_source": "article", "market_moving": false, "origin": "stored", "enrichment": {"event_type": "other", "materiality": "high", "sentiment": 0.5, "relevance": 0.85, "novelty": 0.2, "urgency": "high", "priced_in": true, "analyzed_at": "2026-10-07T05:10:26Z", "geopolitical": false}}, {"id": "4870b84adcf5293f", "market": "india", "tickers": ["HDFCBANK"], "primary_tickers": ["HDFCBANK"], "title": "Can a new CEO solve HDFC Bank's problems?", "source": "Finshots", "source_domain": "finshots.in", "url": "https://news.google.com/rss/articles/CBMid0FVX3lxTE1HY0FwV0JqLWpKQ1BlbUFMNFQxM0trbzdOdDRMNWVEVzhybUh4TWhRbmRlTUdBYzF1ZTZVZVEtNmZlVjR1d05STWNFU1MyYnZKamp1ZkRNazNjTkoweXcwbG0zR1FSLWVHc0k0dElDdmNubXQwMFU4?oc=5", "published_at": "2026-10-07T01:31:38Z", "first_seen_at": "2026-10-07T05:00:49Z", "status": "unverified", "status_as_of": "2026-10-07T05:07:01Z", "independent_origins": 0, "primary_ids": [], "cluster_id": "HDFCBANK-4870b84adcf5293f", "scope": "company", "category": "company", "feed": "gnews:\"HDFC Life\" share", "summary": "(HDFCBANK) Commentary on the HDFC Bank leadership change after Anup Bagchi was named CEO, weighing governance and execution concerns.", "summary_source": "analyst", "market_moving": false, "origin": "stored", "enrichment": {"event_type": "other", "materiality": "medium", "sentiment": -0.2, "relevance": 0.8, "novelty": 0.3, "urgency": "medium", "priced_in": true, "analyzed_at": "2026-10-07T05:10:26Z", "geopolitical": false}}, {"id": "312dd1e3ad991824", "market": "india", "tickers": [], "primary_tickers": [], "title": "West Asia Conflict: India condemns attack on MT On Peace vessel; MEA reiterates maritime security, 17 Indians injured", "source": "Organiser Weekly", "source_domain": "organiser.org", "url": "https://news.google.com/rss/articles/CBMi8wFBVV95cUxPWTJvX1VHTnZsZGlQd3FLNnpkT0JhT0hsYVdsQW5ZWF92Q215Z0dYbHFkWXdValFHLVdPMUZpTm9yLXN1dVBBLU5mNVRJVzhEWlVaRjM0blFxYWdkc3JfRU9GNU1lRThyNUhncGhObjFHSnlybkM4WWsyaU1xejVta2dncGQtNTVqOHdlelY0S1hCalJLeG9iTU9RUUVkakU4cUZiN1gyVEU2aDBvNGNtQkE3Sk1YaFdPckxzdUJFY3ROZDItX0hhUHlfOENTaEFWVlBYM0k0YWwyU0c0MDdCOHdIUVpNWFBwekVJZzRzQ1hubmPSAfgBQVVfeXFMTWthVDRiRVppb3lNVlJIMDlJMjBsY2poZEU5UXlxRy1lUC0wZHNMRXoyRW5LdXpxeGFjZ0RKWnZ5MkRUWXVWX2hzTFRwWHVPNWZmcVoxOEZCdkFmT0hkN2lKZWpkVDk2UGwwR3ozTWhKNFh5VGhONWx0VEtMcUEzTHowVUhlcWpTWERtaEpyYi1Db0tMMEFiRU00aEEzY3doajNxZlFHTjlpX2cwMGFQdnREY2llM0JiaTYzQnZaNWFacExoSTFmS09hcHFrNFNCRTJKOENfWVlZNzlKN2prYXRBb2VpT1M2ZkhWN004bXpmZzFuU1NqSU0?oc=5", "published_at": "2026-10-06T13:14:46Z", "first_seen_at": "2026-10-07T05:00:49Z", "status": null, "status_as_of": null, "independent_origins": null, "primary_ids": [], "cluster_id": null, "scope": "market", "category": "geopolitics", "feed": "gnews:India geopolitical tensions", "summary": "Oil near $100 per barrel on Middle East supply risks and storm threats keeps pressure on India via import costs and the rupee.", "summary_source": "analyst", "market_moving": false, "origin": "stored", "enrichment": {"event_type": "macro", "materiality": "medium", "sentiment": -0.2, "relevance": 0.6, "novelty": 0.35, "urgency": "high", "priced_in": false, "analyzed_at": "2026-10-07T05:10:26Z", "geopolitical": true}}, {"id": "2b5d532b8743719a", "market": "india", "tickers": [], "primary_tickers": [], "title": "Titan Q2 FY27: Growth Moderates to 25% From 41% as Jewellery Buyers Lag", "source": "NiftyTrader", "source_domain": "niftytrader.in", "url": "https://news.google.com/rss/articles/CBMigwFBVV95cUxPQV9DV1E3NzdyTjEzUkVjUEc1eFU5QmE4LWVad3RhSFoyYUZ6NXVULWVYRHZFSlF5dFFlQXFPSU8tZ3RZV0NUZEVkS3YyQkcycER4RXZMVlowdVYyWjJJY3F1UlQwYWl1NDlSUGRtQzY0cE9nV3BadG96MFlqd0hEcnZrNA?oc=5", "published_at": "2026-10-06T16:53:28Z", "first_seen_at": "2026-10-07T05:00:49Z", "status": null, "status_as_of": null, "independent_origins": null, "primary_ids": [], "cluster_id": null, "scope": "market", "category": "flows", "feed": "gnews:FII DII net buying selling", "summary": "Titan fell about 4-5% after its Q2 update showed jewellery growth below estimates, though brokers kept positive targets.", "summary_source": "analyst", "market_moving": true, "origin": "stored", "enrichment": {"event_type": "earnings", "materiality": "high", "sentiment": -0.5, "relevance": 0.45, "novelty": 0.2, "urgency": "high", "priced_in": true, "analyzed_at": "2026-10-07T05:10:26Z", "geopolitical": false}}, {"id": "1ab6da869358336f", "market": "india", "tickers": [], "primary_tickers": [], "title": "RBI MPC Meeting 2026: Malhotra & Co hike repo rate by 25 bps to 5.50% for first time in nearly 4 years as", "source": "The Economic Times", "source_domain": "m.economictimes.com", "url": "https://news.google.com/rss/articles/CBMiqAJBVV95cUxQUU9zZHItbXQxNjBNOW9GMEhkbTRpN3hXZjJhLU5nai13dFJWUGk1NEpCQ2RrOVdBWl9PWmo3OXlLLWhjNGlRSEtfeC1vcWJKc2twY1RGTzF2SmxZWmlRWVAzajFtZ2xSdkc5QnRWMFpDWDdseDgwUm5yamNucG9kdTJCeVVMQzlkbkM2RDNUSjR4dUM3Y2puOGlJQVVIM0diNjRRMlFrWV9lNmstbmNfYU1ZUDlwazZiVi1rS1ZDRkRGZVJVUE9QbXdteXVYZHdBbGpZOG5GZkRLYlZpekdjMXRCMFBTVzJmcFFpVDV5ZF9fdG1Ja0FBRmJEY1Q2TjkyNXl4eVJNODJ6a3JJdUlLcmlnRC1tZlIwbTI5dndMOWRvazdxVUJWYdIBrgJBVV95cUxQS0FJUEdSQkxuc1JjNGJlR1p6cTAtVTFibHN0X3A5Q3ZaT1kwZllOdzRxQ2p5UUVITlhfVm1ZYUxqMnlvV0lEX0paZk4xUUYwQzRfZGotZmlPejIzOWVCYjE1RXRXMW13dEdtRTljSUo1REY1SXBqbVV0bF8zVnd6NXFmMVBOS2tXcjJncElTYXBQQ1U4SlJJeXVPOE5PNE1DLVkyaHF2S05BS3BMYTJlZlVKTEZlNF9Uc3FJQjhTcllFRGZrdVNVQW1OMHNjdS02dWUyUnhqNFY0eEVmREhjMHUydHlyX3o4RFh6MUprbzdQWGhlbGpCRklSa0tTQ0dxR1hXSkh4a1VlWmRsWWtlb0ROZG82d3cyajVJTnNDVlBwRkhpemVVejkybzlPUQ?oc=5", "published_at": "2026-10-07T04:32:38Z", "first_seen_at": "2026-10-07T05:00:49Z", "status": null, "status_as_of": null, "independent_origins": null, "primary_ids": [], "cluster_id": null, "scope": "market", "category": "macro", "feed": "gnews:RBI monetary policy", "summary": "RBI raised the repo rate 25 bps to 5.5% and shifted to calibrated tightening, its first hike since 2023; banks and rate-sensitives in focus.", "summary_source": "analyst", "market_moving": false, "origin": "stored", "enrichment": {"event_type": "macro", "materiality": "medium", "sentiment": -0.3, "relevance": 0.8, "novelty": 0.2, "urgency": "high", "priced_in": false, "analyzed_at": "2026-10-07T05:10:26Z", "geopolitical": false}}, {"id": "09b69c083d8a726b", "market": "india", "tickers": ["RELIANCE"], "primary_tickers": ["RELIANCE"], "title": "Reliance Industries shares gain 3% as JIO IPO inches closer; Jefferies increases weight in conglomerate", "source": "The Economic Times", "source_domain": "m.economictimes.com", "url": "https://news.google.com/rss/articles/CBMihgJBVV95cUxPQ2xlLUZ5Wmg4SFFSMWdOZUFlaFYyYUV0OFpjOF9leG9xaWxMcmh0ZTVHQ0YwYnBVOVRGZUk1ME11TUl1U042a3lKM3dpNExCaHlNSUFLMlRBSzJBVEJObkRFTmlNYVBLOTNxS3djaTB6MUVheV9aZzh3WWJFYXJ2WEV5UlgyUlNudlV5NmN6Qml6dWViT3lxWExzT09KLU1QeVByNXlyLVhEZklXVHIyc0FZandyamNCc0NvSHJ0VWRFc21ZU09EczJUem9UT0J1YmxjVmhETlVHZE9hanIzRDdyVWpCU3VTOWhVeHp1NnctbkswZFRHR1djWllydmVjYWpKN1Rn0gGLAkFVX3lxTE5hSUpkUXdHckdXODJlWm4wMk9Sa1pJY1VHMVJwR0dwOUVzS2lnejc0ZEhEcFpUckdwVmJtTGpYT0hiSXg5WmQwRVNlSk5DVkt2a1hsb3JXZXNnMTJBdmFlQjRuMnNhdnpxUlk3LWY2VWxxNTZXS1A2d1NlY1VrM0F0WklfMFUxSWpSaklDN3VKYmRaNzZjZm0zV0pKeFdaTzE0TXhRYTRvS253VW1mQW00QVdUSjZHVmhaTGtyTkprY1VYWkh3VmhsSndpRmNOTWdRcHNKSWhlQ0tRdnlIV1lsZWM4VVozSWhVbGI2Q3dYbTZNRmlWN0lBdm5NRlZ3MWZ3Sk43UEdFeFFsRQ?oc=5", "published_at": "2026-10-06T11:26:33Z", "first_seen_at": "2026-10-07T05:00:49Z", "status": "single_source", "status_as_of": "2026-10-07T05:07:01Z", "independent_origins": 1, "primary_ids": [], "cluster_id": "RELIANCE-09b69c083d8a726b", "scope": "company", "category": "company", "feed": "gnews:\"Reliance Industries\" share", "summary": "Jio Platforms IPO plans, reportedly around $114 billion valuation and a late-October launch, fuel value-unlocking hopes for Reliance.", "summary_source": "analyst", "market_moving": false, "origin": "stored", "enrichment": {"event_type": "other", "materiality": "high", "sentiment": 0.5, "relevance": 0.85, "novelty": 0.2, "urgency": "high", "priced_in": true, "analyzed_at": "2026-10-07T05:10:26Z", "geopolitical": false}}, {"id": "e38399f1f2545d7d", "market": "india", "tickers": ["HDFCBANK"], "primary_tickers": ["HDFCBANK"], "title": "HDFC Bank Shares Dip; Anup Bagchi Named New CEO", "source": "Rediff MoneyWiz", "source_domain": NaN, "url": "https://news.google.com/rss/articles/CBMipAFBVV95cUxONmIyNUxfZnhjUngzWjRpS1o3MWRkbmtGS2VwQXpVODdhWDF3ZDFkZWdQdjlqQlkyZHRiSmNNcmhOWW1NcEhiUkJkTXRSNWN5SkNUSkFLQzVsX2FjU1h0MDRERUhRMWhPWXdIQzdQQndjWDUtRGFGa2VUUkxuSmVHNW13SDRHUWdKWUxleXM3dkVIblhzbkFVTzJ2RnVZc3dVcjlFNNIBpAFBVV95cUxONmIyNUxfZnhjUngzWjRpS1o3MWRkbmtGS2VwQXpVODdhWDF3ZDFkZWdQdjlqQlkyZHRiSmNNcmhOWW1NcEhiUkJkTXRSNWN5SkNUSkFLQzVsX2FjU1h0MDRERUhRMWhPWXdIQzdQQndjWDUtRGFGa2VUUkxuSmVHNW13SDRHUWdKWUxleXM3dkVIblhzbkFVTzJ2RnVZc3dVcjlFNA?oc=5", "published_at": "2026-10-05T13:13:26Z", "first_seen_at": "2026-10-05T14:39:42Z", "status": "unverified", "status_as_of": "2026-10-07T05:07:01Z", "independent_origins": 0, "primary_ids": [], "cluster_id": "HDFCBANK-226f3fae8e003993", "scope": "company", "category": "company", "feed": "gnews:\"ICICI Bank\" share", "summary": "HDFC Bank appointed former ICICI executive Anup Bagchi as MD and CEO, ending its leadership search; investors weigh the outsider pick.", "summary_source": "analyst", "market_moving": false, "origin": "stored", "enrichment": {"event_type": "other", "materiality": "high", "sentiment": -0.2, "relevance": 0.85, "novelty": 0.2, "urgency": "medium", "priced_in": true, "analyzed_at": "2026-10-05T14:48:14Z", "geopolitical": false}}, {"id": "c923662290f41691", "market": "india", "tickers": ["TATASTEEL"], "primary_tickers": ["TATASTEEL"], "title": "Orissa High Court Quashes Criminal Case Against Tata Steel", "source": "Court Book", "source_domain": NaN, "url": "https://news.google.com/rss/articles/CBMijgFBVV95cUxQakhDYnJhcGZDWTFYVks1bHNjWks5UkthTEx0Qjl2Tm54NVR6MXgtSWhJd2lSWHdOUnpEMFpXZy1GZlZ5azdSU04yckVMdks1QWlSNlJqMWszQjRlSmNOWkVSdl9QejhNSzdCU19tTkMtTWROb2Z6YlpPYUdaRXlwUEY5VzhOZzRhOUJNUF93?oc=5", "published_at": "2026-10-05T10:56:03Z", "first_seen_at": "2026-10-05T14:27:54Z", "status": "unverified", "status_as_of": "2026-10-07T05:07:01Z", "independent_origins": 0, "primary_ids": [], "cluster_id": "TATASTEEL-c923662290f41691", "scope": "company", "category": "company", "feed": "gnews:\"Tata Steel\" share", "summary": "Orissa High Court quashed an air pollution criminal case against Tata Steel tied to Bhushan Steel's pre-insolvency conduct.", "summary_source": "analyst", "market_moving": false, "origin": "stored", "enrichment": {"event_type": "legal", "materiality": "medium", "sentiment": 0.2, "relevance": 0.55, "novelty": 0.4, "urgency": "low", "priced_in": false, "analyzed_at": "2026-10-05T14:48:14Z", "geopolitical": false}}, {"id": "ba14ee8a9b2558de", "market": "india", "tickers": ["HDFCBANK"], "primary_tickers": ["HDFCBANK"], "title": "India's HDFC Bank falls as investors weigh impact of outsider CEO pick", "source": "Reuters", "source_domain": NaN, "url": "https://news.google.com/rss/articles/CBMilwFBVV95cUxPVkZYNmhMbXM5RHNKLV82M0VUWTBsVlZ5RVdWRXFGclB4ejl5clB4ci1iRE9vbHNyRVhXSUZmc1cxRktFcUpBLUM1WGtiRFZBbG1MM3k5QlN6WmlWQXI0UjFPU0tiNEtsQmhIbDJ1VGRDRWpSMTdOX2pZTEpuWDktTUFkR3ZkSldQY09iX1g3eFFsdkZaSy1j?oc=5", "published_at": "2026-10-05T03:59:00Z", "first_seen_at": "2026-10-05T14:27:54Z", "status": "single_source", "status_as_of": "2026-10-07T05:07:01Z", "independent_origins": 1, "primary_ids": [], "cluster_id": "HDFCBANK-ba14ee8a9b2558de", "scope": "company", "category": "company", "feed": "gnews:\"HDFC Bank\" share", "summary": "HDFC Bank appointed former ICICI executive Anup Bagchi as MD and CEO, ending its leadership search; investors weigh the outsider pick.", "summary_source": "analyst", "market_moving": false, "origin": "stored", "enrichment": {"event_type": "other", "materiality": "high", "sentiment": -0.2, "relevance": 0.9, "novelty": 0.6, "urgency": "medium", "priced_in": true, "analyzed_at": "2026-10-05T14:48:14Z", "geopolitical": false}}, {"id": "86259bfed07df0b7", "market": "india", "tickers": ["RELIANCE"], "primary_tickers": ["RELIANCE"], "title": "Jio Platforms to launch $3.8 billion IPO on October 21, set to be India’s biggest listing: Report", "source": "Livemint", "source_domain": NaN, "url": "https://news.google.com/rss/articles/CBMi_AFBVV95cUxQdG96OTRyX3d0YUZYV25iMFBLcHBVN1pySVh0MjVtX1JnYzQ1SnNIdmw5SUNOdno0NVdEaWFDNkRjWjlfVVgtUEtfUGRHcENYM0FUUGFEX0xVbUhhTG1UQ2NJX0E2R0Q4Qm9hd0NNcm5DV1FhTTd2QlRuUEYxOHMtelhKLTVfSHZOMkpweGRiZ0tIOVVhTm1DLTVYV2Z4VUR5UnREbDNXOExhenZQRGFvLUpiQ04wRHE5dy1qdXdnOEt0Q1c5SmF0QVRNMkNyNk1oNzJyWlJLT2FMUG8wVnRxMHMxWkRFZkh6NksxTzBVaWpIQnVPZzdNWnBYa0HSAfwBQVVfeXFMUHRvejk0cl93dGFGWFduYjBQS3BwVTdacklYdDI1bV9SZ2M0NUpzSHZsOUlDTnZ6NDVXRGlhQzZEY1o5X1VYLVBLX1BkR3BDWDNBVFBhRF9MVW1IYUxtVENjSV9BNkdEOEJvYXdDTXJuQ1dRYU03dkJUblBGMThzLXpYSi01X0h2TjJKcHhkYmdLSDlVYU5tQy01WFdmeFVEeVJ0RGwzVzhMYXp2UERhby1KYkNOMERxOXctanV3ZzhLdENXOUphdEFUTTJDcjZNaDcyclpSS09hTFBvMFZ0cTBzMVpERWZIejZLMU8wVWlqSEJ1T2c3TVpwWGtB?oc=5", "published_at": "2026-10-05T10:53:45Z", "first_seen_at": "2026-10-05T14:27:54Z", "status": "rumour", "status_as_of": "2026-10-07T05:07:01Z", "independent_origins": 1, "primary_ids": [], "cluster_id": "RELIANCE-4aab9063ef1d7c42", "scope": "company", "category": "company", "feed": "gnews:\"Reliance Industries\" share", "summary": "Reliance's Jio Platforms reportedly plans to launch an IPO of about $3.8 billion on Oct 21, set to be India's largest listing.", "summary_source": "analyst", "market_moving": false, "origin": "stored", "enrichment": {"event_type": "ma", "materiality": "high", "sentiment": 0.3, "relevance": 0.85, "novelty": 0.5, "urgency": "medium", "priced_in": false, "analyzed_at": "2026-10-05T14:48:14Z", "geopolitical": false}}, {"id": "85d42040bc8738e8", "market": "india", "tickers": [], "primary_tickers": [], "title": "FII Selling vs DII Buying: What September 30 Flows Reveal", "source": "Kalkine India", "source_domain": NaN, "url": "https://news.google.com/rss/articles/CBMi1gFBVV95cUxQV3p4dGtrMzczdWlMN0dCci1EQ1llemdlcVNTNWxBektXZC1IQmtfd1NucjFGdTVVMTI2UjF6S1p3MUNkZ0U3YXBKcWJrelljYklNOERhei10ZUIwUkJNRHM0QVhDRjVWTGtNbHZhNWo3UFQzdGpFYlNiNHRqZ0Z4dEZSUDFIYWt2WUppVVhyZkpZVEVYRzB2Y2UwMVFMbjlnOHNZQkRzUDFSaElpb215SFlWam90NkRNOFdiRmVtZ2JFbUNSYkVjN1A5ZUlRc2dtWkhzb2pB?oc=5", "published_at": "2026-10-05T00:59:10Z", "first_seen_at": "2026-10-05T14:27:54Z", "status": null, "status_as_of": null, "independent_origins": null, "primary_ids": [], "cluster_id": null, "scope": "market", "category": "flows", "feed": "gnews:FII DII net buying selling", "summary": "Flow report for Sept 30 shows foreign investors selling while domestic institutions bought.", "summary_source": "analyst", "market_moving": false, "origin": "stored", "enrichment": {"event_type": "flows", "materiality": "medium", "sentiment": -0.2, "relevance": 0.7, "novelty": 0.3, "urgency": "medium", "priced_in": true, "analyzed_at": "2026-10-05T14:48:14Z", "geopolitical": false}}, {"id": "7f3e5007e765cc74", "market": "india", "tickers": [], "primary_tickers": [], "title": "FPIs withdraw Rs 35,860 crore from Indian equities in September amid elevated crude oil prices", "source": "Mid-Day", "source_domain": NaN, "url": "https://news.google.com/rss/articles/CBMi7gFBVV95cUxQZGdpSy0zbXVBcGlkdlY2MUgxUmlsd2Y4MDVCalRRLTFocnN6Wmx6czgtaWFIc3U1U0dOSHVUWDVXVGcxQ2FxRWZmWGI2R250clczZFV5U1NUQldPZGwzX1lYdFZZU2FaQjEzSUNVcjgweDYzdUNubDlmNm9aOUtlZTRzOEJMcUVfWkhuZXdrY3BmWFlDNDVuSDluMFA0bUJJWF9qbTFqVkNYNHlXT2gzeVRZNmowUXI3akRiT0pWSXE4ZUlrU2lOUXREN2VlYkp0VV9acXhfdFFQcDdfd2NHY3dHSGswOEFIWXVzdkJR0gHzAUFVX3lxTE13RVVYVnU2OFdGMndkQ0Q4cko4UW9Qb201a0lKOGpRMWE2UDdnSUJoakktTHVaNXNyWDFtdHlOS0NzTmhLWTVWR1pqWHZJcFNhR08xLWhLSDVMLWE2MXU1SzM2TUZzbUpSWnRjTW9vb25Oak5FcWh4RG9oTHFWdmJxcXpKWnJLRFdUYzBOZ3YyS3R0bDhHMk9WU0gxcks5dFczVU1aUExmNy1EcnFLWFBMdnpndWgxejFYZk1CaWx4NXNwcWNPYWlJUGl3bG1tRElRekxlWUhyMjVHX1E4SFJ5VDlPbXpPTHR3S0JqckVYT0o3bw?oc=5", "published_at": "2026-10-05T12:11:00Z", "first_seen_at": "2026-10-05T14:27:54Z", "status": null, "status_as_of": null, "independent_origins": null, "primary_ids": [], "cluster_id": null, "scope": "market", "category": "global", "feed": "gnews:crude oil prices India", "summary": "Foreign portfolio investors pulled about Rs 35,860 crore from Indian equities in September amid high crude.", "summary_source": "analyst", "market_moving": false, "origin": "stored", "enrichment": {"event_type": "flows", "materiality": "medium", "sentiment": -0.3, "relevance": 0.75, "novelty": 0.4, "urgency": "medium", "priced_in": true, "analyzed_at": "2026-10-05T14:48:14Z", "geopolitical": false}}, {"id": "6a9777a0704ddaf0", "market": "india", "tickers": ["LT"], "primary_tickers": ["LT"], "title": "L&T wins ₹10,000-15,000 crore power transmission orders in India, Middle East", "source": "The Economic Times", "source_domain": NaN, "url": "https://news.google.com/rss/articles/CBMi7gFBVV95cUxQMXg0aFkyTG96bldBYmNaTlROdV9LOUdOOG0zSjYwQVB1Nm1DbGlKUzZvamJZVjhmQlRKeEtyRjhlNVhlS013bTJpa3Rtc3hzYlluYkpIa0lNRDU1N0JkY2ZzVG93bTlxeVNJTUk4VVI0elpBNFZQSHJUVmdmTEsxcnIyWmlzZW8zR1ZDZUJaZ2phQTZaRUxVVFpjcmpOdFdrb1NBb3ltTy1VOHpPSUlDYmhDRmE3Z3I1cGNVOUg4VkxiN0VUSWoyRGFhVGdtZFY5LVJIa0R4MEE5dktpTmpxaHhMMndlWDFLSEFBUDlR0gHnAUFVX3lxTE5kVGZEc1ZzTHRfalBxRklrS29HOGpOaXc0TWFSSlBYdFI4b2ZwY3lXZnRSRzd0OE1pNkx4bVd6R3MxSG5XMWVWOTUyMTUwTVk4VUcxeEg2RWhlMm9xdlpmZzViUjFXMXl5Rk5sY0JRbnJWQkxldDFoeklEZndnNm1NclotX2xScU5zNHhzemtsOTktY0tWYkZNbmNHLUMtc2N4Z3JLOEdFUzdteXdUQWtKUEIxSVM1N0ZNZ3YxclJEZV9YYzE1Ul9Gb0g3N0hBT1c0ZEkwdm56aHJKUHJHTERNRWw3M1Zjaw?oc=5", "published_at": "2026-10-05T04:16:31Z", "first_seen_at": "2026-10-05T14:27:54Z", "status": "single_source", "status_as_of": "2026-10-07T05:07:01Z", "independent_origins": 1, "primary_ids": [], "cluster_id": "LT-6a9777a0704ddaf0", "scope": "company", "category": "company", "feed": "gnews:\"Larsen & Toubro\" share", "summary": "L&T won power transmission and distribution orders worth Rs 10,000-15,000 crore in India, Saudi Arabia and the UAE.", "summary_source": "analyst", "market_moving": false, "origin": "stored", "enrichment": {"event_type": "product", "materiality": "high", "sentiment": 0.5, "relevance": 0.85, "novelty": 0.6, "urgency": "medium", "priced_in": true, "analyzed_at": "2026-10-05T14:48:14Z", "geopolitical": false}}, {"id": "4cbdf14aa0151b79", "market": "india", "tickers": ["RELIANCE"], "primary_tickers": ["RELIANCE"], "title": "Jio Platforms IPO likely by Oct end at enterprise valuation of $143-146 bn", "source": "bfsi.economictimes.indiatimes.com", "source_domain": NaN, "url": "https://news.google.com/rss/articles/CBMi1AFBVV95cUxNemxkOHc3M1VVOVNHV2ZoVHJwN0E0aXRwb29TUE8tcEptMGY3ZEt1eUxaOUVlNGU2bTJyWXpiblRoQVYya1l4M1JWNHdnTWNJMXVYRHM2eERyblBqVVlVeXJmWWlWdTJicWs4akpSSHpGTlg3UG5xbjNiSE5zOUMtUWdXME53OEVtd2VDTEVYajNsVGVGZkJscXFFRVNhUGRqRjlxZUkyd0pFWldTV0FzcFAzZl9kTnhZWkNnaUNwQ2lGX2w3MjZQaHpkTFBTX0VoMVR5VQ?oc=5", "published_at": "2026-10-05T02:43:14Z", "first_seen_at": "2026-10-05T14:27:54Z", "status": "rumour", "status_as_of": "2026-10-07T05:07:01Z", "independent_origins": 1, "primary_ids": [], "cluster_id": "RELIANCE-4cbdf14aa0151b79", "scope": "company", "category": "company", "feed": "gnews:\"Reliance Industries\" share", "summary": "Jio Platforms IPO likely by end-October at an enterprise value of about $143-146 billion.", "summary_source": "analyst", "market_moving": false, "origin": "stored", "enrichment": {"event_type": "ma", "materiality": "high", "sentiment": 0.3, "relevance": 0.8, "novelty": 0.4, "urgency": "medium", "priced_in": false, "analyzed_at": "2026-10-05T14:48:14Z", "geopolitical": false}}, {"id": "321c0960d0fb1d22", "market": "india", "tickers": [], "primary_tickers": [], "title": "India seen kicking off rate hike cycle as inflation broadens, peers turn hawkish", "source": "Reuters", "source_domain": NaN, "url": "https://news.google.com/rss/articles/CBMioAFBVV95cUxQN2ZLWG5udy12czJna0lwTVJkMDRYRktHekNjMmFyTlN3OXI2SVBFNXMyc2VTTUJ5SDU3QzUzOWVVamVYTjBmc3E4UUtCMHhMM18wTVJFak8xMG1fMUJfaDlBbVAycXMtd0xjbFB5YTltMUNKQ1BjY0pnR0lab2ZteHFTaVlqOHpBSmstZVpxWjdlS1F3UG1RTHI3ZEtvNmZG?oc=5", "published_at": "2026-10-05T00:35:00Z", "first_seen_at": "2026-10-05T14:27:54Z", "status": null, "status_as_of": null, "independent_origins": null, "primary_ids": [], "cluster_id": null, "scope": "market", "category": "macro", "feed": "gnews:RBI monetary policy", "summary": "India is seen starting a rate hike cycle as inflation broadens and global peers turn hawkish.", "summary_source": "analyst", "market_moving": true, "origin": "stored", "enrichment": {"event_type": "macro", "materiality": "high", "sentiment": -0.4, "relevance": 0.85, "novelty": 0.6, "urgency": "medium", "priced_in": false, "analyzed_at": "2026-10-05T14:48:14Z", "geopolitical": false}}, {"id": "2415b4d957af178f", "market": "india", "tickers": [], "primary_tickers": [], "title": "India-US trade talks hit 'plateau', finance minister says, as tariffs narrow room for deal", "source": "Reuters", "source_domain": NaN, "url": "https://news.google.com/rss/articles/CBMiugFBVV95cUxPM1J5UEt2X3M2VGctS2FVQnMtVkJoOEwzdUZ4SENyTzNJRUZkUmJBYjBjWkVCbkVUNG9ITHRueUJONGpBUHVpZ3VaajhUNGY3SThiYTJHQVB3U2l0MXlaaGNKY1NLbWZ6TXNYV3FmNm9BVjJ0Mktod2d3SWV6TWRjUDNkanRCVHdpRU9oZFgtc2RGbUx1TUwyMU0weVM2Ry0wOGJMN0VMZGM5VGhUdDJ5bWNjYWh0WHhWQlE?oc=5", "published_at": "2026-10-05T04:36:00Z", "first_seen_at": "2026-10-05T14:27:54Z", "status": null, "status_as_of": null, "independent_origins": null, "primary_ids": [], "cluster_id": null, "scope": "market", "category": "geopolitics", "feed": "gnews:India trade tariffs", "summary": "Finance minister Sitharaman says India-US trade talks have hit a plateau, with tariffs leaving little room for further concessions.", "summary_source": "analyst", "market_moving": false, "origin": "stored", "enrichment": {"event_type": "macro", "materiality": "medium", "sentiment": -0.3, "relevance": 0.75, "novelty": 0.6, "urgency": "medium", "priced_in": false, "analyzed_at": "2026-10-05T14:48:14Z", "geopolitical": true}}, {"id": "1f1fd6f003ff4e47", "market": "india", "tickers": ["HDFCLIFE"], "primary_tickers": [], "title": "Insurance Stocks Crash: PB Fintech, Max Financial, HDFC Life Tumble After IRDAI Proposes Commission Caps", "source": "goodreturns.in", "source_domain": NaN, "url": "https://news.google.com/rss/articles/CBMi2AFBVV95cUxOZm9JQzBHcVpsMmI2S2t3NFpaZU5FbEdLSDkxYmljdnF6QVNOX0hjUVdPTlJHazlPMzd3cDRNaW9nV0NNMjFBQ19SUFNncS1Hc2hQMm9VZ2JzbndKa2V4Uzh1VnN2Yk5iN1ZaemRzR0RDWmxyeGU4bGRQbXhEaXd2VmhPRVdGYmMtOFloWVQ5Q01HR1Qtd2F1cHZzOFhtaXVCQ3lIMFVqdUdTNnpaTWRfUDBSTHBaWXFHYnJUMTgybnJXOGxiZEQtMV9UbzR6SnJjV1BsYjBZVmY?oc=5", "published_at": "2026-10-05T02:10:52Z", "first_seen_at": "2026-10-05T14:27:54Z", "status": null, "status_as_of": null, "independent_origins": null, "primary_ids": [], "cluster_id": null, "scope": "market", "category": "company", "feed": "gnews:\"HDFC Life\" share", "summary": "Insurance regulator IRDAI proposed caps on distributor commissions, pressuring insurers and intermediaries such as HDFC Life.", "summary_source": "analyst", "market_moving": true, "origin": "stored", "enrichment": {"event_type": "legal", "materiality": "high", "sentiment": -0.5, "relevance": 0.85, "novelty": 0.6, "urgency": "medium", "priced_in": true, "analyzed_at": "2026-10-05T14:48:14Z", "geopolitical": false}}, {"id": "06f9f453cec72f95", "market": "india", "tickers": ["INFY", "TCS"], "primary_tickers": [], "title": "TCS, Wipro, Infosys, HCL, Tech Mahindra shares: Accenture Q4 strong show impact on Indian IT stocks decoded by experts", "source": "Livemint Markets", "source_domain": NaN, "url": "https://www.livemint.com/market/stock-market-news/tcs-wipro-infosys-hcl-tech-mahindra-shares-accenture-q4-strong-show-impact-on-indian-it-stocks-decoded-by-experts-11791182896979.html", "published_at": "2026-10-05T07:34:52Z", "first_seen_at": "2026-10-05T14:27:54Z", "status": null, "status_as_of": null, "independent_origins": null, "primary_ids": [], "cluster_id": null, "scope": "market", "category": "general", "feed": "Livemint Markets", "summary": "Accenture's Q4 revenue and outlook beat raised hopes for battered Indian IT stocks ahead of their Q2 results.", "summary_source": "analyst", "market_moving": false, "origin": "stored", "enrichment": {"event_type": "sector", "materiality": "medium", "sentiment": 0.3, "relevance": 0.7, "novelty": 0.2, "urgency": "medium", "priced_in": true, "analyzed_at": "2026-10-05T14:48:14Z", "geopolitical": false}}, {"id": "04c1032c6aec8f19", "market": "india", "tickers": ["RELIANCE"], "primary_tickers": ["RELIANCE"], "title": "Jio Platforms IPO likely to raise $3.8 billion", "source": "The Indian EYE", "source_domain": NaN, "url": "https://news.google.com/rss/articles/CBMiigFBVV95cUxPVmtMWGsxNUJLclR3VE9qS0djd3UzMndSLTl2VXZmazFfdFVkN3BNNzdtbWtfMi1qWXFLa0hDZzdzU3FDSE5yNHZEX1JFQVNZeDlxRjFxYnUwelB5NzBFMlZWcFlBU1BZa2ktaHpLbVdtbW9kSTgwMUhBWkRDdWhBQU5HeHRjVUp3Tnc?oc=5", "published_at": "2026-10-05T12:29:58Z", "first_seen_at": "2026-10-05T14:27:54Z", "status": "rumour", "status_as_of": "2026-10-07T05:07:01Z", "independent_origins": 1, "primary_ids": [], "cluster_id": "RELIANCE-4aab9063ef1d7c42", "scope": "company", "category": "company", "feed": "gnews:\"Reliance Industries\" share", "summary": "Reliance's Jio Platforms reportedly plans to launch an IPO of about $3.8 billion on Oct 21, set to be India's largest listing.", "summary_source": "analyst", "market_moving": false, "origin": "stored", "enrichment": {"event_type": "ma", "materiality": "high", "sentiment": 0.3, "relevance": 0.8, "novelty": 0.4, "urgency": "medium", "priced_in": false, "analyzed_at": "2026-10-05T14:48:14Z", "geopolitical": false}}, {"id": "0460ef28fc31829c", "market": "india", "tickers": ["HDFCBANK"], "primary_tickers": ["HDFCBANK"], "title": "HDFC Bank: Anup Bagchi at helm lifts overhang; brokerages share outlook", "source": "IndiaIPO", "source_domain": NaN, "url": "https://news.google.com/rss/articles/CBMiqAFBVV95cUxQV0hzcGk2VTJERm1fSWhFNVhrclpjY2hwQVJvSnNFMV9uYWhLNFd4VGF4Z0hCU3ZOOHBjWFQ0enYycThkMUdKMVptWlktWmxzdXFFb3hKQXhSQzd6Vm5RWUZNbHlCRDQ0YUZReldEenRnMDY5aUZMYWFWaHVfUEU0eGdpYzZaak9zSUpleWo5U1B6WE5pWFVvU1JtQVcxN0lnYnR5aHBIODY?oc=5", "published_at": "2026-10-05T06:46:43Z", "first_seen_at": "2026-10-05T14:27:54Z", "status": "unverified", "status_as_of": "2026-10-07T05:07:01Z", "independent_origins": 0, "primary_ids": [], "cluster_id": "HDFCBANK-cf75cbaa061317c3", "scope": "company", "category": "company", "feed": "gnews:\"HDFC Bank\" share", "summary": "Brokerages stay bullish on HDFC Bank, saying the Bagchi appointment removes a leadership overhang and supports a valuation re-rating.", "summary_source": "analyst", "market_moving": false, "origin": "stored", "enrichment": {"event_type": "analyst", "materiality": "high", "sentiment": 0.4, "relevance": 0.85, "novelty": 0.3, "urgency": "medium", "priced_in": true, "analyzed_at": "2026-10-05T14:48:14Z", "geopolitical": false}}, {"id": "nse-ann-7790412", "market": "india", "tickers": ["RELIANCE"], "primary_tickers": ["RELIANCE"], "title": "Reliance Industries: retail subsidiary allots shares to investors (exchange filing)", "source": "NSE announcement", "source_domain": "nseindia.com", "url": "https://nsearchives.nseindia.com/example-2.pdf", "published_at": "2026-10-05T09:05:00Z", "first_seen_at": "2026-10-05T09:20:00Z", "status": "confirmed_primary", "status_as_of": "2026-10-05T09:30:00Z", "independent_origins": 1, "primary_ids": ["nse-ann-7790412"], "cluster_id": "reliance-20261005-allotment", "scope": "company", "category": null, "feed": null, "summary": null, "summary_source": "none", "market_moving": false, "origin": "invented", "enrichment": {"event_type": "ma", "materiality": "high", "sentiment": 0.4, "relevance": 0.95, "novelty": 0.7, "urgency": "medium", "priced_in": false, "analyzed_at": "2026-10-06T02:00:00Z", "geopolitical": null}}], "calendar": [{"market": "india", "date": "2026-10-07", "type": "rbi_policy", "name": "RBI policy decision", "ticker": null, "timing": null, "reaction_sessions": null, "major": true, "widens": "market", "provisional": false, "release": null, "source": "config/events.yaml", "event_id": null}, {"market": "india", "date": "2026-10-08", "type": "earnings", "name": "Tata Consultancy Services results", "ticker": "TCS", "timing": null, "reaction_sessions": ["2026-10-08", "2026-10-09"], "major": false, "widens": "company", "provisional": false, "release": null, "source": "events (yfinance)", "event_id": "TCS-earnings-2026-10-08"}, {"market": "india", "date": "2026-10-13", "type": "weekly_expiry", "name": "Nifty weekly options expiry (Tuesday)", "ticker": null, "timing": null, "reaction_sessions": null, "major": false, "widens": null, "provisional": false, "release": null, "source": "config/events.yaml", "event_id": null}], "calendar_days": 7, "companies": [{"market": "india", "ticker": "HDFCBANK", "name": "HDFC Bank", "sector": "Banks", "state": "active", "open_trades": 4}, {"market": "india", "ticker": "INDIGO", "name": "InterGlobe Aviation (IndiGo)", "sector": "Transport", "state": "inactive", "open_trades": 0}, {"market": "india", "ticker": "MARUTI", "name": "Maruti Suzuki", "sector": "Autos", "state": "active", "open_trades": 0}, {"market": "india", "ticker": "RELIANCE", "name": "Reliance Industries", "sector": "Energy", "state": "active", "open_trades": 10}]}, "us": {"market": "us", "name": "US (NYSE/Nasdaq)", "currency": "USD", "as_of": "2026-10-06", "cutoff": "2026-10-07T12:00:00Z", "built_at": "2026-10-07T11:58:00Z", "status": {"market": "us", "name": "US (NYSE/Nasdaq)", "as_of": "2026-10-06", "currency": "USD", "session": {"local_time": "2026-10-07T08:00-04:00", "trading_day": true, "session_date": "2026-10-07", "previous_session": "2026-10-06", "calendar_covered": true, "session_open_utc": "2026-10-07T13:30:00+00:00", "session_close_utc": "2026-10-07T20:00:00+00:00", "in_session": false, "late_run": false}, "benchmark": {"symbol": "SPY", "name": "S&P 500 ETF", "close": 779.09, "close_date": "2026-10-06", "change_pct": 0.55, "change_5d_pct": 1.95}, "vol_index": {"symbol": "VIX", "name": "VIX", "close": 15.01, "close_date": "2026-10-06", "change_pct": -3.29, "change_5d_pct": -6.42}, "regime": "TRENDING", "runs": {"pre_open": {"at": "2026-10-07T11:45:00Z", "ok": true}, "intraday": [], "post_close": {"at": null, "ok": null, "next_at": "2026-10-07T22:15:00Z"}, "news": {"at": "2026-10-07T08:47:00Z", "ok": true, "new_items": 52}}, "freshness": {"state": "fresh", "built_at": "2026-10-07T11:58:00Z", "age_minutes": 2}, "paper_label": "Paper only - no proven edge yet"}, "horizons": [1, 2, 3, 4, 5], "default_horizon": 1, "go_live": {"proven": false, "months_forward": 0.2, "trades_needed": 290, "beats_best_baseline": false}, "window": {"days": 3, "from": "2026-10-04T12:00:00Z", "to": "2026-10-07T12:00:00Z", "max_items": 50, "stored_in_window": 29, "older_hidden": 2}, "news": [{"id": "f319957f99648a0a", "market": "us", "tickers": ["GOOGL"], "primary_tickers": [], "title": "GOOG, GOOGL Stock Notice: Alphabet Inc. Stock Plummeted 4% after AI Issues Disclosed - Securities Fraud Class Action Filed", "source": "PR Newswire", "source_domain": "prnewswire.com", "url": "https://news.google.com/rss/articles/CBMigwJBVV95cUxNQVh6eTFtWFAyQ0R3MGNQbmtNNGZnU2c0WERzM3QzaE5iX2FXQVlGOTBPWjJjRkMtVWQ0VkFjV1R4RHY0U3lJV1FxcnkwRDZHXzhwMkxtTkZkZkZHUkE2YlIwRnJRWTRmQWpCMWNVZlg3bmJ4N3Y5U1YtS1FwSEJ6RHJTS25CZFprQmdESGhBb1FFZHlrUF9NZXdPSzhfck5wZWt2d1hrQ2ZhUkowN2RIWmd0QUlRc1JVVGxaWGF3ekxkLThIbjBIOUZGOWFJaWlUM3I5SFRUcHNIaFFEd190dlpTVVJoU21pbktDUDlrRzQ5TFBsTXJJdmpYR29VMVRCQy1r?oc=5", "published_at": "2026-10-06T09:36:00Z", "first_seen_at": "2026-10-07T04:32:15Z", "status": null, "status_as_of": null, "independent_origins": null, "primary_ids": [], "cluster_id": null, "scope": "market", "category": "company", "feed": "gnews:\"Alphabet\" stock", "summary": null, "summary_source": "none", "market_moving": true, "origin": "stored", "enrichment": {"event_type": "legal", "materiality": "high", "sentiment": -0.4, "relevance": 0.65, "novelty": 0.7, "urgency": "high", "priced_in": false, "analyzed_at": "2026-10-07T04:42:07Z", "geopolitical": false}}, {"id": "dd984ab092c2d64d", "market": "us", "tickers": ["NVDA"], "primary_tickers": ["NVDA"], "title": "Nvidia share price jumps nearly 30 per cent in 2026 as world's most valuable company heads for USD 6 trill", "source": "The Economic Times", "source_domain": "m.economictimes.com", "url": "https://news.google.com/rss/articles/CBMiqAJBVV95cUxQcm4wcTRxOTRfa2Q3UGVZLU84RE91QW1EY3lkNmtSelJBNmNoVHk3SVZRTHc1YkpnSGNjeFRZQmZZTHczNnp2ZE03MFFkYmN6REZGMnhzOFdVdE9hZktQM3VrMzJZSjRFS0phaTBBYm1sSWlNcGZidXRHb3BqSldNRTV6Vzl1WnR0RG1QRF9ZY3pkV1lqTXBQV3hDNngybGxVVVpGNUFhNHI2Rm53NV9wb2ZpclhTZ0hSZVZ0YkxXTnFZLW00dlA5VU5yZ2lpVnVsdThwamZ4WUdnSm9JRGFLaDdxdjNtZ2pYNUZFZUltLWU5WHRhM29QS1dJajRFV0FsNUc0aVdSUy1RN2ZQT2pkandjSEd3Z191M3liOHZKTHprbGs3UVZZNdIBqAJBVV95cUxQcm4wcTRxOTRfa2Q3UGVZLU84RE91QW1EY3lkNmtSelJBNmNoVHk3SVZRTHc1YkpnSGNjeFRZQmZZTHczNnp2ZE03MFFkYmN6REZGMnhzOFdVdE9hZktQM3VrMzJZSjRFS0phaTBBYm1sSWlNcGZidXRHb3BqSldNRTV6Vzl1WnR0RG1QRF9ZY3pkV1lqTXBQV3hDNngybGxVVVpGNUFhNHI2Rm53NV9wb2ZpclhTZ0hSZVZ0YkxXTnFZLW00dlA5VU5yZ2lpVnVsdThwamZ4WUdnSm9JRGFLaDdxdjNtZ2pYNUZFZUltLWU5WHRhM29QS1dJajRFV0FsNUc0aVdSUy1RN2ZQT2pkandjSEd3Z191M3liOHZKTHprbGs3UVZZNQ?oc=5", "published_at": "2026-10-06T23:43:00Z", "first_seen_at": "2026-10-07T04:32:15Z", "status": "rumour", "status_as_of": "2026-10-07T04:40:07Z", "independent_origins": 1, "primary_ids": [], "cluster_id": "NVDA-dd984ab092c2d64d", "scope": "company", "category": "company", "feed": "gnews:\"Nvidia\" stock", "summary": "Nvidia share price rose to USD 240.25, up by 1.01 points or 0.42 per cent. Nvidia, the world's most valuable company and a bellwether for the AI trade, ticked up 0.14 per cent, rising closer to a market value of $6 trillion.", "summary_source": "article", "market_moving": false, "origin": "stored", "enrichment": {"event_type": "other", "materiality": "low", "sentiment": 0.25, "relevance": 0.55, "novelty": 0.7, "urgency": "low", "priced_in": false, "analyzed_at": "2026-10-07T04:42:07Z", "geopolitical": false}}, {"id": "cf2212081cb4395a", "market": "us", "tickers": ["META", "NVDA"], "primary_tickers": [], "title": "Here are Tuesday's biggest analyst calls of the day: Nvidia, AMD, Procter & Gamble, Meta & more", "source": "CNBC", "source_domain": "cnbc.com", "url": "https://news.google.com/rss/articles/CBMihAFBVV95cUxPWjVIZ0pjYkNPdXl1VFJ1TmQ0U2RhWUI1WXdnSG9OQXA0U2tHOXFrc183SUNDV0dSdjVFSEg2ZUdnYzBONm56U2JPeTdtTW54clNfc1BvWGJsQzd2NjNHRG5FWnNHRTVYRFNyNm1PbGZra09sNV9tMjZfWWQyR3B3TTNQQmk?oc=5", "published_at": "2026-10-06T12:27:47Z", "first_seen_at": "2026-10-07T04:32:15Z", "status": null, "status_as_of": null, "independent_origins": null, "primary_ids": [], "cluster_id": null, "scope": "market", "category": "markets", "feed": "gnews:stock market today site:cnbc.com", "summary": null, "summary_source": "none", "market_moving": false, "origin": "stored", "enrichment": {"event_type": "analyst", "materiality": "medium", "sentiment": 0.0, "relevance": 0.4, "novelty": 0.45, "urgency": "medium", "priced_in": false, "analyzed_at": "2026-10-07T04:42:07Z", "geopolitical": false}}, {"id": "af66503d848eecf0", "market": "us", "tickers": [], "primary_tickers": [], "title": "House China committee chair urges Fed to review Hong Kong’s access to dollar lifeline", "source": "CNBC", "source_domain": "cnbc.com", "url": "https://news.google.com/rss/articles/CBMikgFBVV95cUxQaFRvc2dRdk1HclpNYldISVNWZ2dXSXdjcmN4RDRoX3hhbXpDNnYwMFEycGNLek8yOThYbnJHQmluT09Hd0toZDhSS2VQNTdKRWlNM1JRUDFNZkxqQmhUVkVOUW5JMFRydm81M1lhbTVDZk5IOGt2V2pnVlhlM0phMHRQVXBFTW5DdjlDVGVTMmdpd9IBlwFBVV95cUxNUXpDYlltYW91cm5ieWhHZGFua2htcHRaYm5jTHI2QnlCQUNPbVA1M2NqcmxSMzR0eWJPclJORlNkSE5kZVlrZlRSRWI5cjNrNC1ZMkxiNTh5NU1lWk9JMG9Ud2dnUnRJM2hIdDA5aHI4dDc0cTVpUUJDNkRZeW0zMllTczNaTld6ZkFqNll2OUk1OFJRQVNN?oc=5", "published_at": "2026-10-06T07:00:01Z", "first_seen_at": "2026-10-07T04:32:15Z", "status": null, "status_as_of": null, "independent_origins": null, "primary_ids": [], "cluster_id": null, "scope": "market", "category": "markets", "feed": "gnews:stock market today site:cnbc.com", "summary": null, "summary_source": "none", "market_moving": false, "origin": "stored", "enrichment": {"event_type": "macro", "materiality": "medium", "sentiment": 0.0, "relevance": 0.45, "novelty": 0.7, "urgency": "low", "priced_in": false, "analyzed_at": "2026-10-07T04:42:07Z", "geopolitical": true}}, {"id": "adddd503699f3bf5", "market": "us", "tickers": ["GOOGL"], "primary_tickers": ["GOOGL"], "title": "Alphabet stock consolidates after Poland UOKiK fine risk emerges", "source": "Traders Union", "source_domain": "tradersunion.com", "url": "https://news.google.com/rss/articles/CBMijgFBVV95cUxNckdkcVhNWmxacWkwOFJKdGgxWUhPTWlvbm1OQUZJY3l0NU81VElrekhNY3BnZnFySmI2SzJwd3BlTV8xakdlbmlmci1Bei0tdF9rZUtTb1dVRnB3V2RKa3JKSm9sYXJ1N3lIWGp5WV9PMThVcE53dWlDdm5IM29xeUJNUVlZSDU0UzhYcE9B?oc=5", "published_at": "2026-10-06T14:04:26Z", "first_seen_at": "2026-10-07T04:32:15Z", "status": "unverified", "status_as_of": "2026-10-07T04:40:07Z", "independent_origins": 0, "primary_ids": [], "cluster_id": "GOOGL-adddd503699f3bf5", "scope": "company", "category": "company", "feed": "gnews:\"Alphabet\" stock", "summary": null, "summary_source": "none", "market_moving": false, "origin": "stored", "enrichment": {"event_type": "legal", "materiality": "high", "sentiment": -0.4, "relevance": 0.85, "novelty": 0.7, "urgency": "high", "priced_in": false, "analyzed_at": "2026-10-07T04:42:07Z", "geopolitical": false}}, {"id": "91ff4794ac29d673", "market": "us", "tickers": ["CAT"], "primary_tickers": ["CAT"], "title": "Caterpillar: Upgrading To Buy Ahead Of Earnings, A Clear Line In The Sand (NYSE:CAT)", "source": "Seeking Alpha", "source_domain": "seekingalpha.com", "url": "https://news.google.com/rss/articles/CBMisgFBVV95cUxOOWRVSlNndXpXSVBOaFk1UzN2emF1aFBGVV9qQW0tcEdRYkdIUk5ROXVpSEUxelBxOGVEZEZTSlhZZ2treG1BMFhpeXNvekVYRW9FYnV4a1BiQlI0NTBuZEc1YUV1MzFEcmhjWVBqVXV6RjdzQnVVZUlTc1ZoU2E1TDloeGVwcjlLaF9NcHBoYVFaVzBGVzBKZ3pES3NaLVNnaURMbnNYSlZhM3dlUVIyNWhn?oc=5", "published_at": "2026-10-06T15:04:22Z", "first_seen_at": "2026-10-07T04:32:15Z", "status": "unverified", "status_as_of": "2026-10-07T04:40:07Z", "independent_origins": 0, "primary_ids": [], "cluster_id": "CAT-91ff4794ac29d673", "scope": "company", "category": "company", "feed": "gnews:\"Caterpillar\" stock", "summary": null, "summary_source": "none", "market_moving": false, "origin": "stored", "enrichment": {"event_type": "earnings", "materiality": "medium", "sentiment": 0.25, "relevance": 0.7, "novelty": 0.4, "urgency": "medium", "priced_in": false, "analyzed_at": "2026-10-07T04:42:07Z", "geopolitical": false}}, {"id": "86e61ae11223b4d0", "market": "us", "tickers": ["BAC"], "primary_tickers": ["BAC"], "title": "Bank of America launches new tools and webinars to help small businesses fight rising fraud losses.", "source": "Pluang", "source_domain": "pluang.com", "url": "https://news.google.com/rss/articles/CBMiqwFBVV95cUxQekRMYlp5ZnpHOWhGYWluVENYM29PUVdVaUY0aGhIN3RGcjZLV0Q0eUYzeW5jTWFGMUJkXzY1QnZRVEF3T0dyNHZOekFVWV9Pdkk3bkgtUnZkVWJzYVBNN1J1MnRtTXVIUE4xdWRCc2d3Q2cyNnNCYUpoeFE3T0h5YzczeEhseEhXVnM0WkUzamFmYzRFUmwtZ1lOaU5hYTBtY05SaF9ONFNxLXc?oc=5", "published_at": "2026-10-06T13:23:18Z", "first_seen_at": "2026-10-07T04:32:15Z", "status": "promotional", "status_as_of": "2026-10-07T04:40:07Z", "independent_origins": 0, "primary_ids": [], "cluster_id": "BAC-86e61ae11223b4d0", "scope": "company", "category": "company", "feed": "gnews:\"Bank of America\" stock", "summary": null, "summary_source": "none", "market_moving": false, "origin": "stored", "enrichment": {"event_type": "product", "materiality": "medium", "sentiment": 0.0, "relevance": 0.7, "novelty": 0.7, "urgency": "medium", "priced_in": false, "analyzed_at": "2026-10-07T04:42:07Z", "geopolitical": false}}, {"id": "7e02963c5575112d", "market": "us", "tickers": ["AAPL"], "primary_tickers": ["AAPL"], "title": "Morgan Stanley cuts target for Apple stock from USD 360 to USD 355", "source": "AD HOC NEWS", "source_domain": "ad-hoc-news.de", "url": "https://news.google.com/rss/articles/CBMiyAFBVV95cUxQZ2JqanhUa0s1dlN2N01hTHpwSWNOakRxT3N4X2JqQUpCUW41NnBsRnZEVUJhNXI3QUdYYnEwY2VpdEdpUGM4MUxVZFRxeFRpa08xekpNTmo2Q21MRjNWZEpZbmRkVDlWaHhmcEdBQUF6czcwSEZUUHdkRmpXdHIwVjNWUVRzejlqNzl5SmpmWlhVZnRXRDY1bTE2ZkNSWUp4ZHNkT2JHSnRTX19ZMHItM3NEaGp4S0lMMmpUSzh2aEp1YkNJNUdRbA?oc=5", "published_at": "2026-10-06T08:55:18Z", "first_seen_at": "2026-10-07T04:32:15Z", "status": "promotional", "status_as_of": "2026-10-07T04:40:07Z", "independent_origins": 0, "primary_ids": [], "cluster_id": "AAPL-9d6f7a0f6ec9c0c5", "scope": "company", "category": "company", "feed": "gnews:\"Apple\" stock", "summary": null, "summary_source": "none", "market_moving": false, "origin": "stored", "enrichment": {"event_type": "analyst", "materiality": "medium", "sentiment": -0.25, "relevance": 0.7, "novelty": 0.55, "urgency": "medium", "priced_in": false, "analyzed_at": "2026-10-07T04:42:07Z", "geopolitical": false}}, {"id": "7680e31c82c02f56", "market": "us", "tickers": ["GM"], "primary_tickers": ["GM"], "title": "General Motors' Q3 US Sales Decline 6% Y/Y on Weak EV Demand", "source": "Zacks Investment Research", "source_domain": "zacks.com", "url": "https://news.google.com/rss/articles/CBMinwFBVV95cUxOX0pSNFozcnB1b18xdjhuZDExb0p5bFN2MlJDU1BBanduaXJhdlRPcUdmMnlXaHJNMzc2dldDRkNGSUhVbVlUd29OR2pZX0hJcGlhaWswUjFEMC1jamNLRjJKODdsQ092NC1UYktVTEYxMDVCeW1OZUlVWXBaV1BvbHR0Wm50WGVkZ1J3UFdnY0Fac2tlUlEyUU95RXI0d1E?oc=5", "published_at": "2026-10-06T11:30:36Z", "first_seen_at": "2026-10-07T04:32:15Z", "status": "promotional", "status_as_of": "2026-10-07T04:40:07Z", "independent_origins": 0, "primary_ids": [], "cluster_id": "GM-9f5e926bd79c48e6", "scope": "company", "category": "company", "feed": "gnews:\"General Motors\" stock", "summary": null, "summary_source": "none", "market_moving": true, "origin": "stored", "enrichment": {"event_type": "earnings", "materiality": "high", "sentiment": -0.5, "relevance": 0.85, "novelty": 0.2, "urgency": "high", "priced_in": true, "analyzed_at": "2026-10-07T04:42:07Z", "geopolitical": false}}, {"id": "6e481c3cf27ed9aa", "market": "us", "tickers": ["LLY"], "primary_tickers": [], "title": "Roundup: Shionogi Inc. Acquires IntraBio, Gate Bioscience extends Collaboration with Eli Lilly, Alector Enters Global License Agreement with Genentech", "source": "Pharmaceutical Executive", "source_domain": "pharmexec.com", "url": "https://news.google.com/rss/articles/CBMi0AFBVV95cUxOU2JOSXBzdHR3ZUU5YWNDakhXQjE2Vl91enJQRUk5d2xydFM0WUdKQ3gxczlqcDRuSWM4YURuYXR3UlRrUjVQbDZuRFMzbU4tMmtjM0F5T2RlVTlMSGpuUmJEWEpYbDdIMUxmMGNUdlVzWmRWYVlzTFQxanJTUUs2NnhqTnhnSU5HRkZPMXhiZXhlRHBOOExvNm40R2VvSE1MMTRaaGZCWE55cWxEdTVTRmFFZjN1MVhURERsYkItcHRPVGRGZ1RndmlKNGNyOVdV?oc=5", "published_at": "2026-10-06T13:54:27Z", "first_seen_at": "2026-10-07T04:32:15Z", "status": null, "status_as_of": null, "independent_origins": null, "primary_ids": [], "cluster_id": null, "scope": "market", "category": "company", "feed": "gnews:\"Eli Lilly\" stock", "summary": null, "summary_source": "none", "market_moving": true, "origin": "stored", "enrichment": {"event_type": "ma", "materiality": "high", "sentiment": 0.0, "relevance": 0.65, "novelty": 0.7, "urgency": "high", "priced_in": false, "analyzed_at": "2026-10-07T04:42:07Z", "geopolitical": false}}, {"id": "6cd9c6370602649f", "market": "us", "tickers": ["ALL"], "primary_tickers": ["ALL"], "title": "Barclays Adjusts Allstate Price Target to $221 From $226, Maintains Underweight Rating", "source": "marketscreener.com", "source_domain": "marketscreener.com", "url": "https://news.google.com/rss/articles/CBMi0gFBVV95cUxQYS0zYktzaDlkTDFCd3VObGUweXE2QmpHUV8zdkRmeU1IdHRNcVp2RnVKUjdxR0tJNlB5RkhQX05mTFg2RURzSEdpemtYMmQ1SmhMYjZBZ09ESk9mNHhYZjJVdFpEMWZpNldNajNja2NkV0p4elAyU3pIYkRYcE5HcnY3Y0hVc21yc29LVmdwTUNzMGl4WWlhOXJSYnBSR0VrQ0t5dDhua3lENUtMRTkzdEtzelRWUlQ2UVBrbGFXbUl4TC1yVVpTbUVEeWNoV0xZN1E?oc=5", "published_at": "2026-10-06T11:56:32Z", "first_seen_at": "2026-10-07T04:32:15Z", "status": "unverified", "status_as_of": "2026-10-07T04:40:07Z", "independent_origins": 0, "primary_ids": [], "cluster_id": "ALL-6cd9c6370602649f", "scope": "company", "category": "company", "feed": "gnews:\"Allstate\" stock", "summary": null, "summary_source": "none", "market_moving": false, "origin": "stored", "enrichment": {"event_type": "analyst", "materiality": "medium", "sentiment": 0.0, "relevance": 0.7, "novelty": 0.55, "urgency": "medium", "priced_in": false, "analyzed_at": "2026-10-07T04:42:07Z", "geopolitical": false}}, {"id": "6405e269ded661ea", "market": "us", "tickers": ["META"], "primary_tickers": ["META"], "title": "Meta Threatened With Major Fines In Europe Over 'Addictive' Features", "source": "Investor's Business Daily", "source_domain": "investors.com", "url": "https://news.google.com/rss/articles/CBMigwFBVV95cUxOeGc5Q0ExX2swcWR0WTBPUlpNSzF4V3EyYVV4TG5ycFlrWDNqeFZXbm5xQTB3dGFLNWUzd2ljVDFGU3RLVEZSSGNobUg4ZU9sMkpmMTVEcEtVNXJNRzRhYmwzamVlbFJYTDlJWUtCTVk4MFZ6NjlqampabEh0NnZqclpuWQ?oc=5", "published_at": "2026-10-07T02:31:43Z", "first_seen_at": "2026-10-07T04:32:15Z", "status": "single_source", "status_as_of": "2026-10-07T04:40:07Z", "independent_origins": 1, "primary_ids": [], "cluster_id": "META-6405e269ded661ea", "scope": "company", "category": "company", "feed": "gnews:\"Meta Platforms\" stock", "summary": "Instagram and Facebook use \"addictive\" design features that put parent company Meta Platforms (META) in breach of European Union laws, regulators said Friday. Despite the report, Meta stock added on to a rally from Thursday in early morning trades.", "summary_source": "article", "market_moving": false, "origin": "stored", "enrichment": {"event_type": "legal", "materiality": "high", "sentiment": -0.4, "relevance": 0.85, "novelty": 0.8, "urgency": "high", "priced_in": false, "analyzed_at": "2026-10-07T04:42:07Z", "geopolitical": false}}, {"id": "60c328c71638471f", "market": "us", "tickers": ["NVDA"], "primary_tickers": ["NVDA"], "title": "SPCX Stock Slips After-Hours As SpaceX Reportedly Seeks $40B For Nvidia Chips", "source": "Yahoo Finance", "source_domain": "finance.yahoo.com", "url": "https://news.google.com/rss/articles/CBMimgFBVV95cUxQVXBBWFdGdERkRHZ5WHRaU3I0S3NYaWVzejBJYWtaU1Z4UjJiVl8tdm05cU5tSzVLUzRETGtVZ2oxbHdVa3l6QmtrVG1ZczMycmZhc0NUV1pMbnQ4WVBTTXk2NlExVjRLQzhTZGFheHZ5YzRBck4xT3djVTRoenhOaGoyOFE0WWlYbUU0djI3VEoxYXdjVXBDMWtR?oc=5", "published_at": "2026-10-06T23:48:23Z", "first_seen_at": "2026-10-07T04:32:15Z", "status": "single_source", "status_as_of": "2026-10-07T04:40:07Z", "independent_origins": 1, "primary_ids": [], "cluster_id": "NVDA-ab389b7d388dcec8", "scope": "company", "category": "company", "feed": "gnews:\"Nvidia\" stock", "summary": null, "summary_source": "none", "market_moving": false, "origin": "stored", "enrichment": {"event_type": "product", "materiality": "high", "sentiment": 0.0, "relevance": 0.85, "novelty": 0.7, "urgency": "high", "priced_in": false, "analyzed_at": "2026-10-07T04:42:07Z", "geopolitical": false}}, {"id": "56d59c9c55aee6f9", "market": "us", "tickers": [], "primary_tickers": [], "title": "Wti Crude Oil Prices Weaken—Will Fed Minutes Deepen the Decline?", "source": "Action Forex", "source_domain": "actionforex.com", "url": "https://news.google.com/rss/articles/CBMiywFBVV95cUxQcmcwRmJtbWJFcVBOVVJsXzBWME9rWEN3SmMwV1FlMVlvcUt1UVdaOFBERFYxZ1FSZWpOek0zZzdnMGUwVXhOZHZlRklFZnRJUWJucUx2UHk0cDRDTmYwUHlRbjczSUt6T01oSjNNVERrOU5CLURiZHFIUTJPLUtseVdyVXVOZU1LNk5pRDltMWtlNnBSRTZDdkwwNzNWWEVwVXFuSGtBR1djdE54THRsc0hMN1BwQmIyTnpRNGNSZlhySjJWY0FJcVVGRQ?oc=5", "published_at": "2026-10-07T02:43:38Z", "first_seen_at": "2026-10-07T04:32:15Z", "status": null, "status_as_of": null, "independent_origins": null, "primary_ids": [], "cluster_id": null, "scope": "market", "category": "global", "feed": "gnews:oil prices", "summary": null, "summary_source": "none", "market_moving": false, "origin": "stored", "enrichment": {"event_type": "macro", "materiality": "medium", "sentiment": -0.3, "relevance": 0.45, "novelty": 0.7, "urgency": "medium", "priced_in": false, "analyzed_at": "2026-10-07T04:42:07Z", "geopolitical": false}}, {"id": "5611658ef88c2c7d", "market": "us", "tickers": ["TSLA"], "primary_tickers": ["TSLA"], "title": "TSMC Partnership Talks Fuel Tesla (TSLA) and SpaceX Stock Rally Ahead of Earnings", "source": "Blockonomi", "source_domain": "blockonomi.com", "url": "https://news.google.com/rss/articles/CBMipgFBVV95cUxPVlJhME1mRnd4WlBTaDBOaDIyRkZiTG5ibVAzcFNxdXB4dVAwNzZCakg5cjJUWnRMb0F1M091ZFZTTDZBOHZQTW1LbmtuRlZQQUdtZ29IYmppLUdfQ18tbFR5NHJ6aThXZzBnMlZxYWlabU5UQTE4a1ZOQ29JQ0FoMGtvQmhPZ1k1dWZ1YW1yWWx6dU8zck0ySFJ6TXdKYmNiRThBQWRR?oc=5", "published_at": "2026-10-06T13:47:31Z", "first_seen_at": "2026-10-07T04:32:15Z", "status": "rumour", "status_as_of": "2026-10-07T04:40:07Z", "independent_origins": 0, "primary_ids": [], "cluster_id": "TSLA-5611658ef88c2c7d", "scope": "company", "category": "company", "feed": "gnews:\"Tesla\" stock", "summary": null, "summary_source": "none", "market_moving": false, "origin": "stored", "enrichment": {"event_type": "earnings", "materiality": "medium", "sentiment": 0.25, "relevance": 0.7, "novelty": 0.4, "urgency": "medium", "priced_in": false, "analyzed_at": "2026-10-07T04:42:07Z", "geopolitical": false}}, {"id": "4d905f660c294981", "market": "us", "tickers": [], "primary_tickers": [], "title": "Oil Prices and Inflation: Why Diesel Costs Still Matter", "source": "The Acquirer's Multiple", "source_domain": "acquirersmultiple.com", "url": "https://news.google.com/rss/articles/CBMimAFBVV95cUxPQlBTOUdVTmtXR3FfVzNtTThKVVFXOG5lcHh6a2J4U3lYMnpzeXQ2V0ZHT0s5N3hCMUUtS2UxSnhBNXlNWnlVTTdDcm9vTmRTYUpNRkZ1blFIcDhsSnFOcHNPTHZTUHRDRjRtQVJ5MXlvUEJfeFJJLXlja0hpSUpwREo5M1M0Q2Vwb2Nrb2FZNkhjdHBIT3NRQQ?oc=5", "published_at": "2026-10-07T01:05:57Z", "first_seen_at": "2026-10-07T04:32:15Z", "status": null, "status_as_of": null, "independent_origins": null, "primary_ids": [], "cluster_id": null, "scope": "market", "category": "global", "feed": "gnews:oil prices", "summary": null, "summary_source": "none", "market_moving": false, "origin": "stored", "enrichment": {"event_type": "macro", "materiality": "medium", "sentiment": 0.0, "relevance": 0.45, "novelty": 0.7, "urgency": "medium", "priced_in": false, "analyzed_at": "2026-10-07T04:42:07Z", "geopolitical": false}}, {"id": "4bab66a3fe74b246", "market": "us", "tickers": ["GM"], "primary_tickers": ["GM"], "title": "General Motors reports 670,974 U.S. vehicle sales in Q3", "source": "AD HOC NEWS", "source_domain": "ad-hoc-news.de", "url": "https://news.google.com/rss/articles/CBMiswFBVV95cUxPUUpOSEExTU9FX242X3hFNUxCS1Qwb0ZXRVlha04wZlptLVJzZGljbU5TSUxPRjVzUHlGRk5MWHo1Qm9aYVBKMjltbndJVUFXMlhJTWNCQ3lSWmx4X0JSdE5EMGtrNHV0X2RFcDB6M0h2cm1xT0VGMndFR1dCdkNabGlLSHQ0UHR2X1lFMGRlWXdvVE1GVWVYVHAyLVMzeGJjdWRrbi1PM2duUG9ZUTZHcFVQZw?oc=5", "published_at": "2026-10-06T18:25:29Z", "first_seen_at": "2026-10-07T04:32:15Z", "status": "promotional", "status_as_of": "2026-10-07T04:40:07Z", "independent_origins": 0, "primary_ids": [], "cluster_id": "GM-4bab66a3fe74b246", "scope": "company", "category": "company", "feed": "gnews:\"General Motors\" stock", "summary": null, "summary_source": "none", "market_moving": true, "origin": "stored", "enrichment": {"event_type": "earnings", "materiality": "high", "sentiment": 0.0, "relevance": 0.85, "novelty": 0.7, "urgency": "high", "priced_in": false, "analyzed_at": "2026-10-07T04:42:07Z", "geopolitical": false}}, {"id": "453445f0fc8ca915", "market": "us", "tickers": ["BAC"], "primary_tickers": ["BAC"], "title": "Bank of America: As Q3 Earnings Near, I'm Cautious About Evolving Risks (NYSE:BAC)", "source": "Seeking Alpha", "source_domain": "seekingalpha.com", "url": "https://news.google.com/rss/articles/CBMiuAFBVV95cUxOZ09lLUFqRUVTa1N6aDVQSHlqbXowS05VbnBjd21icnZUVEU2RUpCSjdTVzQ4RkpVZkYtMG5OVjFlZVU3ZnI1OFREazBwejY1MFF1ZmJObUg1MTg5eTVXT1BNQjJyaDBhWWoyak0wLUo2RWpNSkV6dFhuMndDdVhsUFR6RkhzeUJMY19yMnFIVFhjS1AwcW5TcVdpRzU5cC1NeXFQZFdhZG9RaGJaTURPcGI1dDV0S2gt?oc=5", "published_at": "2026-10-06T12:00:18Z", "first_seen_at": "2026-10-07T04:32:15Z", "status": "unverified", "status_as_of": "2026-10-07T04:40:07Z", "independent_origins": 0, "primary_ids": [], "cluster_id": "BAC-453445f0fc8ca915", "scope": "company", "category": "company", "feed": "gnews:\"Bank of America\" stock", "summary": null, "summary_source": "none", "market_moving": false, "origin": "stored", "enrichment": {"event_type": "earnings", "materiality": "medium", "sentiment": 0.0, "relevance": 0.7, "novelty": 0.7, "urgency": "medium", "priced_in": false, "analyzed_at": "2026-10-07T04:42:07Z", "geopolitical": false}}, {"id": "391e11d583bb9b08", "market": "us", "tickers": ["AAPL"], "primary_tickers": ["AAPL"], "title": "UBS reiterates Apple stock neutral on slowing App Store growth By Investing.com", "source": "Investing.com Nigeria", "source_domain": "ng.investing.com", "url": "https://news.google.com/rss/articles/CBMiwAFBVV95cUxNbzJVNEc0SEh3VEtPSUVtTEs5ZEQ4bTUtZ05MM1hGdC02UlVUeFR0TVVPdFZvUldPSHJVWjJYczk0aVgyZkt1Z0REYzNrYkRUdWdLNXllSFFad1JqQXpmRm15b05pQzY5YnRBdGdlRFc4cGNGTVNNOEFwZ0dieGdVanZyN0tySGVBeEZBNGVwOHFGM00wODZ2VWFWSzFaYkhsRTdSNklhdzRzOEtuQmU0eGRaaEl5a0JVbllTUGpnNlk?oc=5", "published_at": "2026-10-06T14:22:36Z", "first_seen_at": "2026-10-07T04:32:15Z", "status": "unverified", "status_as_of": "2026-10-07T04:40:07Z", "independent_origins": 0, "primary_ids": [], "cluster_id": "AAPL-391e11d583bb9b08", "scope": "company", "category": "company", "feed": "gnews:\"Apple\" stock", "summary": null, "summary_source": "none", "market_moving": false, "origin": "stored", "enrichment": {"event_type": "analyst", "materiality": "medium", "sentiment": 0.25, "relevance": 0.7, "novelty": 0.55, "urgency": "medium", "priced_in": false, "analyzed_at": "2026-10-07T04:42:07Z", "geopolitical": false}}, {"id": "26b070d12395b94a", "market": "us", "tickers": ["ALL"], "primary_tickers": ["ALL"], "title": "Allstate launches Auto Lab to train claims adju...", "source": "Pluang", "source_domain": "pluang.com", "url": "https://news.google.com/rss/articles/CBMirwFBVV95cUxPc0lPWXliZ3I2Z3dPbUVCcU1leXNIQTdKOFJDNWRraFpycGQ3X3JwczFHRGJZejdHbXA3ZkdVaWRBaUs1RlU1S3hJTlhCOGNZRUVmY2ptUy05YkRKY0Q3cmROYTBOLTZlU1BMREJvakpfV1ZVSUtic2xPQmhJdFZVcFR3aUt5SlBQanExTWc5WFBjUDdEbVpXUnUxNU5PRV84eWJvbzFIODlpUDhpdGpB?oc=5", "published_at": "2026-10-06T13:16:56Z", "first_seen_at": "2026-10-07T04:32:15Z", "status": "promotional", "status_as_of": "2026-10-07T04:40:07Z", "independent_origins": 0, "primary_ids": [], "cluster_id": "ALL-26b070d12395b94a", "scope": "company", "category": "company", "feed": "gnews:\"Allstate\" stock", "summary": null, "summary_source": "none", "market_moving": false, "origin": "stored", "enrichment": {"event_type": "product", "materiality": "medium", "sentiment": 0.0, "relevance": 0.7, "novelty": 0.7, "urgency": "medium", "priced_in": false, "analyzed_at": "2026-10-07T04:42:07Z", "geopolitical": false}}, {"id": "1b5f50285fa39a2c", "market": "us", "tickers": ["NVDA"], "primary_tickers": ["NVDA"], "title": "SpaceX seeks $40 billion financing led by Apollo to buy Nvidia chips, FT reports", "source": "KSL News", "source_domain": "ksl.com", "url": "https://news.google.com/rss/articles/CBMilgFBVV95cUxNdWNlSmVNY0kwaUlSbGc5bTNBYXN3RS1JdE1aMmk5T21wblJTU0xNZER4djFoX28wM0daT0N0QXdsenc2NXBXdzNEZVZRV1Zyc3cyWnBJTnRIcEszeElVUy1DUTJ0anJaX2VkNVAwdEpZeklBLWFDaTE4WTFkTWJ3dlNPSjA0Rl9WT2lQVmNmQVJGOFpTMWc?oc=5", "published_at": "2026-10-07T00:33:45Z", "first_seen_at": "2026-10-07T04:32:15Z", "status": "unverified", "status_as_of": "2026-10-07T04:40:07Z", "independent_origins": 1, "primary_ids": [], "cluster_id": "NVDA-ab389b7d388dcec8", "scope": "company", "category": "company", "feed": "gnews:\"Nvidia\" stock", "summary": null, "summary_source": "none", "market_moving": false, "origin": "stored", "enrichment": {"event_type": "other", "materiality": "high", "sentiment": 0.3, "relevance": 0.85, "novelty": 0.2, "urgency": "high", "priced_in": true, "analyzed_at": "2026-10-07T04:42:07Z", "geopolitical": false}}, {"id": "109d9954cc7c1b1d", "market": "us", "tickers": ["CAT"], "primary_tickers": ["CAT"], "title": "Caterpillar upgraded to Buy after record Q2 ear...", "source": "Pluang", "source_domain": "pluang.com", "url": "https://news.google.com/rss/articles/CBMilwFBVV95cUxPbE1jd2dFcXVuWm90SEh5Q0E4U01ZMmpSeVJIOGV5UkxQb00yU2g3OE5HVTRYVGxMQjJjWEdWbXZiNm96aGVfd2FaYTJRekJ5ZFMzOWtrSWM1UjlpdWFBaHU3UlFKc2pISnVpUWJ5ZmlXUjJ6emV0ZjJUdWR5YUVRNXFmS1lrNXpXWWZOMU1fNlBWckZMSGJN?oc=5", "published_at": "2026-10-06T15:41:08Z", "first_seen_at": "2026-10-07T04:32:15Z", "status": "promotional", "status_as_of": "2026-10-07T04:40:07Z", "independent_origins": 0, "primary_ids": [], "cluster_id": "CAT-109d9954cc7c1b1d", "scope": "company", "category": "company", "feed": "gnews:\"Caterpillar\" stock", "summary": null, "summary_source": "none", "market_moving": false, "origin": "stored", "enrichment": {"event_type": "earnings", "materiality": "medium", "sentiment": 0.5, "relevance": 0.7, "novelty": 0.7, "urgency": "medium", "priced_in": false, "analyzed_at": "2026-10-07T04:42:07Z", "geopolitical": false}}, {"id": "0fcc2294cf2b48a4", "market": "us", "tickers": ["GOOGL"], "primary_tickers": [], "title": "GOOG, GOOGL Stock Notice: Alphabet Inc. Stock Plummeted 4% after AI Issues Disclosed - Securities Fraud Class Action Filed", "source": "TradingView", "source_domain": "tradingview.com", "url": "https://news.google.com/rss/articles/CBMiiAJBVV95cUxNV2ZtX2Q0UWJaOVp1YmE5QkM0S0dfbXhRdzRhamotZXItRkRyeWpDZ1BJTURnQV9GNjdjX0x3QmM1OFAwSVQ0TjdkQWxmcVBsaVFfaW5GeEQyeHEzOGppdnZ2UXlEbl9zSFlXMVk1MGVETThxRTNZY2RKMmJFelc2cU4ySENFU0FiYWpFNlJqUVV3bzVhQXNvUjVWN3pKTVQ5OTRBSldxRlQyV0txSlF2ZEJFcy1WRU5yN1Nvd00xX1dzRjhTdmtxbzBtTnNZekRUT0VqcXF4Z2pnT1QtYUZFMlJKaWRlb0FoVEZRUldKV2tHM0Z5VldvajZabDg4N2tTallnQW5aNHI?oc=5", "published_at": "2026-10-06T09:36:00Z", "first_seen_at": "2026-10-07T04:32:15Z", "status": null, "status_as_of": null, "independent_origins": null, "primary_ids": [], "cluster_id": null, "scope": "market", "category": "company", "feed": "gnews:\"Alphabet\" stock", "summary": null, "summary_source": "none", "market_moving": true, "origin": "stored", "enrichment": {"event_type": "legal", "materiality": "high", "sentiment": -0.4, "relevance": 0.65, "novelty": 0.2, "urgency": "high", "priced_in": true, "analyzed_at": "2026-10-07T04:42:07Z", "geopolitical": false}}, {"id": "0a9b68483b3e8323", "market": "us", "tickers": [], "primary_tickers": [], "title": "Wall St futures rise as yields, oil dip", "source": "Tri-City Herald", "source_domain": "tri-cityherald.com", "url": "https://news.google.com/rss/articles/CBMihgFBVV95cUxOSDNRQV9vMkc0TFc3VXB0bVllTGNiakIzMjV6MEVlZUxNVHp4OVZ6eVpjWmxLSk1ldzRTSGZfY3JxNmJIQTZDenpjTVNBaDBRQzFSeWZOR2U5eTFxRG5IWThuQnZZWTJaSzB4VlZsc0Fva3dfSlgyOWlKVDVaWS1iT3VQVm1TZw?oc=5", "published_at": "2026-10-06T10:27:00Z", "first_seen_at": "2026-10-07T04:32:15Z", "status": null, "status_as_of": null, "independent_origins": null, "primary_ids": [], "cluster_id": null, "scope": "market", "category": "rates", "feed": "gnews:Treasury yields", "summary": null, "summary_source": "none", "market_moving": false, "origin": "stored", "enrichment": {"event_type": "macro", "materiality": "medium", "sentiment": 0.0, "relevance": 0.45, "novelty": 0.2, "urgency": "medium", "priced_in": true, "analyzed_at": "2026-10-07T04:42:07Z", "geopolitical": false}}, {"id": "05f325aed81e5127", "market": "us", "tickers": ["BAC"], "primary_tickers": [], "title": "Bank of America cuts target for Leonardo stock to EUR 71.00", "source": "AD HOC NEWS", "source_domain": "ad-hoc-news.de", "url": "https://news.google.com/rss/articles/CBMivwFBVV95cUxNX09hUVZjSUd0bm1qV0VDT2J6TGVvMmcydW1nLXlOaGc0NjZaWlVHTWdtM2NyeGZTTEFadW9abFFkbjlIYk1salJMNTlnaW9FZkstbE5FNTkyWkpFa014M01TV3Z4NXcyS1plOGJ4M21NQlJoSmZVeWVtZ0hmM1J4dUZyaTVGeHMtSGxheV9LLXZlSlZDdlpNTHJaVHZzbW0zYWhxcnZST3RWUXFWYTdvM0drZWR1SkZ5X1l2LTk0dw?oc=5", "published_at": "2026-10-06T13:36:42Z", "first_seen_at": "2026-10-07T04:32:15Z", "status": null, "status_as_of": null, "independent_origins": null, "primary_ids": [], "cluster_id": null, "scope": "market", "category": "company", "feed": "gnews:\"Bank of America\" stock", "summary": null, "summary_source": "none", "market_moving": false, "origin": "stored", "enrichment": {"event_type": "analyst", "materiality": "medium", "sentiment": -0.25, "relevance": 0.5, "novelty": 0.55, "urgency": "medium", "priced_in": false, "analyzed_at": "2026-10-07T04:42:07Z", "geopolitical": false}}, {"id": "0559d9d7a390a288", "market": "us", "tickers": [], "primary_tickers": [], "title": "10-year U.S. Treasury yields surge to 5.3%, while the Nasdaq and S&P 500 hit new highs—how should we interpret this unusual equity-bond dynamic?", "source": "富途牛牛", "source_domain": "news.futunn.com", "url": "https://news.google.com/rss/articles/CBMikgFBVV95cUxQbFdSR1V1dDBydTRlOGNsdDcxMmxrSFY5V2pldlVSM2FNMEdnd29JT2ZaNElvODBpSkdNRUpmMzVfX0Q0TmNxR0tnSm5GZDlxYVRxY1d1S1hPdjNKLTA2dWNsMlRoSi1aTnJfQTgyVE5CRDcyNG94MzYtTVZla2hRODBQR0RYaEFLREJ3eC02cTJnQQ?oc=5", "published_at": "2026-10-07T01:18:20Z", "first_seen_at": "2026-10-07T04:32:15Z", "status": null, "status_as_of": null, "independent_origins": null, "primary_ids": [], "cluster_id": null, "scope": "market", "category": "rates", "feed": "gnews:Treasury yields", "summary": null, "summary_source": "none", "market_moving": false, "origin": "stored", "enrichment": {"event_type": "macro", "materiality": "medium", "sentiment": 0.3, "relevance": 0.45, "novelty": 0.7, "urgency": "medium", "priced_in": false, "analyzed_at": "2026-10-07T04:42:07Z", "geopolitical": false}}, {"id": "01a8661fcfce9919", "market": "us", "tickers": [], "primary_tickers": [], "title": "Fed rate hike pushes Canadian mortgage rates up", "source": "Money.ca", "source_domain": "money.ca", "url": "https://news.google.com/rss/articles/CBMilgFBVV95cUxOQ2xnX2hCZnRQM3BGYzZzeWpMUkdBMnFMZWM0ZkJpYi1YVlZoQUtvRF9HMWJWdUcwN2s4ampteVJJbHdybG5ITk1lMmxjcFpUdklLUzU5REdlaGpZRVBSMnY4ekRmRlR0WkxLa3R1ZU91amg3Sjd4YVNaVmxwMEJfS0xVa1Z1UzhnUHY2YTJzYTRFb0NBN0E?oc=5", "published_at": "2026-10-06T20:06:00Z", "first_seen_at": "2026-10-07T04:32:15Z", "status": null, "status_as_of": null, "independent_origins": null, "primary_ids": [], "cluster_id": null, "scope": "market", "category": "macro", "feed": "gnews:Federal Reserve interest rates", "summary": null, "summary_source": "none", "market_moving": false, "origin": "stored", "enrichment": {"event_type": "macro", "materiality": "medium", "sentiment": 0.0, "relevance": 0.45, "novelty": 0.7, "urgency": "medium", "priced_in": false, "analyzed_at": "2026-10-07T04:42:07Z", "geopolitical": false}}, {"id": "0059830a4a7cec33", "market": "us", "tickers": [], "primary_tickers": [], "title": "Does Gold Go Up When Interest Rates Go Up?", "source": "Medium", "source_domain": "moneymetalsexchange.medium.com", "url": "https://news.google.com/rss/articles/CBMimAFBVV95cUxPMDZreWFqMFFCODBtXzh6UEI2UEtfY3Bselc4NzZuaEY1QlVYQ2VfQ0x3WnFMVFhtM0VxVDhfTEc0UHVza01SMkdNRG52QjY4QjR5T3NGTVpfSFBUTW5sbFI3RjJWSU51S05abVlxSWVSS0JSUUNZbFdmWDVDZTV2R2oyM2JxMGVuLVdhcXlIazN6VG0wWnZUNg?oc=5", "published_at": "2026-10-06T18:11:30Z", "first_seen_at": "2026-10-07T04:32:15Z", "status": null, "status_as_of": null, "independent_origins": null, "primary_ids": [], "cluster_id": null, "scope": "market", "category": "macro", "feed": "gnews:Federal Reserve interest rates", "summary": null, "summary_source": "none", "market_moving": false, "origin": "stored", "enrichment": {"event_type": "macro", "materiality": "medium", "sentiment": 0.0, "relevance": 0.45, "novelty": 0.7, "urgency": "medium", "priced_in": false, "analyzed_at": "2026-10-07T04:42:07Z", "geopolitical": false}}, {"id": "c0d2e4f6a8b1c3d5", "market": "us", "tickers": ["JPM"], "primary_tickers": ["JPM"], "title": "JPMorgan said to weigh sale of payments unit stake", "source": "Example Business Wire Blog", "source_domain": "example-blog.com", "url": "https://example-blog.com/jpm", "published_at": "2026-10-06T15:00:00Z", "first_seen_at": "2026-10-06T16:47:00Z", "status": "rumour", "status_as_of": "2026-10-07T11:15:00Z", "independent_origins": 0, "primary_ids": [], "cluster_id": "jpm-20261006-stake", "scope": "company", "category": null, "feed": null, "summary": null, "summary_source": "none", "market_moving": false, "origin": "invented", "enrichment": {"event_type": "ma", "materiality": "medium", "sentiment": 0.2, "relevance": 0.7, "novelty": 0.7, "urgency": "low", "priced_in": false, "analyzed_at": "2026-10-07T11:20:00Z", "geopolitical": null}}], "calendar": [{"market": "us", "date": "2026-10-13", "type": "earnings", "name": "JPMorgan results", "ticker": "JPM", "timing": null, "reaction_sessions": ["2026-10-13", "2026-10-14"], "major": false, "widens": "company", "provisional": false, "release": null, "source": "events (yfinance)", "event_id": "JPM-earnings-2026-10-13"}, {"market": "us", "date": "2026-10-14", "type": "cpi", "name": "US CPI (September)", "ticker": null, "timing": null, "reaction_sessions": null, "major": true, "widens": "market", "provisional": false, "release": "08:30 ET", "source": "config/events.yaml", "event_id": null}, {"market": "us", "date": "2026-10-14", "type": "earnings", "name": "Bank of America results", "ticker": "BAC", "timing": null, "reaction_sessions": ["2026-10-14", "2026-10-15"], "major": false, "widens": "company", "provisional": false, "release": null, "source": "events (yfinance)", "event_id": "BAC-earnings-2026-10-14"}, {"market": "us", "date": "2026-10-14", "type": "earnings", "name": "Progressive results", "ticker": "PGR", "timing": null, "reaction_sessions": ["2026-10-14", "2026-10-15"], "major": false, "widens": "company", "provisional": false, "release": null, "source": "events (yfinance)", "event_id": "PGR-earnings-2026-10-14"}], "calendar_days": 7, "companies": [{"market": "us", "ticker": "AAPL", "name": "Apple", "sector": "Tech", "state": "active", "open_trades": 4}, {"market": "us", "ticker": "DAL", "name": "Delta Air Lines", "sector": "Airlines", "state": "inactive", "open_trades": 0}, {"market": "us", "ticker": "JPM", "name": "JPMorgan", "sector": "Banks", "state": "active", "open_trades": 3}, {"market": "us", "ticker": "NVDA", "name": "Nvidia", "sector": "Tech", "state": "active", "open_trades": 6}]}}, "_data_requests": ["market-wide items, a summary line per item, volume and an engine-side market_moving flag: answered by W1 on 2026-10-08 (data request 8: 56 real stored items, 28 per market, with scope, category, feed, summary, market_moving and origin). Not in the stored data and not invented: a region, confirmed or corroborated statuses on the stored items (only four of the six invented items carry them), clusters with more than one origin, and summaries for most US items (the analyst's are templated)"]};</script>
+<script>
+/* Shared script of the design-track mockups: DOM helpers, formatters, the app shell (sidebar, top bar, phone
+   drawer and bar), the tooltip, the page head and small visual parts (odds meter, icon tile, family label, range
+   bar, buyers-by-horizon bars). A page defines `const D = ...payload...` before this script and calls `shell(...)`
+   then builds its sections. Spec constants named once here with their source. */
+const $ = (s, el=document) => el.querySelector(s);
+const el = (tag, attrs={}, ...kids) => { const n = document.createElement(tag); for (const [k,v] of Object.entries(attrs)) { if (v == null || v === false) continue; if (k==='class') n.className=v; else if (k==='html') n.innerHTML=v; else if (k.startsWith('on')) n.addEventListener(k.slice(2), v); else n.setAttribute(k, v === true ? '' : v);} for (const k of kids) { if (k==null) continue; n.append(k.nodeType? k : document.createTextNode(String(k))); } return n; };
+const svgEl = (tag, attrs={}) => { const n = document.createElementNS('http://www.w3.org/2000/svg', tag); for (const [k,v] of Object.entries(attrs)) n.setAttribute(k, v); return n; };
+const icon = (id, cls='ms') => { const s = svgEl('svg', {class: cls, 'aria-hidden': 'true'}); const u = svgEl('use'); u.setAttribute('href', '#' + (id.startsWith('ms-') ? id : 'ms-' + id)); s.append(u); return s; };
+const help = tip => el('button', {class:'md-help', 'data-tip': tip, 'aria-label':'Explain', type:'button'}, '?');
+const LABEL = {india: 'India', us: 'US'};
+const ZONE = {india: 'IST', us: 'ET'};                      /* presentation only: the market's local clock label */
+const LOCALE = {INR: 'en-IN', USD: 'en-US'}, SYMBOL = {INR: '₹', USD: '$'};
+const FAMILY = {rule: ['Rule strategies', 'ms-settings', 'r'], baseline: ['Baselines', 'ms-trending_flat', 'b'], ai: ['AI traders', 'ms-bolt', 'a']};
+const FAMILY_SHORT = {rule: 'Rule', baseline: 'Baseline', ai: 'AI'};
+const PICK = {best_expected_gain: 'Best expected gain', highest_probability: 'Highest probability'};
+const BAND = {below80: ['below the 80% range', 'flag'], below50: ['below the 50% range', ''], inside50: ['inside the 50% range', 'ok'], above50: ['above the 50% range', ''], above80: ['above the 80% range', 'flag']};
+const BAND_SHORT = {below80: 'below 80%', below50: 'below 50%', inside50: 'inside 50%', above50: 'above 50%', above80: 'above 80%'};
+const FLAG = {outside_range: 'outside its range', far_from_target: 'far from its target', against_prediction: 'against the prediction'};
+const FLAG_SHORT = {outside_range: 'outside range', far_from_target: 'far from target', against_prediction: 'against prediction'};
+const STATUS = {confirmed_primary: ['confirmed', 'A primary document (exchange filing, company release) confirms it. Can be the main evidence of a call.', 'ms-verified_user'],
+  corroborated: ['corroborated', 'Two or more independent outlets reported it on their own. Can be the main evidence of a call.', 'ms-check'],
+  single_source: ['single source', 'One independent origin so far. Lowers a call’s confidence; cannot be the main evidence.', 'ms-warning'],
+  unverified: ['unverified', 'No vetted outlet read yet. Lowers confidence; cannot be the main evidence.', null],
+  rumour: ['rumour', 'Reported as a rumour or from unnamed sources. Never supports a call.', 'ms-close'],
+  promotional: ['promotional', 'A paid, promotional or opinion item. Never supports a call.', 'ms-close'],
+  contradicted: ['contradicted', 'A checked claim conflicts with a primary document. Can only widen a range.', 'ms-close']};
+const CAN_CARRY = ['confirmed_primary', 'corroborated'];
+/* Spec constants (not data): docs/SPEC.md F7.2 go-live bar = 2 months of forward paper trading and about 300 settled trades per strategy; section 7 = two intraday checks per session; section 6 = fewer than 20 settled trades is too few to rank; F2.3 = the back-test runs on the 15-year history cache; F7.1 luck test = a 95% percentile bootstrap interval (marketbrief/lab/luck.py, alpha 0.05); F4.2, section 7 and F6 = an AI trader's reason, a deviation note and an EOD reason are at most 60 words; F11 and mcp/tools.yaml (explain) = the assistant's question is at most 500 characters, its budget $0.65 a day under a $20 monthly hard cap, conversations kept 90 days. */
+const GO_LIVE_MONTHS = 2, GO_LIVE_TRADES_ABOUT = 300, INTRADAY_CHECKS_PER_SESSION = 2, MIN_TRADES_TO_RANK = 20, BACKTEST_YEARS = 15, LUCK_INTERVAL_PCT = 95, REASON_MAX_WORDS = 60;
+const ASSISTANT_QUESTION_MAX_CHARS = 500, ASSISTANT_DAILY_USD = 0.65, ASSISTANT_MONTHLY_USD_CAP = 20, ASSISTANT_LOG_DAYS = 90;
+/* News page rules (owner decision 2026-10-08, design/mockups/09-news/rationale.md): at most 10 market movers, 10 stories a page; the 3-day window and the 50-item cap are the build's (data.json `window`). */
+const NEWS_MOVERS_MAX = 10, NEWS_PAGE_SIZE = 10, NEWS_RECENT_HOURS = 24;
+/* Sentiment words: the news analyst's score (-1..1) reads positive above +0.05 and negative below -0.05 (the Home page's convention, decision of the design track). */
+const SENTIMENT_FLAT_BAND = 0.05;
+const DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'], DOWL = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'], MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const dt = iso => new Date(iso.slice(0,10)+'T00:00:00Z');
+const fmtD = (iso, dow=true) => { const d = dt(iso); return (dow? DOW[d.getUTCDay()]+' ' : '') + d.getUTCDate() + ' ' + MON[d.getUTCMonth()]; };
+const fmtDY = iso => fmtD(iso, false) + ' ' + iso.slice(0,4);
+const offsetMin = local => { const m = /([+-])(\d\d):(\d\d)$/.exec(local); return m ? (m[1]==='-'?-1:1) * (60*+m[2] + +m[3]) : 0; };
+const fmtLocal = (iso, m, withDate=false) => { if (!iso) return '—'; const t = new Date(new Date(iso).getTime() + offsetMin(P(m).status.session.local_time)*60000); const hm = `${String(t.getUTCHours()).padStart(2,'0')}:${String(t.getUTCMinutes()).padStart(2,'0')}`; return (withDate ? `${t.getUTCDate()} ${MON[t.getUTCMonth()]} ` : '') + `${hm} ${ZONE[m]}`; };
+const sgn = (x, dec=2, unit='%') => (x>0?'+':x<0?'−':'') + Math.abs(x).toFixed(dec) + unit;
+const pct = (x, dec=0) => x == null ? '—' : (x*100).toFixed(dec) + '%';
+const money = (cur, x, dec=0, sign=false) => { if (x == null) return '—'; const s = Math.abs(x).toLocaleString(LOCALE[cur], {minimumFractionDigits: dec, maximumFractionDigits: dec}); return (sign ? (x>0?'+':x<0?'−':'') : (x<0?'−':'')) + SYMBOL[cur] + s; };
+const price = (cur, x) => x == null ? '—' : x.toLocaleString(LOCALE[cur], {minimumFractionDigits: 2, maximumFractionDigits: 2});
+const delta = (x, dec=2, unit='%') => x == null ? el('span', {class:'muted'}, '—') : el('span', {class:'mb-delta '+(x>0?'up':x<0?'down':'flat')}, sgn(x, dec, unit));
+const moneyDelta = (cur, x, dec=0) => x == null ? el('span', {class:'muted'}, '—') : el('span', {class:'mb-delta '+(x>0?'up':x<0?'down':'flat')}, money(cur, x, dec, true));
+const dec = cur => cur === 'INR' ? 0 : 2;
+const P = m => D.markets[m];
+const companyOf = (m, t) => (P(m).companies || []).find(c => c.ticker === t) || {ticker: t, name: t};
+const stratOf = (m, id) => (P(m).strategies || {})[id] || {id, name: id, family: '—'};
+const PAGES = {home: '../01-home/page.html', watchlist: '../02-watchlist/page.html', company: '../03-company/page.html', strategies: '../04-stock-strategies/page.html', lab: '../05-strategy-lab/page.html', compare: '../06-rule-vs-ai/page.html', portfolios: '../07-paper-portfolios/page.html', track: '../08-track-record/page.html', news: '../09-news/page.html', companies: '../10-companies/page.html', assistant: '../11-assistant/page.html', help: '../12-help/page.html'};
+const companyPage = t => `${PAGES.company}#${t}`, strategiesPage = t => `${PAGES.strategies}#${t}`;
+const odds = (p, tipText) => { if (p == null) return el('span', {class:'muted'}, '—'); const s = svgEl('svg', {viewBox:'0 0 64 14'}); s.append(svgEl('rect', {class:'track', x:0, y:5, width:64, height:4, rx:2})); s.append(svgEl('line', {class:'mid', x1:32, x2:32, y1:1, y2:13})); const cx = Math.max(4, Math.min(60, (p - 0.30) / 0.40 * 64)); s.append(svgEl('circle', {class:'dot '+(p>0.5?'up':'dn'), cx, cy:7, r:4.5})); return el('span', {class:'mb-odds', 'data-tip': tipText}, s, el('b', {}, pct(p))); };
+/* a pick's costs: the market-cost expected gain it was ranked on, and decision 51's viability at the owner's own cost */
+const pickCand = k => (k.candidates || []).find(c => c.horizon_days === k.horizon_days) || null;
+const yourViable = k => { const cd = pickCand(k); return cd && cd.cost_viable != null ? cd.cost_viable : null; };
+function costLabels(cur, k) {
+  const mk = k.expected_gain_pct > 0, cd = pickCand(k), out = [];
+  out.push(el('span', {class:'mb-label ' + (mk ? 'success' : 'neutral'), 'data-tip': `Expected gain after market costs ${sgn(k.expected_gain_pct)} of ${money(cur, k.amount)}: ${pct(k.prob_up, 1)} × ${sgn(k.move_pct)} − ${pct(1 - k.prob_up, 1)} × ${k.loss_pct}% − ${k.costs_pct}% (brokerage, taxes and fees of config/costs.yaml; strategies are ranked on this view).`}, icon(mk ? 'ms-check' : 'ms-close'), `${sgn(k.expected_gain_pct)} · ${mk ? 'clears market costs' : 'below market costs'}`));
+  if (cd && cd.cost_viable != null) out.push(el('span', {class:'mb-label ' + (cd.cost_viable ? 'success' : 'warn'), 'data-tip': `Decision 51, your own costs: with your broker’s extra charges the round trip is ${cd.your_cost_pct}% and the expected gain ${sgn(cd.expected_gain_your_pct)}, so this pick is ${cd.cost_viable ? 'viable' : 'not viable'} at your cost. The flag never blocks a paper trade.`}, icon(cd.cost_viable ? 'ms-check' : 'ms-warning'), cd.cost_viable ? 'viable at your cost' : 'not viable at your cost'));
+  return out;
+}
+const viableLine = (picked) => { const mk = picked.filter(k => k.expected_gain_pct > 0).length, yv = picked.filter(k => yourViable(k) === true).length, known = picked.filter(k => yourViable(k) != null).length; return `${mk ? `${mk} clear${mk === 1 ? 's' : ''} market costs` : 'none clears market costs'} · ${known ? (yv ? `${yv} viable at your cost` : 'none viable at your cost') : 'your-cost view not stored'}`; };
+const avatar = (ico, kind='', size='') => el('span', {class:`mb-avatar ${kind} ${size}`, 'aria-hidden':'true'}, icon(ico));
+const famLabel = (f, text) => el('span', {class:'mb-label ' + ({rule:'', baseline:'warn', ai:'info'}[f])}, el('i', {class:'sw ' + FAMILY[f][2]}), text);
+const statusBadge = st => { const s = STATUS[st] || [st, '', null]; return el('span', {class:'md-badge ' + st, 'data-tip': s[1]}, s[2] ? icon(s[2]) : null, s[0]); };
+const sentSquare = v => { const s = v == null ? 'flat' : v > SENTIMENT_FLAT_BAND ? 'up' : v < -SENTIMENT_FLAT_BAND ? 'dn' : 'flat'; return el('span', {class:'mb-dir ' + s, 'aria-label': 'sentiment ' + (v ?? 'n/a'), 'data-tip': v == null ? 'sentiment not scored' : `sentiment ${v > 0 ? '+' : ''}${v} (−1 very negative to +1 very positive), the news analyst’s score`}, icon(s === 'up' ? 'ms-arrow_upward' : s === 'dn' ? 'ms-arrow_downward' : 'ms-remove')); };
+/* range bar: the trade's or prediction's 50% and 80% bands, the entry dotted, the target as a triangle, the last price as the dark line */
+function rangeBar(cur, r, last, entry) {
+  const lo = Math.min(r.lo80, entry ?? r.lo80, last ?? r.lo80) * 0.997, hi = Math.max(r.hi80, entry ?? r.hi80, last ?? r.hi80, r.target_price) * 1.003, X = v => (v - lo) / (hi - lo) * 96 + 2;
+  const s = svgEl('svg', {viewBox:'0 0 100 18', role:'img', 'aria-label':`80% range ${price(cur, r.lo80)} to ${price(cur, r.hi80)}${last != null ? ', last ' + price(cur, last) : ''}`});
+  s.append(svgEl('rect', {x: X(r.lo80), y: 5, width: X(r.hi80) - X(r.lo80), height: 8, rx: 4, fill: 'var(--mb-chart-band-80)'}));
+  s.append(svgEl('rect', {x: X(r.lo50), y: 5, width: X(r.hi50) - X(r.lo50), height: 8, rx: 4, fill: 'var(--mb-chart-band-50)'}));
+  if (entry != null) s.append(svgEl('line', {x1: X(entry), x2: X(entry), y1: 3, y2: 15, stroke: 'var(--md-sys-color-outline)', 'stroke-width': 1.5, 'stroke-dasharray': '2 1.5'}));
+  s.append(svgEl('path', {d: `M${X(r.target_price)-3},1 L${X(r.target_price)+3},1 L${X(r.target_price)},5 Z`, fill: 'var(--mb-chart-1)'}));
+  if (last != null) s.append(svgEl('line', {x1: X(last), x2: X(last), y1: 2, y2: 16, stroke: 'var(--md-sys-color-on-surface)', 'stroke-width': 2}));
+  return el('span', {class:'rng', 'data-tip': `Predicted 50% range ${price(cur, r.lo50)}–${price(cur, r.hi50)}, 80% range ${price(cur, r.lo80)}–${price(cur, r.hi80)}; target ${price(cur, r.target_price)} (the triangle)${entry != null ? `; entry ${price(cur, entry)} (dotted)` : ''}${last != null ? `; last ${price(cur, last)} (the dark line)` : ''}.`}, s);
+}
+/* buyers by horizon: five small bars, the selected horizon dark */
+function horizonBars(m, ticker, horizon) {
+  const p = P(m), s = svgEl('svg', {viewBox:'0 0 96 40', role:'img', 'aria-label':'buyers by horizon'});
+  const rows = p.horizons.map(k => (p.agreement[String(k)] || []).find(x => x.ticker === ticker));
+  const max = Math.max(1, ...rows.map(a => a ? a.of : 0));
+  rows.forEach((a, i) => { const x = i * 19 + 1, h = a ? Math.max(2, a.buy / max * 26) : 2, on = p.horizons[i] === horizon;
+    s.append(svgEl('rect', {class: on ? 'on' : 'off', x, y: 28 - h, width: 15, height: h, rx: 3}));
+    const tx = svgEl('text', {class: on ? 'on' : '', x: x + 7.5, y: 38, 'text-anchor':'middle'}); tx.textContent = a ? a.buy : '–'; s.append(tx); });
+  const wrap = el('span', {class:'hzb', 'data-tip': `Buyers at each horizon: ${p.horizons.map(k => { const a = (p.agreement[String(k)] || []).find(x => x.ticker === ticker); return `N+${k} ${a ? a.buy + ' of ' + a.of : 'no prediction'}`; }).join(' · ')}. The strongest other horizon is the one with the most buyers (ties: the shorter).`}, s);
+  return wrap;
+}
+function horizonTabs(horizons, current, onPick) {
+  const seg = el('div', {class:'md-segmented dense light', role:'group', 'aria-label':'Horizon'});
+  for (const k of horizons) seg.append(el('button', {type:'button', 'aria-pressed': String(k === current), onclick: () => onPick(k)}, `N+${k}`));
+  return seg;
+}
+const horizonWords = k => k === 1 ? 'the next session’s close' : `the close of the ${['','1st','2nd','3rd','4th','5th'][k]} session after the open`;
+
+/* ---------- state: the market from the hash ---------- */
+let market = (location.hash.slice(1).split('/')[0] in D.markets) ? location.hash.slice(1).split('/')[0] : 'india';
+
+/* ---------- shell ---------- */
+const NAV = [['home','Home',PAGES.home], ['format_list_bulleted','Watchlist',PAGES.watchlist], ['science','Strategy lab',PAGES.lab], ['layers','Rule vs AI',PAGES.compare], ['account_balance_wallet','Paper portfolios',PAGES.portfolios], ['query_stats','Track record',PAGES.track], ['newspaper','News',PAGES.news], ['apartment','Companies',PAGES.companies], ['bolt','Assistant',PAGES.assistant], ['help','Help',PAGES.help]];
+let onMarketChange = () => {};
+function shell(current, title, opts={}) {
+  const navItem = ([ico, label, href]) => el('a', {class:'mb-nav-item', href: href === current ? '#' : href, 'aria-current': href === current ? 'page' : null}, el('span', {class:'mb-nav-ind'}, icon('ms-'+ico)), el('span', {class:'mb-nav-label'}, label));
+  const sidebar = $('#sidebar');
+  sidebar.append(el('div', {class:'mb-sidebar-brand'}, el('span', {class:'mb-brand-mark', 'aria-hidden':'true'}, 'MB'), el('span', {}, 'Market brief', el('small', {}, 'research cockpit'))), el('div', {class:'mb-sidebar-section'}, 'Pages'), ...NAV.map(navItem), el('div', {class:'mb-sidebar-foot', id:'side-foot'}));
+  const menuBtn = $('#menu-btn'), scrim = $('#scrim');
+  const toggleMenu = on => { sidebar.classList.toggle('open', on); menuBtn.setAttribute('aria-expanded', String(on)); };
+  menuBtn.addEventListener('click', () => toggleMenu(!sidebar.classList.contains('open')));
+  scrim.addEventListener('click', () => toggleMenu(false));
+  const barItems = (opts.bar || [NAV[0], NAV[1], NAV[2], NAV[3]]).map(navItem);
+  $('#navbar').append(...barItems, el('button', {class:'mb-nav-item', type:'button', 'aria-controls':'sidebar', onclick: () => toggleMenu(true)}, el('span', {class:'mb-nav-ind'}, icon('ms-menu')), el('span', {class:'mb-nav-label'}, 'More')));
+  window.addEventListener('scroll', () => $('#topbar').classList.toggle('scrolled', window.scrollY > 4), {passive:true});
+  /* tooltip (hover, focus, tap; Escape closes) */
+  const tip = $('#tip'); let tipPinned = null;
+  const showTip = (target, html) => { tip.innerHTML = html; tip.classList.add('on'); const r = target.getBoundingClientRect(); let left = r.left + r.width/2 - tip.offsetWidth/2, top = r.top - tip.offsetHeight - 10; left = Math.max(8, Math.min(window.innerWidth - tip.offsetWidth - 8, left)); if (top < 8) top = r.bottom + 12; tip.style.left = left + 'px'; tip.style.top = top + 'px'; };
+  const hideTip = () => { if (tipPinned) return; tip.classList.remove('on'); };
+  document.addEventListener('pointerover', e => { const t = e.target.closest('[data-tip]'); if (t && !tipPinned) showTip(t, t.dataset.tip); });
+  document.addEventListener('pointerout', e => { if (e.target.closest('[data-tip]')) hideTip(); });
+  document.addEventListener('focusin', e => { const t = e.target.closest('[data-tip]'); if (t) showTip(t, t.dataset.tip); });
+  document.addEventListener('focusout', e => { if (e.target.closest('[data-tip]')) { tipPinned = null; hideTip(); } });
+  document.addEventListener('click', e => { const t = e.target.closest('[data-tip]'); if (t && t.tagName !== 'A' && !t.classList.contains('md-btn') && t.closest('.md-segmented') == null && !t.closest('.md-chip.filter') && !t.closest('th')) { if (tipPinned === t) { tipPinned = null; hideTip(); } else { tipPinned = t; showTip(t, t.dataset.tip); } e.preventDefault(); } else if (tipPinned) { tipPinned = null; hideTip(); } });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') { tipPinned = null; hideTip(); toggleMenu(false); } });
+  window.addEventListener('hashchange', () => { const h = location.hash.slice(1).split('/')[0]; if (h in D.markets && h !== market) { market = h; onMarketChange(); } });
+}
+function marketSeg(onPick) { const seg = $('#market-seg'); seg.innerHTML = ''; for (const m of Object.keys(D.markets)) seg.append(el('button', {type:'button', 'aria-pressed': String(m === market), 'data-tip': `Switch to the ${LABEL[m]} ${document.title.split(' · ')[1] || 'page'} (${P(m).name})`, onclick: () => { market = m; history.replaceState(null, '', '#'+m); onPick(m); }}, LABEL[m])); }
+function sideFoot(m) { const p = P(m), f = $('#side-foot'); f.innerHTML = ''; f.append(el('b', {}, p.status.paper_label), el('br'), `${LABEL[m]} · data as of ${fmtD(p.as_of, false)}`); }
+function makeFocusable(root) { for (const n of root.querySelectorAll('[data-tip]')) if (!n.matches('a[href], button, input, select, [tabindex]')) n.setAttribute('tabindex', '0'); }
+function pageHead(m, title, subtitle) {
+  const p = P(m), s = p.status.session, open = !!s.in_session, fr = p.status.freshness;
+  const h = el('section', {class:'phead', 'aria-label':'Session and freshness'});
+  h.append(el('div', {}, el('h1', {}, title), el('div', {class:'sub'}, subtitle)));
+  const chips = el('div', {class:'chips'});
+  chips.append(el('span', {class:'md-chip', 'data-tip': `Session ${fmtLocal(s.session_open_utc, m)}–${fmtLocal(s.session_close_utc, m)}.`}, el('span', {class:'dot'+(open?' open':'')}), s.trading_day ? (open ? el('b', {}, 'Open now') : (s.late_run ? 'Closed for today' : el('span', {}, 'Opens ', el('b', {}, fmtLocal(s.session_open_utc, m))))) : 'No session today'));
+  chips.append(el('span', {class:'md-chip', 'data-tip':'Market mood stored by the daily run: CALM / TRENDING / EVENT_HEAVY / UNSTABLE. AI traders lower their probability in EVENT_HEAVY and UNSTABLE; rule strategies either filter those days or not.'}, 'Regime ', el('b', {}, p.status.regime)));
+  chips.append(el('span', {class:'md-chip', 'data-tip': `Page data built ${fmtLocal(fr.built_at, m, true)} (${fr.age_minutes} min before the cut-off ${fmtLocal(p.cutoff, m, true)}). Nothing stored after the cut-off is used.`}, icon(fr.state === 'fresh' ? 'ms-check' : 'ms-warning'), el('b', {}, fr.state), ` · built ${fmtLocal(fr.built_at, m)}`));
+  chips.append(el('span', {class:'mb-tag paper', 'data-tip': p.status.paper_label}, 'paper'));
+  h.append(chips);
+  return h;
+}
+function paperBand(m, g, n) {
+  const p = P(m);
+  if (g && g.proven) return el('section', {class:'mb-alert band success', 'aria-label':'Signals'}, icon('ms-check'), el('div', {}, el('b', {class:'t'}, 'A strategy has met the go-live bar'), el('div', {class:'s'}, `${p.status.paper_label}. Strong signals may now appear on the strategy pages; the rankings still say who agrees, not what to do.`)), el('a', {class:'md-btn text act', href: PAGES.track, style:'color:inherit'}, 'Track record', icon('ms-chevron_right')));
+  return el('section', {class:'mb-alert band', 'aria-label':'Signals'}, icon('ms-block'), el('div', {}, el('b', {class:'t'}, 'No proven strong signals today'),
+    el('div', {class:'s'}, `${p.status.paper_label}.` + (g ? ` None of the ${n} strategies has met the go-live bar (${g.trades_needed} settled trades, ${g.months_forward} of ${GO_LIVE_MONTHS} months forward so far, beating the best baseline after costs).` : '') + ' Nothing here is advice.')),
+    el('a', {class:'md-btn text act', href: PAGES.track, style:'color:inherit'}, 'Track record', icon('ms-chevron_right')));
+}
+function footer(m, endpoint) { const p = P(m); return el('footer', {}, `Personal research project. Example data from the data catalogue; nothing here is investment advice and nothing trades. as_of ${p.as_of} · cutoff ${p.cutoff} · built_at ${p.built_at} · `, el('code', {}, endpoint.replace('{market}', m))); }
+
+</script>
+<script>
+let filter = 'all', ticker = null, pageNo = 1;
+shell(PAGES.news, 'News', {bar: [NAV[0], NAV[1], NAV[6], NAV[9]]});
+onMarketChange = () => { filter = 'all'; ticker = null; pageNo = 1; render(); };
+
+/* words for the news analyst's event types (News item enrichment.event_type) */
+const KIND = {earnings: 'results', macro: 'rates & macro', product: 'product', legal: 'legal', sector: 'sector', analyst: 'analyst', ma: 'deal', flows: 'flows', commodity: 'commodities', geopolitics: 'geopolitics', index: 'index move', regulation: 'regulation', other: 'other'};
+const MAT = {high: 3, medium: 2, low: 1};
+const scopeOf = n => n.scope;          /* the catalogue's scope: market-wide when the tagger found no primary watchlist company */
+const hoursBefore = (p, iso) => (dt2(p.cutoff) - dt2(iso)) / 36e5;
+const dt2 = iso => new Date(iso).getTime();
+const ago = (p, iso) => { const h = hoursBefore(p, iso); return h < 1 ? 'under an hour before the cut-off' : h < NEWS_RECENT_HOURS ? `${Math.floor(h)} h before the cut-off` : `${Math.floor(h / NEWS_RECENT_HOURS)} day${h < 2 * NEWS_RECENT_HOURS ? '' : 's'} before the cut-off`; };
+const dayKey = (iso, m) => fmtLocal(iso, m, true).replace(/\s\d{1,2}:\d{2}.*$/, '');   /* the local date part of the shell's local time */
+const canCarry = n => CAN_CARRY.includes(n.status);
+
+/* the market movers: the engine's market_moving flag first (W1's rule: high materiality and market-wide or results), then the page's own order to fill the band: market-wide first, watchlist results next, then materiality, then newest */
+function movers(p) {
+  const score = n => (n.market_moving ? 1000 : 0) + (scopeOf(n) === 'market' ? 100 : 0) + (n.enrichment.event_type === 'earnings' ? 50 : 0) + (MAT[n.enrichment.materiality] || 0) * 10 + (canCarry(n) ? 5 : 0);
+  return p.news.filter(n => n.market_moving || n.enrichment.materiality === 'high' || scopeOf(n) === 'market' || n.enrichment.event_type === 'earnings')
+    .sort((a, b) => score(b) - score(a) || b.first_seen_at.localeCompare(a.first_seen_at))
+    .filter((n, i, arr) => arr.findIndex(x => x.title === n.title) === i)   /* the same headline stored twice (two feeds) shows once in the band */
+    .slice(0, NEWS_MOVERS_MAX);
+}
+
+function itemBody(p, n) {
+  const m = market, mkt = scopeOf(n) === 'market', kind = mkt && n.category && n.category !== 'company' && n.category !== 'general' ? n.category : (KIND[n.enrichment.event_type] || n.enrichment.event_type);
+  const body = el('div', {class:'ni'});
+  const head = el('div', {}, el('span', {class:'kind' + (mkt ? ' mkt' : ''), 'data-tip': mkt ? 'A market-wide story: no single company, it moves the whole market.' : `A company story (${n.tickers.join(', ')}).`}, icon(mkt ? 'ms-public' : 'ms-apartment'), mkt ? 'market · ' + kind : kind));
+  body.append(head, el('h3', {}, el('a', {href: n.url, rel:'noopener', target:'_blank', 'data-tip': `Opens the article at ${n.source_domain} in a new tab. Stored here: the headline, its scores and status, never the text.`}, n.title)));
+  if (n.summary) body.append(el('p', {class:'sum'}, n.summary));
+  const meta = el('div', {class:'meta'});
+  meta.append(el('span', {'data-tip': `Published by ${n.source} ${fmtLocal(n.published_at, m, true)}; first stored here ${fmtLocal(n.first_seen_at, m, true)}.`}, `${n.source} · published ${ago(p, n.published_at)}`));
+  meta.append(n.status ? statusBadge(n.status) : el('span', {class:'mb-label neutral', 'data-tip':'Market-wide stories carry no verification status: verification is per company (DESIGN 3b).'}, 'not verified per company'), el('span', {'data-tip': 'The news analyst’s materiality: how much the story can move the price.'}, `${n.enrichment.materiality} materiality`));
+  if (n.market_moving) meta.append(el('span', {class:'mb-label warn', 'data-tip':'The engine’s market-moving flag: high materiality and market-wide or a results item.'}, icon('ms-warning'), 'market moving'));
+  if (n.enrichment.geopolitical) meta.append(el('span', {class:'mb-label neutral', 'data-tip':'The news analyst marked it geopolitical.'}, 'geopolitical'));
+  if (n.independent_origins > 1) meta.append(el('span', {'data-tip':'Independent vetted outlets carrying the same story (copies of one agency story count once).'}, `${n.independent_origins} outlets`));
+  for (const t of n.primary_tickers) meta.append(el('a', {class:'tk', href: companyPage(t), 'data-tip': `${(companyOf(m, t) || {name: t}).name}: open the company page`}, t));
+  meta.append(el('a', {class:'go', href: n.url, rel:'noopener', target:'_blank'}, 'Open article', icon('ms-open_in_new')));
+  body.append(meta);
+  return body;
+}
+
+function moversCard(p) {
+  const list = movers(p), card = el('section', {class:'card', 'aria-label':'Market movers'});
+  card.append(el('div', {class:'head'}, el('h2', {}, `Market movers · last ${p.window.days} days`, help(`At most ${NEWS_MOVERS_MAX} stories that can move the whole market or a watchlist company's price. First the stories the engine flags as market moving (high materiality and market-wide or a results item), then, to fill the band, market-wide stories (rates, inflation and jobs, commodities, geopolitics, an index moving sharply anywhere), the watchlist's results and anything scored high materiality, newest first within each rank. The verification status says how far a story can be trusted; the Help page explains each status.`)), el('span', {class:'mb-tag paper end'}, 'paper')));
+  if (!list.length) { card.append(el('div', {class:'empty'}, `No market-moving story in the last ${p.window.days} days: ${p.news.length} stor${p.news.length === 1 ? 'y' : 'ies'} stored in the window, none flagged, market-wide, results or high materiality.`)); return card; }
+  const g = el('div', {class:'mv'});
+  list.forEach((n, i) => g.append(el('div', {class:'it'}, el('span', {class:'rk', 'aria-label': `rank ${i + 1}`}, String(i + 1)), itemBody(p, n))));
+  card.append(g);
+  return card;
+}
+
+function feedCard(p) {
+  const m = market, card = el('section', {class:'card', 'aria-label':'All stories of the window'});
+  const last24 = p.news.filter(n => hoursBefore(p, n.published_at) < NEWS_RECENT_HOURS).length;   /* the owner's decision: the last 24 h by the outlet's publish time */
+  card.append(el('div', {class:'head'}, el('h2', {}, `Last ${p.window.days} days`, help(`Every story first seen in the ${p.window.days} days before the cut-off, the latest stored first (the time shown is the outlet's publish time; the day groups follow the day the story was stored), ${NEWS_PAGE_SIZE} a page and at most ${p.window.max_items} in all (the owner's rule: a short trading window needs no older news). Older stories stay in the data; the Company page shows every stored story about a company. Filters: published in the last ${NEWS_RECENT_HOURS} hours, market-wide, the engine's market-moving flag, one company, or only stories that can carry a call (confirmed or corroborated).`)), el('span', {class:'end muted'}, `${p.news.length} stor${p.news.length === 1 ? 'y' : 'ies'} · ${last24} in the last ${NEWS_RECENT_HOURS} h`)));
+  const bar = el('div', {class:'toolbar'});
+  const chip = (key, label, tipText) => { const b = el('button', {type:'button', class:'md-chip filter', 'aria-pressed': String(filter === key && !ticker), 'data-tip': tipText}, label); b.addEventListener('click', () => { filter = key; ticker = null; pageNo = 1; render(); }); return b; };
+  bar.append(chip('all', 'All', 'Every story of the window.'), chip('24h', `Last ${NEWS_RECENT_HOURS} h`, `Published in the ${NEWS_RECENT_HOURS} hours before the cut-off.`), chip('market', 'Market-wide', 'Stories about no single company.'), chip('moving', 'Market moving', 'The engine’s flag: high materiality and market-wide or a results item.'), chip('carry', 'Can carry a call', 'Confirmed by a filing or corroborated by independent outlets: the only statuses that may be the main evidence of a call.'));
+  const withNews = p.companies.filter(c => p.news.some(n => n.tickers.includes(c.ticker)));
+  if (withNews.length) { const sel = el('select', {'aria-label':'Company'}); sel.append(el('option', {value:''}, 'Company…')); for (const c of withNews) sel.append(el('option', {value: c.ticker, selected: ticker === c.ticker ? 'selected' : null}, `${c.ticker} · ${c.name}`)); sel.addEventListener('change', () => { ticker = sel.value || null; filter = ticker ? 'company' : 'all'; pageNo = 1; render(); }); bar.append(sel); }
+  card.append(bar);
+  const noSummary = p.news.filter(n => !n.summary).length; if (noSummary > p.news.length / 2) card.append(el('p', {class:'note', style:'margin:8px 0 0'}, `${noSummary} of the ${p.news.length} stories have no summary line yet (the analyst’s summaries were templated), so they show the headline alone; the article is one click away.`));
+  let items = p.news;
+  if (filter === '24h') items = items.filter(n => hoursBefore(p, n.published_at) < NEWS_RECENT_HOURS);
+  else if (filter === 'market') items = items.filter(n => scopeOf(n) === 'market');
+  else if (filter === 'moving') items = items.filter(n => n.market_moving);
+  else if (filter === 'carry') items = items.filter(canCarry);
+  else if (filter === 'company' && ticker) items = items.filter(n => n.tickers.includes(ticker));
+  if (!items.length) { card.append(el('div', {class:'empty', style:'margin-top:12px'}, p.news.length ? (filter === 'carry' ? 'No story in the window is confirmed by a filing or corroborated by independent outlets yet: the stored statuses so far are unverified, single source, rumour and promotional. Such stories lower a call’s confidence and never carry it.' : 'No story matches this filter in the window.') : `No story first seen in the last ${p.window.days} days in the example data (${p.window.older_hidden} older stor${p.window.older_hidden === 1 ? 'y is' : 'ies are'} hidden by the window; the Company page shows them).`)); return card; }
+  const pages = Math.ceil(items.length / NEWS_PAGE_SIZE); if (pageNo > pages) pageNo = pages;
+  const slice = items.slice((pageNo - 1) * NEWS_PAGE_SIZE, pageNo * NEWS_PAGE_SIZE);
+  const feed = el('div', {class:'feed'}); let lastDay = null;
+  const sessionDay = dayKey(p.cutoff, m);
+  for (const n of slice) {
+    const dk = dayKey(n.first_seen_at, m);
+    if (dk !== lastDay) { lastDay = dk; const count = items.filter(x => dayKey(x.first_seen_at, m) === dk).length; feed.append(el('div', {class:'day'}, el('b', {}, dk === sessionDay ? 'Today' : dk), ` · ${count} stor${count === 1 ? 'y' : 'ies'}`)); }
+    feed.append(el('div', {class:'row'}, el('span', {class:'tm', 'data-tip': `Published ${fmtLocal(n.published_at, m, true)}; first stored here ${fmtLocal(n.first_seen_at, m, true)} (the order of the feed).`}, fmtLocal(n.published_at, m, dayKey(n.published_at, m) !== dayKey(n.first_seen_at, m))), sentSquare(n.enrichment.sentiment), itemBody(p, n)));
+  }
+  card.append(feed);
+  const pager = el('div', {class:'pager'}); pager.append(el('span', {}, `Page ${pageNo} of ${pages} · ${items.length} stor${items.length === 1 ? 'y' : 'ies'}, ${NEWS_PAGE_SIZE} a page`));
+  const pg = el('div', {class:'pg', role:'group', 'aria-label':'Pages'});
+  const btn = (label, to, cur) => { const b = el('button', {type:'button', class:'md-btn outlined small', 'aria-current': cur ? 'page' : null, disabled: to == null ? 'disabled' : null}, label); if (to != null) b.addEventListener('click', () => { pageNo = to; render(); document.querySelector('.card[aria-label="All stories of the window"]').scrollIntoView({block:'start'}); }); return b; };
+  pg.append(btn('Previous', pageNo > 1 ? pageNo - 1 : null)); for (let i = 1; i <= pages; i++) pg.append(btn(String(i), i, i === pageNo)); pg.append(btn('Next', pageNo < pages ? pageNo + 1 : null));
+  pager.append(pg); card.append(pager);
+  return card;
+}
+
+function calendarCard(p) {
+  const m = market, card = el('section', {class:'card', 'aria-label':'Coming up'});
+  card.append(el('div', {class:'head'}, el('h2', {}, `Coming up · ${p.calendar_days} days`, help('Scheduled events from the session being predicted: the market’s own (policy decisions, inflation and jobs prints, expiries, holidays) and the active companies’ results and ex-dividend dates. A major market event raises the regime to EVENT_HEAVY within two days before it and widens every range whose window contains it; a company’s results widen its own ranges and block a new call within a day.'))));
+  if (!p.calendar.length) { card.append(el('div', {class:'empty'}, `Nothing scheduled in the next ${p.calendar_days} days.`)); return card; }
+  const list = el('div', {class:'cal'});
+  for (const e of p.calendar) {
+    const d = dt(e.date);
+    const sub = el('div', {class:'sub'});
+    if (e.major) sub.append(el('span', {class:'mb-label warn', 'data-tip':'Major: widens every range of this market whose window contains it (F2, major_event_factor).'}, icon('ms-warning'), 'major'));
+    if (e.widens === 'company') sub.append(el('span', {class:'mb-label neutral', 'data-tip':'Widens this company’s ranges; no new call within a day of it.'}, 'widens its ranges'));
+    if (e.ticker) sub.append(el('a', {class:'tk', href: companyPage(e.ticker)}, e.ticker));
+    if (e.release) sub.append(el('span', {}, `release ${e.release}`));
+    if (e.provisional) sub.append(el('span', {class:'mb-label neutral'}, 'date provisional'));
+    sub.append(el('span', {class:'muted', 'data-tip': `Source: ${e.source}.`}, e.type.replace(/_/g, ' ')));
+    list.append(el('div', {class:'ev' + (e.major ? ' major' : '')}, el('div', {class:'d'}, DOW[d.getUTCDay()], el('b', {}, String(d.getUTCDate())), MON[d.getUTCMonth()]), el('div', {}, el('div', {class:'nm'}, e.name), sub)));
+  }
+  card.append(list);
+  return card;
+}
+
+function companiesCard(p) {
+  const m = market, card = el('section', {class:'card', 'aria-label':'By company'});
+  card.append(el('div', {class:'head'}, el('h2', {}, `By company · ${p.window.days} days`, help('Each watchlist company with a story in the window: how many, the tone mix of the news analyst’s sentiment (green up, red down, grey flat), its open paper trades, and the latest headline. Click the ticker for the company page, the count to filter the feed.'))));
+  const rows = p.companies.map(c => ({c, items: p.news.filter(n => n.tickers.includes(c.ticker))})).filter(x => x.items.length).sort((a, b) => b.items.length - a.items.length || a.c.ticker.localeCompare(b.c.ticker));
+  if (!rows.length) { card.append(el('div', {class:'empty'}, 'No watchlist company has a story in the window.')); return card; }
+  const list = el('div', {class:'cos'});
+  for (const {c, items} of rows) {
+    const up = items.filter(n => n.enrichment.sentiment > SENTIMENT_FLAT_BAND).length, dn = items.filter(n => n.enrichment.sentiment < -SENTIMENT_FLAT_BAND).length, flat = items.length - up - dn;
+    const mix = el('span', {class:'mix', 'data-tip': `${up} positive, ${flat} neutral, ${dn} negative by the news analyst’s sentiment.`, role:'img', 'aria-label': `${up} positive, ${flat} neutral, ${dn} negative`});
+    for (const [k, v] of [['up', up], ['flat', flat], ['dn', dn]]) if (v) mix.append(el('i', {class: k, style: `width:${v / items.length * 100}%`}));
+    const b = el('button', {type:'button', class:'md-btn text small ct', 'data-tip': 'Show only this company in the feed.'}, String(items.length)); b.addEventListener('click', () => { ticker = c.ticker; filter = 'company'; pageNo = 1; render(); document.querySelector('.card[aria-label="All stories of the window"]').scrollIntoView({block:'start'}); });
+    list.append(el('div', {class:'co'}, el('a', {class:'tk', href: companyPage(c.ticker), 'data-tip': c.name}, c.ticker), el('div', {class:'nm'}, el('div', {style:'display:flex;gap:8px;align-items:center;flex-wrap:wrap'}, mix, c.open_trades ? el('span', {class:'mb-label paper', 'data-tip': `${c.open_trades} open paper trade${c.open_trades === 1 ? '' : 's'} on this company.`}, `${c.open_trades} open`) : null, c.state !== 'active' ? el('span', {class:'mb-label neutral'}, c.state) : null), el('small', {}, items[0].title)), b));
+  }
+  card.append(list);
+  return card;
+}
+
+function legend(p) {
+  return el('div', {class:'legend2'}, el('span', {}, el('span', {class:'mb-tag paper'}, 'paper'), ' news informs paper calls; nothing here is advice'),
+    el('span', {}, 'Statuses: ', ...CAN_CARRY.map(s => statusBadge(s)), ' can carry a call; the others (single source, unverified, rumour, promotional, contradicted) cannot (', el('a', {href: PAGES.help + '#news'}, 'Help'), ')'),
+    el('span', {}, el('b', {}, 'Open article'), ' opens the outlet’s page in a new tab; the cockpit stores headlines, scores and statuses, never the text'),
+    el('span', {}, `Window: ${fmtLocal(p.window.from, market, true)} to ${fmtLocal(p.window.to, market, true)}`));
+}
+
+function render() {
+  const p = P(market), page = $('#page'); page.innerHTML = '';
+  document.title = `Market brief · News · ${LABEL[market]}`; $('#title').textContent = 'News';
+  sideFoot(market); marketSeg(() => { filter = 'all'; ticker = null; pageNo = 1; render(); });
+  page.append(pageHead(market, 'News', `${p.name} · the last ${p.window.days} days, the market movers first, the newest first · every story links to its article · research only`));
+  page.append(moversCard(p));
+  const g = el('div', {class:'grid news'}); g.append(feedCard(p), el('div', {class:'col'}, calendarCard(p), companiesCard(p))); page.append(g);
+  page.append(legend(p), footer(market, D.endpoint));
+  makeFocusable(page);
+}
+render();
+</script>
+</body>
+</html>

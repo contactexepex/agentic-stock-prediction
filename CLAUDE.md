@@ -77,7 +77,7 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   switchable in `config/ranges.yaml`).
   `review` is the weekly review (coverage, calls, input ablations; thresholds in
   `config/review.yaml`): it proposes `config/ranges.yaml` changes, a human applies them; it also
-  reruns the signal-model backtest on the inputs stored by the reviewed week's end and says plainly
+  reruns the signal-model backtest on the inputs dated (or first seen) by the reviewed week's end and says plainly
   whether the model shows skill (`model_skill`).
   Direction calls are scored close-to-close before `call_scoring.from` in `config/settings.yaml` and
   open-to-close from then on (`label_basis` on each outcome; `marketbrief/analytics/call_basis.py`); an open-to-close
@@ -141,11 +141,17 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   `MOTHERDUCK_TOKEN`, never printed; without it the local file of the config under `work/`): one schema per market
   with the cockpit's tables (bars, quotes, features, regime, predictions, track record per label basis, ranges, model
   scores and versions, news with status, events, agent reasoning, lessons, reviews), replaced in one transaction, plus
-  per-page read models in `rm` (`overview`, `watchlist`, `stock`, `bars`, `track_record`; key `(market, page_key)`,
+  per-page read models in `rm` (`overview`, `watchlist`, `stock`, `bars`, `track_record`, `status`; key `(market, page_key)`,
   payload sliced from `gather_dashboard`, upserted by `payload_sha256`), `rm.builds` and `meta.sync_runs`. Kill switch
   `enabled` and `monthly_hours_ceiling` in the config. Optional, non-blocking, rebuildable with `--full`; static
-  `reports/` and Slack never depend on it. Planned, not built: the API under `/api/v1` (WS2) and the Next.js app on
-  Vercel (WS3) reading only `rm`; contract in `api/openapi.yaml` (checked by `tests/test_openapi.py`).
+  `reports/` and Slack never depend on it. Read-model framework (B4, docs/ws/b4.md): each `rm.<table>` is a
+  `PageBuilder` declared in a `warehouse/rm_<page>.py` module (found by name; shared page blocks in `rm_common.py`,
+  as of the clock, collected companies only via B1's `watchlist(market, cutoff, "collected")`), checked against its
+  schema before writing; a MotherDuck sync then revalidates the app's cache of the changed keys (`app_url`,
+  `REVALIDATE_SECRET`). The API under `/api/v1` (Next.js route handlers in `web/app/api/v1/`, shared helpers in
+  `web/lib/data/`) reads only `rm`; contract `api/openapi.yaml` 2.0 plus `api/paths/*.yaml` and `api/schemas/*.yaml`
+  (one file per page session; bundled by `warehouse/openapi_spec.py`), checked by `tests/test_openapi.py` and
+  against the approved mockups by `tests/test_api_contract.py` (`scripts/api_contract.py` for the live warehouse).
 - Strategy lab and lifecycle formats (W1, docs/SPEC.md sections 3-4 and 10; field guide `docs/DATA_CATALOGUE.md`,
   example data `design/catalogue/*.json`, rebuilt by `design/catalogue/make_examples.py` with B2's engine code; notes
   `docs/ws/w1.md`): `config/strategies.yaml` is the strategy registry. It holds the horizon list
@@ -199,7 +205,7 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   `inbox.company_commands` (read by `company.py import-inbox`), paper trades to `inbox.requests` (read by
   `portfolio.py import-inbox`); each write dispatches `onboard.yml`; pending until imported. Every call is logged in `inbox.command_log`
   (operational, not imported); refusals are posted to #market-brief for the owner. Gateway mode (`MB_GATEWAY=1`,
-  Vercel project `market-brief-gateway`, `web/middleware.ts`) serves only `/slack/*` (signed, at most 5 minutes old),
+  the Vercel project at `omenix-gateway.vercel.app`, `web/middleware.ts`) serves only `/slack/*` (signed, at most 5 minutes old),
   `/mcp` (GitHub OAuth, the owner's login and numeric id only) and `/oauth/*` plus `/.well-known/oauth-*` (POST only on
   `/slack/commands` and `/slack/interactions`). Slack:
   `/company`, `/trade`, `/ask` (stub until B8), in #market-brief only; Confirm posts a visible request message whose
@@ -271,7 +277,9 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   final before the open of D) are switched per market and group under `cross_market:` in `config/model.yaml` (all off: no tradable skill
   in the 15-year test, DESIGN.md section 15.1).
   `model_history` fetches Yahoo daily bars from 2011 (`--start`) into `work/model_history/<market>/` (gitignored, manifest;
-  never data/). Symbols of role `adr` (`adr_of: <ticker>`) are collected as bars only. The forecaster anchors on the score: `model_prob`, `agent_adjustment` (|x| <= 0.10) and
+  never data/; a symbol whose fetch fails keeps its previous rows, `kept_previous_rows` in `failed`).
+  Symbols of role `adr` (`adr_of: <ticker>`) are collected as bars only. The forecaster anchors on the score:
+  `model_prob`, `agent_adjustment` (|x| <= 0.10) and
   `adjustment_reason`, checked by `validate --stage forecast` (MODEL_ADJUSTMENT); `agent_reasoning validate|add`
   stores the day's bull case, bear case and verdict per ticker (`data/<market>/agent_reasoning/`).
 - Horizons N+1..N+5 (B10, docs/SPEC.md F2.7, decision 37; docs/ws/b10.md; `core/horizons.py`): horizon k means buy
@@ -313,8 +321,9 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   the market-cost view and its your-cost view -> `cost_views`; F1.9 measures, F1.10 automatic reason; a prediction
   or pick made or first committed at or after D's open is refused; a split correction re-settles as a new row),
   `news-impact` (weekly -> `news_impact`), `summary` (scoreboard ranked on market cost with the bootstrap luck test
-  and Bonferroni correction, the go-live bar on your cost, paired comparisons, heatmap data), `backtest` (always-up
-  and momentum on stored bars, basis backtest, never in data/), `pick-study`. Costs (`lab/costs.py`): the statutory
+  and Bonferroni correction, the go-live bar on your cost, paired comparisons, heatmap data), `backtest` (always-up,
+  momentum and, on B10's walk-forward probabilities as of the clock, the model strategies without news; stored bars,
+  `--history` adds the cache; basis backtest; `backtest --store` -> `lab_backtests`, once per run_id), `pick-study`. Costs (`lab/costs.py`): the statutory
   rates of `config/costs.yaml` plus its `broker:` section (Axis Direct NRI Normal tier Non-PIS, BUX Basic;
   owner-provided, marked verify; the owner confirms them with a contract note before Wave 5 switches paper trading
   on); market cost = brokerage, statutory taxes and exchange or regulatory fees; your cost adds India's NRI
@@ -343,8 +352,10 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   `config/settings.yaml` holds the repo URL, optional `pages_url`, the Slack channel id and the AI
   model's `model_training_cutoff` (ai_replay's fair vs contaminated split). `pages_url` is the owner's
   private Vercel site serving `reports/` (Vercel Authentication on all deployments), so Slack links open
-  the rendered pages; `reports/index.html` is its hand-written landing page (the one file under
-  `reports/` that build work may change; no script writes it)
+  the rendered pages. It deploys only by hand from the Vercel dashboard (`reports/vercel.json`:
+  `git.deploymentEnabled` false, owner decision 2026-10-08), so a day's links open only after the owner deploys.
+  `reports/index.html` is its hand-written landing page and `reports/vercel.json` its deployment setting (the
+  only files under `reports/` that build work may change; no script writes them)
 - `reports/<market>/review-YYYY-Www.md` the weekly review (record in `data/<market>/reviews/`)
 - `judgments/log.jsonl` every judge verdict on build work (append-only); daily-run verdicts are in
   `data/<market>/judgments/`

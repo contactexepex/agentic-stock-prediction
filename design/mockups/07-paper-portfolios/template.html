@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Market brief · Paper portfolios</title>
+<meta name="description" content="Paper portfolios of the personal stock cockpit: the head-to-head portfolios per family and pick rule, every open paper trade by strategy with its latest intraday check, and the owner's own paper trades and positions with a euro view of US holdings; add an own paper trade as a request. Research only, every figure Paper, nothing is an order.">
+<!--@@SYSTEM_CSS@@-->
+<!--@@SHARED_CSS@@-->
+<style>
+/* Paper portfolios mockup (design track, SPEC section 6 page 7). Page-local layout only; every colour is a token. */
+.ctrls{display:flex;gap:10px 18px;flex-wrap:wrap;align-items:center;margin-top:16px}
+.ctrls .c{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;color:var(--md-sys-color-on-surface-variant)}
+/* head-to-head portfolios */
+.h2h{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.fbox{border-radius:12px;padding:14px 16px;background:var(--md-sys-color-surface-container-low);min-width:0;display:grid;gap:8px;align-content:start}
+.fbox .fh{display:flex;align-items:center;gap:8px;flex-wrap:wrap} .fbox .fh b{font-size:14px} .fbox .fh small{color:var(--md-sys-color-on-surface-variant);font-size:12px}
+.fbox .tot{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap} .fbox .tot .n{font:700 24px/1.1 var(--md-ref-typeface-plain);letter-spacing:-.4px} .fbox .tot small{color:var(--md-sys-color-on-surface-variant);font-size:12px}
+.pr{display:grid;grid-template-columns:auto 1fr auto;gap:6px 10px;align-items:center;font-size:12.5px;padding:7px 0;border-top:1px solid var(--md-sys-color-surface-container-high)}
+.pr .l{color:var(--md-sys-color-on-surface-variant)} .pr .st{display:flex;gap:10px;flex-wrap:wrap;color:var(--md-sys-color-on-surface-variant)} .pr b{white-space:nowrap}
+.luck{display:inline-flex;align-items:center;gap:6px} .luck svg{width:80px;height:16px;display:block;flex:none}
+.luck .z{stroke:var(--mb-chart-axis)} .luck .raw{stroke:var(--mb-chart-1);stroke-width:2;opacity:.45} .luck .cor{stroke:var(--mb-chart-1);stroke-width:5;stroke-linecap:round} .luck .mean{fill:var(--md-sys-color-on-surface)} .luck .cor.edge{stroke:var(--mb-color-up)}
+/* open trades grouped by strategy */
+.ot td{vertical-align:middle} .ot .h-lab{font-size:11.5px}
+.ot tr.grp td{background:var(--md-sys-color-surface-container-low);font-weight:600;padding:8px 12px;font-size:13px}
+.ot tr.grp td small{font-weight:500;color:var(--md-sys-color-on-surface-variant);margin-left:8px}
+.ot tr.grp td .tk,.ot tr.grp td .mb-label,.ot tr.grp td .mb-delta,.ot tr.grp td small{display:inline-block;vertical-align:middle}
+.ot .nm b{display:block;font-size:13px;font-weight:600} .ot .nm small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:11.5px}
+/* owner */
+.own td{vertical-align:middle} .own .pn b{font-weight:700} .own .pn small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:11px}
+.eur{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:10px}
+.eur .n{border-radius:8px;padding:10px 12px;background:var(--md-sys-color-surface-container-low);min-width:0}
+.eur .n .l{font-size:11.5px;color:var(--md-sys-color-on-surface-variant)} .eur .n .v{font-weight:700;font-size:15px} .eur .n .s{font-size:11.5px;color:var(--md-sys-color-on-surface-variant)}
+.tl{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:2px}
+.tl li{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--md-sys-color-surface-container-high);font-size:13px}
+.tl li:first-child{border-top:0} .tl li small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:11.5px}
+.pend{display:grid;gap:6px;margin-top:10px}
+dialog.md-dialog{border:0;border-radius:16px;padding:0;max-width:min(480px, calc(100vw - 32px));box-shadow:var(--mb-card-shadow-hover);background:var(--md-sys-color-surface-container-lowest);color:var(--md-sys-color-on-surface)}
+dialog.md-dialog::backdrop{background:var(--md-sys-color-scrim);opacity:.4}
+dialog .dbody{padding:22px 24px;display:grid;gap:12px;font-size:13.5px}
+dialog .dbody h3{margin:0;font:600 18px/1.3 var(--md-ref-typeface-plain)}
+dialog .dbody label{display:grid;gap:4px;font-size:12.5px;color:var(--md-sys-color-on-surface-variant)}
+dialog .dbody input,dialog .dbody select{height:38px;border-radius:8px;border:1px solid var(--md-sys-color-outline-variant);padding:0 12px;font:inherit;color:var(--md-sys-color-on-surface);background:var(--md-sys-color-surface)}
+dialog .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+dialog .dact{display:flex;justify-content:flex-end;gap:8px;padding:0 24px 20px}
+@media (max-width:1359px){ .ot .c3{display:none} }
+@media (max-width:1199px){ .ot .cw{display:none} .eur{grid-template-columns:1fr 1fr} }
+@media (max-width:1000px){ .own .cw{display:none} }
+@media (max-width:760px){ .h2h{grid-template-columns:1fr} .ot .cm,.own .cm{display:none} .ot th,.ot td,.own th,.own td{padding:8px 6px;white-space:normal} .ot .st{white-space:normal;display:inline} .ot .mb-label{white-space:normal} .luck svg{display:none} .pr{grid-template-columns:1fr auto} .pr .st{grid-column:1 / span 2} }
+@media (max-width:599px){ .eur{grid-template-columns:1fr} dialog .row2{grid-template-columns:1fr} }
+</style>
+</head>
+<body>
+<!--@@ICONS@@-->
+<div id="tip" class="md-tooltip" role="tooltip"></div>
+
+<div class="mb-app">
+  <nav class="mb-sidebar" aria-label="Pages" id="sidebar"></nav>
+  <div class="mb-scrim" id="scrim"></div>
+  <header class="mb-topbar" id="topbar">
+    <button class="md-icon-btn mb-menu-btn" type="button" id="menu-btn" aria-label="Open the menu" aria-controls="sidebar" aria-expanded="false"><svg class="ms"><use href="#ms-menu"/></svg></button>
+    <div class="mb-topbar-title" id="title">Paper portfolios</div>
+    <div class="mb-topbar-actions">
+      <div class="md-segmented dense light" role="group" aria-label="Market" id="market-seg"></div>
+      <a class="md-btn filled" href="../11-assistant/page.html" data-tip="Ask the assistant (page 11): answers cite ids and as-of times, read-only." aria-label="Ask the assistant"><svg class="ms"><use href="#ms-bolt"/></svg><span class="ask-l">Ask</span></a>
+    </div>
+  </header>
+  <main class="mb-content"><div class="mb-content-inner" id="page"></div></main>
+  <nav class="mb-navbar" aria-label="Pages" id="navbar"></nav>
+</div>
+<dialog class="md-dialog" id="dlg"></dialog>
+
+<script>const D = /*__DATA__*/null;</script>
+<!--@@SHARED_JS@@-->
+<script>
+let cost = 'market', famFilter = null, viewFilter = null, pending = {};
+shell(PAGES.portfolios, 'Paper portfolios');
+onMarketChange = () => { famFilter = null; viewFilter = null; render(); };
+const val = (r, k) => cost === 'your' && r.your_cost && k in r.your_cost ? r.your_cost[k] : r[k];
+const luckOf = r => cost === 'your' && r.your_cost ? r.your_cost.luck_test : r.luck_test;
+const SOURCE = {dashboard: 'the dashboard', slack: 'Slack', cli: 'the command line', claude_app: 'the Claude app', claude_code: 'Claude Code'};
+function luckBar(r) {
+  const t = luckOf(r); if (!t || t.low_pct == null) return el('span', {class:'muted', 'data-tip':'Fewer than 2 trades: no luck interval yet.'}, 'none yet');
+  const lo = Math.min(t.corrected_low_pct ?? t.low_pct, t.low_pct, 0), hi = Math.max(t.corrected_high_pct ?? t.high_pct, t.high_pct, 0), X = v => 4 + (v - lo) / ((hi - lo) || 1) * 72;
+  const s = svgEl('svg', {viewBox:'0 0 80 16', role:'img', 'aria-label': `luck interval ${sgn(t.low_pct)} to ${sgn(t.high_pct)}, corrected ${sgn(t.corrected_low_pct)} to ${sgn(t.corrected_high_pct)}`});
+  s.append(svgEl('line', {class:'z', x1: X(0), x2: X(0), y1: 1, y2: 15}), svgEl('line', {class:'raw', x1: X(t.low_pct), x2: X(t.high_pct), y1: 8, y2: 8}));
+  if (t.corrected_low_pct != null) s.append(svgEl('line', {class:'cor' + (t.corrected ? ' edge' : ''), x1: X(t.corrected_low_pct), x2: X(t.corrected_high_pct), y1: 8, y2: 8}));
+  s.append(svgEl('circle', {class:'mean', cx: X(val(r, 'mean_return_pct')), cy: 8, r: 2.5}));
+  const few = r.sample_badge === 'too_few_to_rank';
+  return el('span', {class:'luck', 'data-tip': `Luck test (${t.n} trades): mean return per trade ${sgn(val(r, 'mean_return_pct'))}; ${LUCK_INTERVAL_PCT}% interval ${sgn(t.low_pct)} to ${sgn(t.high_pct)} (thin), corrected for the ${t.m} rows compared ${sgn(t.corrected_low_pct)} to ${sgn(t.corrected_high_pct)} (thick). ${t.corrected ? (few ? `Excludes zero, but on fewer than ${MIN_TRADES_TO_RANK} trades: not counted as an edge yet.` : 'Excludes zero: an edge may be real.') : 'Includes zero: could be luck; no edge claimed.'}`}, s, el('span', {class:'mb-label ' + (t.corrected && !few ? 'success' : 'neutral')}, t.corrected ? (few ? 'edge? too few' : 'edge') : 'luck?'));
+}
+
+/* ---------- KPIs ---------- */
+function kpis(p) {
+  const cur = p.currency, open = p.open_trades, unreal = open.reduce((s, t) => s + t.unrealised_pnl, 0), flagged = p.trade_checks.filter(c => c.flagged).length;
+  const fam = f => p.h2h_rows.find(r => r.scope === 'strategy' && r.family === f && r.horizon_days === 'all');
+  const R = fam('rule'), A = fam('ai'), pos = p.owner.positions, val_ = pos.reduce((s, x) => s + x.value, 0), pnl = pos.reduce((s, x) => s + x.pnl, 0);
+  const K = el('section', {class:'kpis', 'aria-label':'At a glance'});
+  const card = (ico, kind, label, value, sub, tipText) => el('div', {class:'mb-kpi', 'data-tip': tipText}, avatar(ico, kind), el('div', {}, el('div', {class:'l'}, label), el('div', {class:'v'}, value)), el('div', {class:'s'}, sub));
+  K.append(card('account_balance_wallet', 'paper', 'Open paper trades', String(open.length), el('span', {}, 'unrealised ', moneyDelta(cur, unreal, dec(cur)), ' before costs', p.trade_checks.length ? ` · ${flagged} flagged` : ''), 'Every paper trade that has entered and not yet exited, all strategies and horizons, both views; unrealised against the latest stored close.'));
+  K.append(card('layers', 'info', `Head-to-head rule portfolio`, R ? moneyDelta(cur, val(R, 'net_pnl'), dec(cur)) : 'No trades yet', el('span', {}, 'AI portfolio ', A ? moneyDelta(cur, val(A, 'net_pnl'), dec(cur)) : '—', ` · after ${cost} cost · ${(R ? R.trades : 0) + (A ? A.trades : 0)} settled`), 'The two family portfolios of the head-to-head view: the strongest rule strategy vs the strongest AI trader on identical company-days (decisions 41-42).'));
+  K.append(card('apartment', '', 'Your own paper positions', pos.length ? money(cur, val_, dec(cur)) : 'None', pos.length ? el('span', {}, moneyDelta(cur, pnl, dec(cur)), ` on ${pos.length} position${pos.length === 1 ? '' : 's'}, before costs`) : 'no own paper trade recorded', 'Your manual paper trades (WS4), marked to the latest stored close. A paper trade is a record, never an order.'));
+  const pend = (pending[market] || []).length;
+  K.append(card('pending', pend ? 'warn' : 'neutral', 'Pending requests', String(pend), pend ? 'own paper trades waiting for the next import' : 'nothing waiting', 'An own paper trade typed here is appended to the inbox with your sign-in and an idempotency key; the next run imports it (F10). Mockup: nothing is sent.'));
+  return K;
+}
+
+/* ---------- head-to-head portfolios ---------- */
+function h2hCard(p) {
+  const cur = p.currency, card = el('section', {class:'card', 'aria-label':'Head-to-head portfolios'});
+  card.append(el('div', {class:'head'}, el('h2', {}, 'Head-to-head portfolios'), el('span', {class:'mb-tag paper'}, 'paper'), help('The portfolios of the head-to-head view (F1, F7.1): per family (the strongest rule strategy and the strongest AI trader) and per pick rule (best expected gain, highest probability). Each pick is one paper trade of the company’s amount. Profit after the selected costs; the luck test says whether a lead could be chance.'), el('div', {class:'end'}, el('a', {class:'go', href: PAGES.compare}, 'Rule vs AI', icon('ms-chevron_right')))));
+  const g = el('div', {class:'h2h'});
+  for (const f of ['rule', 'ai']) {
+    const fr = p.h2h_rows.find(r => r.scope === 'strategy' && r.family === f && r.horizon_days === 'all'), box = el('div', {class:'fbox'});
+    box.append(el('div', {class:'fh'}, avatar(FAMILY[f][1], f === 'ai' ? 'info' : '', 'sm'), el('b', {}, FAMILY[f][0]), fr ? el('small', {}, `· ${stratOf(market, fr.strategy_id).name}`) : el('small', {}, '· nothing settled yet')));
+    if (fr) { box.append(el('div', {class:'tot'}, el('span', {class:'n'}, moneyDelta(cur, val(fr, 'net_pnl'), dec(cur))), fr.sample_badge === 'too_few_to_rank' ? el('span', {class:'mb-label neutral', 'data-tip': `Fewer than ${MIN_TRADES_TO_RANK} settled trades: a handful of trades is mostly luck (SPEC section 6).`}, `too few to rank (under ${MIN_TRADES_TO_RANK})`) : null, el('small', {}, `after ${cost} cost on ${fr.trades} trade${fr.trades === 1 ? '' : 's'} · ${pct(val(fr, 'win_rate'))} won · drawdown ${money(cur, val(fr, 'max_drawdown'), dec(cur), true)}`), luckBar(fr)));
+      for (const k of ['best_expected_gain', 'highest_probability']) { const r = p.h2h_rows.find(x => x.scope === 'pick_rule' && x.family === f && x.pick_rule === k && x.horizon_days === 'all'); box.append(el('div', {class:'pr'}, el('span', {class:'l'}, PICK[k]), r ? el('span', {class:'st'}, el('span', {}, `${r.trades} trade${r.trades === 1 ? '' : 's'}`), el('span', {}, `${pct(val(r, 'win_rate'))} won`), r.sample_badge === 'too_few_to_rank' ? el('span', {class:'mb-label neutral', style:'font-size:10.5px;padding:0 5px'}, 'too few to rank') : null, luckBar(r)) : el('span', {class:'st muted'}, 'no trade yet'), r ? el('b', {}, moneyDelta(cur, val(r, 'net_pnl'), dec(cur))) : el('b', {class:'muted'}, '—'))); } }
+    else box.append(el('div', {class:'quiet'}, 'No settled head-to-head trade for this family yet.'));
+    g.append(box);
+  }
+  card.append(g);
+  card.append(el('p', {class:'note'}, `Ranked on market cost (decision 50); your cost adds your broker’s charges. ${p.status.paper_label}: a paper trade is a record, never an order.`));
+  return card;
+}
+
+/* ---------- open trades by strategy ---------- */
+function openTrades(p) {
+  const cur = p.currency, card = el('section', {class:'card', 'aria-label':'Open paper trades by strategy'});
+  const checks = {}; for (const c of p.trade_checks) checks[c.trade_id] = c;
+  let rows = p.open_trades.filter(r => (!famFilter || r.family === famFilter) && (!viewFilter || r.view === viewFilter));
+  const ck0 = p.trade_checks[0];
+  card.append(el('div', {class:'head'}, el('h2', {}, 'Open paper trades by strategy'), el('span', {class:'mb-tag paper'}, 'paper'), help('Every paper trade that has entered (bought at the open of its entry session) and not yet exited, grouped by strategy: the accuracy view (one trade per qualifying prediction) and the head-to-head view (the daily picks, H2H). Unrealised = the latest stored close against the entry, before costs. Range = where the last close sits in the trade’s own predicted range. Check = the latest intraday check at its own price.'), el('div', {class:'end'}, `${rows.length} of ${p.open_trades.length} open`, ck0 ? ` · checked ${fmtLocal(ck0.check_at, market)}` : ' · no intraday check yet')));
+  const bar = el('div', {class:'toolbar', style:'margin:0 0 12px'});
+  const chips = [];
+  const chip = (label, kind, v) => { const b = el('button', {type:'button', class:'md-chip filter', 'aria-pressed': String((kind === 'fam' ? famFilter : viewFilter) === v), onclick: () => { if (kind === 'fam') famFilter = v; else viewFilter = v; for (const x of chips) x.setAttribute('aria-pressed', String((x._kind === 'fam' ? famFilter : viewFilter) === x._v)); rerenderTable(); }}, label); b._kind = kind; b._v = v; chips.push(b); return b; };
+  bar.append(chip('All families', 'fam', null), ...['rule', 'baseline', 'ai'].map(f => chip(FAMILY[f][0], 'fam', f)), el('span', {class:'muted', style:'margin:0 4px'}, '·'), chip('Both views', 'view', null), chip('Accuracy', 'view', 'accuracy'), chip('Head-to-head', 'view', 'head_to_head'));
+  card.append(bar);
+  const host = el('div'); card.append(host);
+  const draw = () => {
+    host.innerHTML = ''; rows = p.open_trades.filter(r => (!famFilter || r.family === famFilter) && (!viewFilter || r.view === viewFilter));
+    card.querySelector('.head .end').textContent = `${rows.length} of ${p.open_trades.length} open${ck0 ? ` · checked ${fmtLocal(ck0.check_at, market)}` : ' · no intraday check yet'}`;
+    if (!rows.length) { host.append(el('div', {class:'quiet'}, 'No open paper trade matches the filter.')); return; }
+    const tb = el('table', {class:'md-table tbl ot'});
+    tb.append(el('thead', {}, el('tr', {}, el('th', {}, 'Company'), el('th', {}, 'Horizon'), el('th', {class:'num cw'}, 'Entry'), el('th', {class:'num cw'}, 'Last'), el('th', {class:'num'}, 'Unrealised'), el('th', {class:'cm'}, 'Predicted range'), el('th', {class:'num c3'}, 'To target'), el('th', {}, 'Check'))));
+    const body = el('tbody'); const byS = {}; for (const r of rows) (byS[r.strategy_id] = byS[r.strategy_id] || []).push(r);
+    for (const id of Object.keys(byS).sort((a, b) => ({rule: 0, baseline: 1, ai: 2}[stratOf(market, a).family] - {rule: 0, baseline: 1, ai: 2}[stratOf(market, b).family]) || a.localeCompare(b))) {
+      const st = stratOf(market, id), trs = byS[id], sum = trs.reduce((s, r) => s + r.unrealised_pnl, 0);
+      body.append(el('tr', {class:'grp'}, el('td', {colspan: 8}, el('a', {class:'tk', href: `${PAGES.lab}#${market}/${id}`, 'data-tip': `${st.name}: open it in the Strategy lab.`}, st.name), ' ', famLabel(st.family, FAMILY_SHORT[st.family]), el('small', {}, `${trs.length} open · unrealised\u00a0`), moneyDelta(cur, sum, dec(cur)))));
+      for (const r of trs) { const ck = checks[r.trade_id]; let status;
+        if (!ck) status = el('span', {class:'st muted', 'data-tip':'No intraday check stored for this trade by the cut-off.'}, '—');
+        else { const b = BAND[ck.band] || [ck.band, '']; const fl = ck.flags.map(f => FLAG[f] || f); status = el('span', {class:'st ' + (ck.flagged ? 'flag' : b[1]), 'data-tip': `${fmtLocal(ck.check_at, market)}: ${price(cur, ck.last_price)}, ${sgn(ck.ret_since_entry_pct)} since entry, ${b[0]}${fl.length ? '; ' + fl.join(', ') : ''}. Best so far ${sgn(ck.high_since_entry_pct)}, worst ${sgn(ck.low_since_entry_pct)}.`}, icon(ck.flagged ? 'ms-warning' : 'ms-check'), ck.flagged ? ck.flags.map(f => FLAG_SHORT[f] || f).join(', ') : (BAND_SHORT[ck.band] || ck.band)); }
+        body.append(el('tr', {}, el('td', {}, el('span', {class:'nm'}, el('b', {}, el('a', {class:'tk', href: companyPage(r.ticker)}, r.ticker), r.view === 'head_to_head' ? el('span', {class:'mb-label neutral', style:'margin-left:6px;font-size:10.5px;padding:0 5px', 'data-tip':'Head-to-head view: one of the daily picks for this company.'}, 'H2H') : null), el('small', {}, companyOf(market, r.ticker).name))), el('td', {}, el('span', {class:'h-lab'}, `N+${r.horizon_days}`), el('small', {class:'muted cw', style:'white-space:nowrap'}, ` ${fmtD(r.entry_date, false)} → ${fmtD(r.exit_date, false)}`)), el('td', {class:'num cw'}, price(cur, r.entry_price)), el('td', {class:'num cw', 'data-tip': `Latest stored close (${fmtD(r.last_price_date)}).`}, price(cur, r.last_price)), el('td', {class:'num'}, moneyDelta(cur, r.unrealised_pnl, dec(cur)), el('span', {class:'cw'}, ' ', delta(r.unrealised_pct))), el('td', {class:'cm'}, rangeBar(cur, r, r.last_price, r.entry_price)), el('td', {class:'num c3'}, el('span', {'data-tip': r.to_target_pct < 0 ? `Already past the target ${price(cur, r.target_price)}.` : `${sgn(r.to_target_pct)} to the target ${price(cur, r.target_price)}.`}, r.to_target_pct < 0 ? 'past target' : sgn(r.to_target_pct))), el('td', {}, status))); }
+    }
+    tb.append(body); host.append(el('div', {class:'md-table-wrap'}, tb)); makeFocusable(host);
+  };
+  card._draw = draw; draw();
+  return card;
+}
+let otCard; const rerenderTable = () => otCard && otCard._draw();
+
+/* ---------- the owner's own paper portfolio ---------- */
+function owner(p) {
+  const cur = p.currency, o = p.owner, card = el('section', {class:'card', 'aria-label':'Your own paper portfolio'});
+  card.append(el('div', {class:'head'}, el('h2', {}, 'Your own paper portfolio'), el('span', {class:'mb-tag paper'}, 'paper'), help('Your manual paper trades (WS4): each a record with its side, quantity, the price and its basis (the session’s open or close, or a manual price inside the day’s range), the date and the channel it came from. Positions are first-in-first-out, marked to the latest stored close, before costs. US positions carry a euro view (F1.11, decision 11): the EUR/USD rate on the buy date and now, and BUX’s FX markup each way.'), el('div', {class:'end'}, el('button', {class:'md-btn filled small', type:'button', onclick: () => openDialog(p)}, icon('ms-receipt_long'), 'Add own paper trade'))));
+  if (!o.positions.length && !o.trades.length) { card.append(el('div', {class:'quiet'}, `No own paper trade in ${p.name} yet. Add one above; the default amount per paper trade is ${money(cur, o.default_amount)}.`)); const ph = el('div', {class:'pend'}); card.append(ph); renderPending(ph); return card; }
+  const tb = el('table', {class:'md-table tbl own'});
+  tb.append(el('thead', {}, el('tr', {}, el('th', {}, 'Position'), el('th', {class:'num'}, 'Shares'), el('th', {class:'num cw'}, 'Average price'), el('th', {class:'num cw'}, 'Last close'), el('th', {class:'num cm'}, 'Cost'), el('th', {class:'num'}, 'Value'), el('th', {class:'num'}, 'Profit'))));
+  const body = el('tbody');
+  for (const x of o.positions) body.append(el('tr', {}, el('td', {}, el('a', {class:'tk', href: companyPage(x.ticker)}, x.ticker), el('small', {class:'muted', style:'display:block;font-size:11px'}, companyOf(market, x.ticker).name)), el('td', {class:'num'}, String(x.quantity)), el('td', {class:'num cw'}, price(cur, x.avg_price)), el('td', {class:'num cw', 'data-tip': `Latest stored close, ${fmtD(x.last_close_date)}.`}, price(cur, x.last_close)), el('td', {class:'num cm'}, money(cur, x.cost, dec(cur))), el('td', {class:'num'}, money(cur, x.value, dec(cur))), el('td', {class:'num pn'}, el('b', {}, moneyDelta(cur, x.pnl, dec(cur))), el('small', {}, sgn(x.pnl_pct)))));
+  tb.append(body); card.append(el('div', {class:'md-table-wrap'}, tb));
+  const eurPos = o.positions.filter(x => x.eur_view);
+  for (const x of eurPos) { const e = x.eur_view; card.append(el('div', {class:'sub2', style:'margin:14px 0 0'}, `Euro view of ${x.ticker} (${e.quantity} share${e.quantity === 1 ? '' : 's'}, marked ${fmtD(e.mark_date, false)})`, help(`What the position cost in euros and what it would give back if converted now: EUR/USD ${e.eurusd_at_buy} on the buy date, ${e.eurusd_now} now, FX markup ${(e.fx_fee_rate * 100).toFixed(2)}% each way. ${e.note}`)));
+    const g = el('div', {class:'eur'}); const euro = v => (v < 0 ? '−' : '') + '€' + Math.abs(v).toLocaleString('en-IE', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    g.append(el('div', {class:'n', 'data-tip': `Dollars paid including the buy order’s cost: ${money(cur, e.cost_usd, 2)} ÷ ${e.eurusd_at_buy} × (1 + ${e.fx_fee_rate}).`}, el('div', {class:'l'}, 'Euros paid'), el('div', {class:'v'}, euro(e.cost_eur)), el('div', {class:'s'}, `at EUR/USD ${e.eurusd_at_buy} + markup`)), el('div', {class:'n', 'data-tip': `Dollars held now ${money(cur, e.value_usd, 2)} ÷ ${e.eurusd_now} × (1 − ${e.fx_fee_rate}).`}, el('div', {class:'l'}, 'Euros back if sold now'), el('div', {class:'v'}, euro(e.value_eur)), el('div', {class:'s'}, `at EUR/USD ${e.eurusd_now} − markup`)), el('div', {class:'n', 'data-tip':'Euros back minus euros paid.'}, el('div', {class:'l'}, 'Profit in euros'), el('div', {class:'v'}, el('span', {class:'mb-delta ' + (e.pnl_eur > 0 ? 'up' : e.pnl_eur < 0 ? 'down' : 'flat')}, euro(e.pnl_eur).replace(/^(?!−)/, e.pnl_eur > 0 ? '+' : ''))), el('div', {class:'s'}, `vs ${money(cur, x.pnl, 2, true)} in dollars before costs`)), el('div', {class:'n', 'data-tip':'The part of the euro result due to the exchange rate alone, before any fee.'}, el('div', {class:'l'}, 'Of which the rate'), el('div', {class:'v'}, el('span', {class:'mb-delta ' + (e.fx_effect_eur > 0 ? 'up' : e.fx_effect_eur < 0 ? 'down' : 'flat')}, euro(e.fx_effect_eur).replace(/^(?!−)/, e.fx_effect_eur > 0 ? '+' : ''))), el('div', {class:'s'}, 'rate change only')));
+    card.append(g); }
+  card.append(el('div', {class:'sub2', style:'margin:14px 0 0'}, `${o.trades.length} recorded trade${o.trades.length === 1 ? '' : 's'}`));
+  const ul = el('ul', {class:'tl'});
+  for (const t of o.trades) ul.append(el('li', {}, el('span', {class:'mb-label ' + (t.side === 'buy' ? 'success' : 'warn')}, t.side), el('span', {}, `${t.quantity} ${t.ticker} at ${price(cur, t.price)} (${t.price_basis === 'manual' ? 'manual price' : `the ${t.price_basis}`}) on ${fmtD(t.trade_date)}`, el('small', {}, `from ${SOURCE[t.source] || t.source} · entered ${fmtLocal(t.entered_at, market, true)}${t.note ? ` · “${t.note}”` : ''}${t.supersedes ? ' · corrects an earlier record' : ''}`))));
+  card.append(ul);
+  const ph = el('div', {class:'pend'}); card.append(ph); renderPending(ph);
+  return card;
+}
+function renderPending(host) {
+  host.innerHTML = '';
+  for (const r of (pending[market] || [])) host.append(el('div', {class:'mb-alert', style:'padding:10px 14px'}, icon('ms-pending'), el('div', {}, el('b', {class:'t'}, `Pending: ${r}`), el('div', {class:'s'}, 'A paper trade is a record, never an order. Appended to the inbox with your sign-in and an idempotency key; the next run imports it and checks the price against the stored bar (F10, WS4). Mockup: nothing was sent.'))));
+}
+function openDialog(p) {
+  const cur = p.currency, dlg = $('#dlg'); dlg.innerHTML = '';
+  const sel = el('select', {'aria-label':'Company'}); for (const c of p.companies.filter(c => c.state === 'active')) sel.append(el('option', {value: c.ticker}, `${c.ticker} · ${c.name}`));
+  const side = el('select', {'aria-label':'Side'}, el('option', {value:'buy'}, 'Buy'), el('option', {value:'sell'}, 'Sell'));
+  const qty = el('input', {type:'number', min:'1', step: cur === 'INR' ? '1' : '0.000001', value: '1', 'aria-label':'Shares'});
+  const basis = el('select', {'aria-label':'Price basis'}, el('option', {value:'open'}, 'The session’s open'), el('option', {value:'close'}, 'The session’s close'), el('option', {value:'manual'}, 'A price I type (inside the day’s range)'));
+  const px = el('input', {type:'number', step:'0.01', placeholder:'only for a typed price', 'aria-label':'Price'});
+  const date = el('input', {type:'date', value: p.as_of, 'aria-label':'Session date'});
+  const body = el('div', {class:'dbody'}, el('h3', {id:'dlg-title'}, 'Add an own paper trade'), el('div', {}, `A paper trade is a record of what you would have done, never an order. The price must be the stored bar’s open or close, or a typed price inside that day’s low-high; the import checks it (WS4). Whole shares in India, fractions in the US.`), el('label', {}, 'Company', sel), el('div', {class:'row2'}, el('label', {}, 'Side', side), el('label', {}, 'Shares', qty)), el('div', {class:'row2'}, el('label', {}, 'Price basis', basis), el('label', {}, `Price (${cur})`, px)), el('label', {}, 'Session date', date), el('div', {class:'muted', style:'font-size:12.5px'}, 'Recorded with your sign-in and an idempotency key; pending until the next run imports it. Nothing is bought or sold.'));
+  const acts = el('div', {class:'dact'}, el('button', {class:'md-btn text', type:'button', onclick: () => dlg.close()}, 'Cancel'), el('button', {class:'md-btn filled', type:'button', onclick: () => { (pending[market] = pending[market] || []).push(`${side.value} ${qty.value} ${sel.value} at ${basis.value === 'manual' ? (px.value ? price(cur, +px.value) : 'a typed price') : `the ${basis.value}`} on ${fmtD(date.value)}`); dlg.close(); render(); }}, 'Record paper trade'));
+  dlg.setAttribute('aria-labelledby', 'dlg-title'); dlg.append(body, acts); dlg.showModal();
+}
+
+function legend() {
+  return el('div', {class:'legend2', 'aria-label':'Legend'}, el('span', {}, 'Legend (sample values): ', el('span', {class:'mb-delta up'}, '+1.2%'), ' up, ', el('span', {class:'mb-delta down'}, '−1.2%'), ' down, always with the sign'),
+    el('span', {}, el('i', {class:'sw r'}), 'rule ', el('i', {class:'sw b'}), 'baselines ', el('i', {class:'sw a'}), 'AI'),
+    el('span', {}, el('span', {class:'mb-label neutral', style:'font-size:10.5px;padding:0 5px'}, 'H2H'), ' a head-to-head pick; ', el('span', {class:'mb-label success'}, 'edge'), ' / ', el('span', {class:'mb-label neutral'}, 'luck?'), ' the corrected luck interval excludes zero or not'),
+    el('span', {}, el('span', {class:'mb-tag paper'}, 'paper'), ' every figure until proven; a paper trade is a record, never an order'));
+}
+
+function render() {
+  const p = P(market);
+  document.title = `Market brief · Paper portfolios · ${LABEL[market]}`; $('#title').textContent = `Paper portfolios · ${p.name}`;
+  sideFoot(market); marketSeg(() => { famFilter = null; viewFilter = null; render(); });
+  const page = $('#page'); page.innerHTML = '';
+  const bar = el('div', {class:'ctrls'}); const sg = el('div', {class:'md-segmented dense light', role:'group', 'aria-label':'Costs'}); for (const [k, t] of [['market', 'Market cost'], ['your', 'Your cost']]) sg.append(el('button', {type:'button', 'aria-pressed': String(k === cost), onclick: () => { cost = k; render(); }}, t)); bar.append(el('span', {class:'c'}, 'Costs', help('Market cost: brokerage, taxes and fees (the ranking view). Your cost adds your own broker’s charges; the go-live bar uses it (decision 50). Open trades are before costs.'), sg));
+  page.append(pageHead(market, 'Paper portfolios', `head-to-head portfolios, open paper trades by strategy, and your own · ${p.name} · data as of the ${fmtD(p.as_of, false)} close · research only, nothing is an order`), paperBand(market, p.go_live, Object.keys(p.strategies).length), bar, kpis(p));
+  page.append(el('div', {style:'margin-top:16px'}, h2hCard(p)));
+  otCard = openTrades(p); page.append(el('div', {style:'margin-top:16px'}, otCard));
+  page.append(el('div', {style:'margin-top:16px'}, owner(p)), legend(), footer(market, D.endpoint));
+  makeFocusable(page);
+}
+render();
+</script>
+</body>
+</html>

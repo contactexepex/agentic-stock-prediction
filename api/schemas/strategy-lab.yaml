@@ -1,0 +1,217 @@
+# B13: the Strategy lab payload and the scoreboard records the strategy pages share (docs/DATA_CATALOGUE.md "Scoreboard
+# row", "Heatmap cell", "Cumulative line"; design/mockups/05-strategy-lab/notes.md)
+StrategyLabResponse:
+  allOf:
+    - $ref: '#/components/schemas/ReadModelMeta'
+    - type: object
+      required: [payload]
+      properties:
+        payload: {$ref: '#/components/schemas/StrategyLab'}
+StrategyLab:
+  x-source: warehouse/rm_strategies.strategy_lab_pages
+  description: >-
+    One market's Strategy lab: every scoreboard row (forward basis from the settled trades stored by the cut-off,
+    backtest basis from B2's back-test on the stored bars; the page filters on `basis`, never pooling them), the
+    forward heatmap cells and cumulative lines, and the back-test run's facts. Paper only.
+  allOf:
+    - $ref: '#/components/schemas/PageHeader'
+    - $ref: '#/components/schemas/HorizonChoice'
+    - type: object
+      required: [status, reference_strategy, go_live, strategies, companies, rows, cells, lines, bases, backtest_run]
+      properties:
+        status: {$ref: '#/components/schemas/StatusBlock'}
+        reference_strategy: {type: string, description: The registry's reference rule strategy id}
+        go_live: {$ref: '#/components/schemas/GoLive'}
+        strategies: {$ref: '#/components/schemas/StrategyMap'}
+        companies:
+          type: array
+          items: {$ref: '#/components/schemas/CompanyBrief'}
+        rows:
+          type: array
+          items: {$ref: '#/components/schemas/ScoreboardRow'}
+        cells:
+          type: array
+          items: {$ref: '#/components/schemas/HeatmapCell'}
+        lines:
+          type: array
+          items: {$ref: '#/components/schemas/CumulativeLine'}
+        bases:
+          type: array
+          description: The distinct `basis` values of `rows`
+          items: {$ref: '#/components/schemas/ScoreBasis'}
+        backtest_run: {$ref: '#/components/schemas/BacktestRun'}
+CompanyBrief:
+  type: object
+  x-source: warehouse/rm_strategies.companies
+  description: A collected company (B1's watchlist as of the cut-off) with the fields a page lists
+  required: [market, ticker, name, sector, state]
+  properties:
+    market: {$ref: '#/components/schemas/Market'}
+    ticker: {$ref: '#/components/schemas/Ticker'}
+    name: {type: string}
+    sector: {type: ['string', 'null']}
+    state: {type: string, enum: [active, inactive]}
+    amount: {$ref: '#/components/schemas/NullableNumber'}
+    amount_overridden: {type: ['boolean', 'null']}
+    currency: {type: ['string', 'null'], enum: [INR, USD, null]}
+    last_close: {$ref: '#/components/schemas/NullableNumber'}
+    last_close_date: {type: ['string', 'null'], format: date}
+ScoreBasis:
+  type: string
+  enum: [forward, backtest]
+  description: forward = paper trades settled live; backtest = B2's back-test on stored bars (F2.3). Never pooled.
+ScoreView:
+  type: string
+  enum: [accuracy, head_to_head]
+HorizonOrAll:
+  oneOf: [{$ref: '#/components/schemas/Horizon'}, {type: string, const: all}]
+LuckTest:
+  type: object
+  x-source: lab/luck.luck_test
+  description: Percentile bootstrap of the mean net return per trade (%), Bonferroni-corrected over the compared rows
+  required: [method, n, m, low_pct, high_pct, excludes_zero, corrected_low_pct, corrected_high_pct, corrected]
+  properties:
+    method: {type: string}
+    n: {type: integer}
+    m: {type: integer}
+    low_pct: {$ref: '#/components/schemas/NullableNumber'}
+    high_pct: {$ref: '#/components/schemas/NullableNumber'}
+    excludes_zero: {type: ['boolean', 'null']}
+    corrected_low_pct: {$ref: '#/components/schemas/NullableNumber'}
+    corrected_high_pct: {$ref: '#/components/schemas/NullableNumber'}
+    corrected: {type: ['boolean', 'null']}
+YourCostView:
+  type: object
+  x-source: lab/scoreboard.your_view
+  description: The row in the your-cost view (owner's charges); a back-test row carries net_pnl and mean_return_pct only
+  required: [net_pnl, mean_return_pct]
+  properties:
+    net_pnl: {$ref: '#/components/schemas/NullableNumber'}
+    mean_return_pct: {$ref: '#/components/schemas/NullableNumber'}
+    win_rate: {$ref: '#/components/schemas/NullableNumber'}
+    worst_losing_streak: {type: ['integer', 'null']}
+    max_drawdown: {$ref: '#/components/schemas/NullableNumber'}
+    luck_test:
+      oneOf: [{$ref: '#/components/schemas/LuckTest'}, {type: 'null'}]
+RowGoLive:
+  type: object
+  x-source: lab/scoreboard.go_live
+  description: A strategy row's position against the go-live bar (SPEC F7.2), in the your-cost view
+  required: [proven, months_forward, trades_needed, beats_best_baseline]
+  properties:
+    proven: {type: boolean}
+    months_forward: {type: number}
+    trades_needed: {type: integer}
+    beats_best_baseline: {type: ['boolean', 'null']}
+    best_baseline_net_pnl: {$ref: '#/components/schemas/NullableNumber'}
+    drawdown_limit: {$ref: '#/components/schemas/NullableNumber'}
+    drawdown_within_limit: {type: ['boolean', 'null']}
+    holds_in_calm_and_volatile: {type: ['boolean', 'null']}
+    cost_view: {type: string}
+ScoreboardRow:
+  type: object
+  x-source: warehouse/rm_strategies.scoreboard_rows
+  description: >-
+    One market x view x basis x slice of B2's scoreboard (lab/scoreboard.py). Money in the market-cost view;
+    `your_cost` repeats it in the your-cost view. Forward rows carry `as_of` (the data's as-of date) and, on scope
+    `strategy`, `go_live`; back-test rows have neither.
+  required: [scope, market, view, basis, strategy_id, family, pick_rule, ticker, regime, horizon_days, trades, net_pnl,
+             mean_return_pct, win_rate, worst_losing_streak, max_drawdown, sample_badge, first_entry, last_exit,
+             luck_test, your_cost]
+  properties:
+    scope: {type: string, enum: [strategy, strategy_company, pick_rule, strategy_regime]}
+    market: {$ref: '#/components/schemas/Market'}
+    view: {$ref: '#/components/schemas/ScoreView'}
+    basis: {$ref: '#/components/schemas/ScoreBasis'}
+    strategy_id: {type: ['string', 'null']}
+    family: {type: ['string', 'null'], enum: [rule, baseline, ai, null]}
+    pick_rule: {type: ['string', 'null']}
+    ticker: {type: ['string', 'null']}
+    regime: {type: ['string', 'null']}
+    horizon_days: {$ref: '#/components/schemas/HorizonOrAll'}
+    trades: {type: integer}
+    net_pnl: {$ref: '#/components/schemas/NullableNumber'}
+    mean_return_pct: {$ref: '#/components/schemas/NullableNumber'}
+    win_rate: {$ref: '#/components/schemas/NullableNumber'}
+    target_reached_rate: {$ref: '#/components/schemas/NullableNumber'}
+    median_reached_session: {$ref: '#/components/schemas/NullableNumber'}
+    avg_target_error_pct: {$ref: '#/components/schemas/NullableNumber'}
+    range_hit_rate: {$ref: '#/components/schemas/NullableNumber'}
+    worst_losing_streak: {type: ['integer', 'null']}
+    max_drawdown: {$ref: '#/components/schemas/NullableNumber'}
+    sample_badge: {type: ['string', 'null']}
+    first_entry: {type: ['string', 'null'], format: date}
+    last_exit: {type: ['string', 'null'], format: date}
+    as_of: {type: ['string', 'null'], format: date}
+    luck_test:
+      oneOf: [{$ref: '#/components/schemas/LuckTest'}, {type: 'null'}]
+    your_cost:
+      oneOf: [{$ref: '#/components/schemas/YourCostView'}, {type: 'null'}]
+    go_live: {$ref: '#/components/schemas/RowGoLive'}
+HeatmapCell:
+  type: object
+  x-source: lab/heatmaps.cells
+  required: [market, view, basis, strategy_id, dimension, column, week, trades, wins, win_rate, net_pnl]
+  properties:
+    market: {$ref: '#/components/schemas/Market'}
+    view: {$ref: '#/components/schemas/ScoreView'}
+    basis: {$ref: '#/components/schemas/ScoreBasis'}
+    strategy_id: {type: string}
+    dimension: {type: string, enum: [horizon, company, reason_code]}
+    column: {type: string, description: 'A horizon k, a ticker or a reason code'}
+    week: {type: string, description: 'ISO week of the exit (YYYY-Www) or `all`'}
+    trades: {type: integer}
+    wins: {type: integer}
+    win_rate: {type: number}
+    net_pnl: {type: number}
+CumulativeLine:
+  type: object
+  x-source: lab/heatmaps.cumulative
+  required: [market, view, basis, series, date, net_pnl, cumulative_net_pnl]
+  properties:
+    market: {$ref: '#/components/schemas/Market'}
+    view: {$ref: '#/components/schemas/ScoreView'}
+    basis: {$ref: '#/components/schemas/ScoreBasis'}
+    series: {type: string, description: 'A strategy id (accuracy view) or `family:pick_rule` (head-to-head view)'}
+    date: {$ref: '#/components/schemas/IsoDate'}
+    net_pnl: {type: number}
+    cumulative_net_pnl: {type: number}
+BacktestRun:
+  type: object
+  x-source: warehouse/rm_strategies.backtest
+  description: >-
+    The facts of the back-test behind the backtest rows: history cache used, first and last bar date, the EUR/USD
+    source of the US order fee, and a note (B2's, or why the run was refused, e.g. no stored EUR/USD closes)
+  required: [history, first_date, last_date, eurusd, note]
+  properties:
+    history: {type: boolean}
+    first_date: {type: ['string', 'null'], format: date}
+    last_date: {type: ['string', 'null'], format: date}
+    eurusd: {type: ['string', 'null']}
+    note: {type: ['string', 'null']}
+StrategyLabTable:
+  description: "An rm.strategies page: `_` is the Strategy lab (StrategyLab), a strategy id is one strategy's detail"
+  anyOf: [{$ref: '#/components/schemas/StrategyLab'}, {$ref: '#/components/schemas/StrategyDetail'}]
+StrategyDetail:
+  type: object
+  x-source: warehouse/rm_strategies.strategy_page
+  description: >-
+    One registry strategy (rm.strategies page key = its id; B5's get_scoreboard): its entry, every scoreboard row of
+    it (all scopes, views and bases, each carrying its basis), its heatmap cells, its cumulative line (accuracy view)
+    and the go-live block of its accuracy row over all horizons (null before any settled trade). Paper only.
+  required: [market, as_of, strategy, go_live, rows, cells, lines]
+  properties:
+    market: {$ref: '#/components/schemas/Market'}
+    as_of: {type: ['string', 'null'], format: date}
+    strategy: {$ref: '#/components/schemas/StrategyEntry'}
+    go_live:
+      oneOf: [{$ref: '#/components/schemas/RowGoLive'}, {type: 'null'}]
+    rows:
+      type: array
+      items: {$ref: '#/components/schemas/ScoreboardRow'}
+    cells:
+      type: array
+      items: {$ref: '#/components/schemas/HeatmapCell'}
+    lines:
+      type: array
+      items: {$ref: '#/components/schemas/CumulativeLine'}

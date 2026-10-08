@@ -7,7 +7,7 @@ the shape and is computed here from those inputs so the files agree with each ot
 agreement counts, scoreboard sums). Costs come from B2's engine with config/costs.yaml's rates (marked verify).
 Sessions come from the real market calendar (India 2026-10-02 is a holiday). Rerun after a change:
 
-    python design/catalogue/make_examples.py
+    python design/catalogue/make_examples.py   # about a minute: the back-test examples run B2's back-test
 
 Files whose entity is a stored kind hold rows with exactly that kind's columns (tests/test_w1_catalogue.py)."""
 from __future__ import annotations

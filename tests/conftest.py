@@ -60,6 +60,11 @@ SLOW = {
         "test_score_cli_on_recorded_calls",
         "test_training_cutoff_comes_from_config",
     },
+    "tests/test_api_contract.py": {
+        "test_every_contract_case_passes_on_synced_read_models",
+        "test_status_page_values_come_from_the_stored_data",
+        "test_a_sync_revalidates_written_and_deleted_pages_in_both_modes",
+    },
     "tests/test_call_basis.py": {
         "test_no_entry_open_no_score_and_old_rows_read_as_close_to_close",
         "test_scoring_bases_match_the_model_labels",
@@ -142,6 +147,14 @@ SLOW = {
         "test_model_check_reruns_the_backtest_into_work",
         "test_review_end_to_end",
         "test_review_with_little_data_makes_no_live_proposal",
+    },
+    "tests/test_rm_entities.py": {
+        "test_agreement_counts_match_the_catalogue",
+        "test_companies_carry_the_agreement_and_open_trade_counts",
+        "test_open_trade_factors_come_from_the_stored_splits",
+        "test_open_trades_match_the_catalogue",
+        "test_records_validate_against_their_shared_schemas",
+        "test_settled_late_and_future_predictions_are_not_open",
     },
     "tests/test_sec_times.py": {
         "test_stored_shifted_rows_are_corrected_on_read",

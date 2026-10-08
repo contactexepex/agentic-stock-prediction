@@ -1,0 +1,61 @@
+# B13: the Paper portfolios page (design/mockups/07-paper-portfolios; docs/ws/b13.md). Research only: a paper trade is
+# a record, never an order.
+/api/v1/markets/{market}/paper-trades:
+  post:
+    tags: [portfolio]
+    operationId: createPaperTrade
+    summary: Submit one of the owner's paper trades (pending until the next import validates and stores it)
+    description: |
+      The add-trade form of the Paper portfolios page. A thin call into the governed tool layer (`add_paper_trade`,
+      mcp/tools.yaml; agent `dashboard`, identity from Vercel Authentication, never from the body), which appends one
+      row to the append-only inbox (`inbox.requests`) and logs the call; `scripts/portfolio.py import-inbox` validates
+      it with the same checks as `add-trade` and appends it to data/<market>/portfolio_trades/. Nothing is sent to any
+      broker. Pending means in the inbox, not yet recorded. JSON only; a cross-site Origin is refused. Repeating a request with the same Idempotency-Key and body
+      returns the first receipt; the same key with another body is a conflict. Refused in gateway mode.
+    parameters:
+      - $ref: '#/components/parameters/Market'
+      - $ref: '#/components/parameters/IdempotencyKey'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/PaperTradeSubmission'}
+    responses:
+      '202':
+        description: Pending in the inbox until the import writes it to the record
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/PaperTradeReceipt'}
+      '200':
+        description: The receipt of an earlier request with the same key and body
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/PaperTradeReceipt'}
+      '403':
+        description: Refused for this caller (a cross-site Origin, before the tool layer and not logged; or the channel)
+      '404': {$ref: '#/components/responses/NotFound'}
+      '409':
+        description: The Idempotency-Key was already used for another request; nothing was written
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/PaperTradeReceipt'}
+      '415':
+        description: The body is not application/json
+        content:
+          application/problem+json:
+            schema: {$ref: '#/components/schemas/Problem'}
+      '422':
+        description: The body failed validation (no Idempotency-Key, not a JSON object, unknown fields, or the tool layer's checks); logged in the command log
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/PaperTradeReceipt'}
+      '429':
+        description: The dashboard agent's daily write budget is used up
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/PaperTradeReceipt'}
+      '503':
+        description: The inbox or command log is unavailable, or the dashboard agent is switched off; nothing was written
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/PaperTradeReceipt'}

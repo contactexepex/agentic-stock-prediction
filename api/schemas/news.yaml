@@ -1,0 +1,132 @@
+# The News page (B11; design/mockups/09-news/notes.md) and the catalogue records it shares with Home (B11) and the
+# company page (B12): NewsItemRecord, NewsEnrichment, CalendarEvent. Builder: scripts/marketbrief/warehouse/rm_news.py.
+NewsResponse:
+  allOf:
+    - $ref: '#/components/schemas/ReadModelMeta'
+    - type: object
+      required: [payload]
+      properties:
+        payload: {$ref: '#/components/schemas/NewsPayload'}
+NewsPayload:
+  x-source: warehouse/rm_news.news_pages
+  description: >-
+    The News page: the page shell, the news items first seen in the 3 days before the cut-off (at most 50: 25 company
+    and 25 market-wide, each half by market movers, high materiality, then newest; listed newest first), the calendar
+    from the session being predicted to 7 days after it and the companies of the rail
+  allOf:
+    - $ref: '#/components/schemas/PageHeader'
+    - $ref: '#/components/schemas/HorizonChoice'
+    - type: object
+      required: [status, go_live, window, news, calendar, calendar_days, companies]
+      properties:
+        status: {$ref: '#/components/schemas/StatusBlock'}
+        go_live: {$ref: '#/components/schemas/GoLive'}
+        window: {$ref: '#/components/schemas/NewsWindow'}
+        news:
+          type: array
+          maxItems: 50
+          items: {$ref: '#/components/schemas/NewsItemRecord'}
+        calendar:
+          type: array
+          items: {$ref: '#/components/schemas/CalendarEvent'}
+        calendar_days: {type: integer, description: Days after the session being predicted the calendar covers (7)}
+        companies:
+          type: array
+          description: >-
+            The collected companies (active and inactive), by ticker, with market, ticker, name, sector, state and
+            open_trades
+          items: {$ref: '#/components/schemas/CompanyRecord'}
+NewsWindow:
+  type: object
+  x-source: warehouse/news_items.news_window
+  required: [days, from, to, max_items, stored_in_window, older_hidden]
+  properties:
+    days: {type: integer}
+    from: {$ref: '#/components/schemas/IsoTime'}
+    to: {$ref: '#/components/schemas/IsoTime'}
+    max_items: {type: integer}
+    stored_in_window: {type: integer, description: Listable items first seen in the window (before the cap)}
+    older_hidden: {type: integer, description: Stored items first seen before the window}
+NewsEnrichment:
+  type: object
+  x-source: news_enriched (newest row analyzed by the cut-off)
+  required: [event_type, materiality, sentiment, relevance, novelty, urgency, priced_in, analyzed_at]
+  properties:
+    event_type: {type: ['string', 'null']}
+    materiality: {type: ['string', 'null'], enum: [high, medium, low, null]}
+    sentiment: {$ref: '#/components/schemas/NullableNumber'}
+    relevance: {$ref: '#/components/schemas/NullableNumber'}
+    novelty: {$ref: '#/components/schemas/NullableNumber'}
+    urgency: {type: ['string', 'null']}
+    priced_in: {type: ['boolean', 'null']}
+    geopolitical: {type: ['boolean', 'null']}
+    analyzed_at: {type: ['string', 'null'], format: date-time}
+NewsItemRecord:
+  type: object
+  x-source: warehouse/news_items.news_items
+  description: >-
+    The catalogue's News item as of the cut-off (docs/DATA_CATALOGUE.md). A company deleted by the cut-off is never in
+    `tickers` or `primary_tickers` (decision 12). `status` is the item's own status for its first primary ticker
+    (none for a market-wide item). `headline_history` and `headline_history_status` are carried where a page lists
+    them (Home, the company page), not on the News page. `required` is the core every page carries; the other
+    fields are present where the page's mockup lists them (the contract test checks each page's keys)
+  required: [id, market, tickers, primary_tickers, title, source, source_domain, url, published_at, first_seen_at,
+             status, status_as_of, independent_origins, primary_ids, cluster_id, enrichment]
+  properties:
+    id: {type: string}
+    market: {$ref: '#/components/schemas/Market'}
+    tickers: {type: array, items: {type: string}}
+    primary_tickers: {type: array, items: {type: string}}
+    title: {type: string}
+    source: {type: ['string', 'null']}
+    source_domain: {type: ['string', 'null']}
+    url: {type: ['string', 'null']}
+    published_at: {type: ['string', 'null'], format: date-time}
+    first_seen_at: {$ref: '#/components/schemas/IsoTime'}
+    status:
+      oneOf: [{$ref: '#/components/schemas/NewsStatus'}, {type: 'null'}]
+    status_as_of: {type: ['string', 'null'], format: date-time}
+    independent_origins: {type: ['integer', 'null']}
+    primary_ids: {type: array, items: {type: string}}
+    cluster_id: {type: ['string', 'null']}
+    scope: {type: string, enum: [company, market]}
+    category: {type: ['string', 'null']}
+    feed: {type: ['string', 'null']}
+    summary: {type: ['string', 'null']}
+    summary_source: {type: string, enum: [article, analyst, none]}
+    market_moving: {type: boolean}
+    origin: {type: string, enum: [stored]}
+    enrichment: {$ref: '#/components/schemas/NewsEnrichment'}
+    headline_history:
+      type: array
+      items:
+        type: object
+        required: [seen_at, title]
+        properties:
+          seen_at: {$ref: '#/components/schemas/IsoTime'}
+          title: {type: string}
+    headline_history_status: {type: string}
+CalendarEvent:
+  type: object
+  x-source: warehouse/calendar_events.calendar_events
+  description: >-
+    The catalogue's Calendar event: a market event of config/events.yaml, a weekday the exchange is closed, or a
+    company's results or ex-dividend date as known by the cut-off
+  required: [market, date, type, name, ticker, timing, reaction_sessions, major, widens, provisional, release,
+             source, event_id]
+  properties:
+    market: {$ref: '#/components/schemas/Market'}
+    date: {$ref: '#/components/schemas/IsoDate'}
+    type: {type: string}
+    name: {type: string}
+    ticker: {type: ['string', 'null']}
+    timing: {type: ['string', 'null'], enum: [before_open, during, after_close, null]}
+    reaction_sessions:
+      type: ['array', 'null']
+      items: {$ref: '#/components/schemas/IsoDate'}
+    major: {type: boolean}
+    widens: {type: ['string', 'null'], enum: [market, company, null]}
+    provisional: {type: boolean}
+    release: {type: ['string', 'null']}
+    source: {type: string}
+    event_id: {type: ['string', 'null']}

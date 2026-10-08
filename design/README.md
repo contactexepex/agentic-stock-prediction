@@ -29,20 +29,92 @@ implements the mockups as React components on the design system.
 ## Pages (SPEC section 6)
 | # | Page | Folder | Status |
 |---|---|---|---|
-| 1 | Home | `mockups/01-home/` | approved by the owner (2026-10-08, with "fix the clipped and overlapping text"); judge PASS round 3 at a0467b2; on main |
+| 1 | Home | `mockups/01-home/` | approved by the owner (2026-10-08, with "fix the clipped and overlapping text"); judge PASS round 3 at a0467b2; on main; cosmetic issues #160-#162 |
 | 2 | Watchlist | `mockups/02-watchlist/` | built on the owner's delegated authority (2026-10-08); judge PASS round 2 at b1c9127; on main; cosmetic issues #152-#155 |
-| 3 | Company | `mockups/03-company/` | built on the owner's delegated authority (2026-10-08); judge PASS round 2 at 8912657; on main |
-| 4 | Stock strategies | `mockups/04-stock-strategies/` | built on the owner's delegated authority (2026-10-08); judge PASS round 2 at ca019cd; on main |
-| 5 | Strategy lab | `mockups/05-strategy-lab/` | built; with the judge |
-| 6 | Rule vs AI | | |
-| 7 | Paper portfolios | | |
-| 8 | Track record | | |
-| 9 | News | | the owner decided in the earlier round to fold the news into Home (the news card) and the Company page; to be confirmed |
-| 10 | Companies | | |
-| 11 | Assistant | | |
-| 12 | Help | | |
+| 3 | Company | `mockups/03-company/` | built on the owner's delegated authority (2026-10-08); judge PASS round 2 at 8912657; on main; cosmetic issues #169-#175 |
+| 4 | Stock strategies | `mockups/04-stock-strategies/` | built on the owner's delegated authority (2026-10-08); judge PASS round 2 at ca019cd; on main; cosmetic issues #157-#158, #163-#168 |
+| 5 | Strategy lab | `mockups/05-strategy-lab/` | built on the owner's delegated authority (2026-10-08); judge PASS round 2 at a7c4ff3 and, reading W1's back-test rows on the Back-test basis, PASS round 4 at 4d03deb, and reading W1's heatmap cells and cumulative lines PASS round 2 at 5c5c60b; on main; cosmetic issues #197-#207, #219-#221, #223-#224 |
+| 6 | Rule vs AI | `mockups/06-rule-vs-ai/` | built on the owner's delegated authority (2026-10-08); judge PASS round 4 at e0d2b7d and, rebuilt on W1's W40 research reviews, round 7 at 821298d; on main; cosmetic issues #179-#189 |
+| 7 | Paper portfolios | `mockups/07-paper-portfolios/` | built on the owner's delegated authority (2026-10-08); judge PASS round 2 at 5d22863; on main; cosmetic issues #190-#193 |
+| 8 | Track record | `mockups/08-track-record/` | built on W1's `track_record` entity (2026-10-08); judge PASS round 2 at 17c5c6f; on main; cosmetic issues #213-#216 |
+| 9 | News | `mockups/09-news/` | built on the owner's rules of 2026-10-08 (the last 3 days, the market movers first, every story linking to its article, the calendar and the companies in a rail) and W1's data request 8; judge PASS round 2 at 163963a and, with the publish time, round 3 at 022a83a, closing round PASS at 4dc05f9 (round 2); on main; cosmetic issues #225-#226 (#227 fixed by the closing round) |
+| 10 | Companies | `mockups/10-companies/` | built on the owner's delegated authority (2026-10-08); judge PASS round 2 at 23c56a4; on main; cosmetic issues #194-#196 |
+| 11 | Assistant | `mockups/11-assistant/` | built on W1's `assistant_answer` entity (2026-10-08); judge PASS round 2 at 656b699 and, rebuilt on W1's data request 7 (answers asked before the cut-off), round 3 at 437a891; on main; cosmetic issues #217-#218, #222 |
+| 12 | Help | `mockups/12-help/` | built on the owner's delegated authority (2026-10-08); judge PASS round 3 at 962b8dc; on main; cosmetic issues #208-#212 |
 
 Order: the spec's, proposed to the owner with Home first.
+
+## Decisions taken on the owner's behalf (2026-10-08, for the morning review)
+
+The owner delegated the remaining pages ("go with your recommendation, notify the orchestrator"). Each page's
+`rationale.md` has the full list under "Decisions taken for the owner"; this is the one-place summary.
+
+| Page | Decisions |
+|---|---|
+| 1 Home | Approved by the owner directly (Materialize-style admin layout; the decision-51 cost labels added later with the Stock strategies page). |
+| 2 Watchlist | The table is the page, no second chart; the visual parts are the stacked agreement bar, the odds meter, the buyers-by-horizon bars and the range bar. Inactive companies are not rows (decision 13): named once under the table with a link. |
+| 3 Company | Opens with a decision card (today's numbers a retail investor can act on, with one plain-words line), not the chart. The chart projects the reference strategy's ranges as a fan to N+5 and shows every strategy's target at the selected horizon as a spread, not fifteen lines. The open-trade and settlement tables sit full width above the two-column part. The "why it moved" split is a diverging bar per trade. Change amount / deactivate are confirm dialogs recording a pending request; delete is left to the Companies page. |
+| 4 Stock strategies | Agreement is a chart (grouped stacked bars per horizon), not a table. The ranked table shows each strategy's prediction at the selected horizon only; the horizon tabs switch it. |
+| 5 Strategy lab | One scoreboard for all 15 strategies with the baselines in the list, ranked on market cost with your cost beside it and a cost switch. The luck test is a bar with a three-valued word: "edge" (corrected interval above zero), "luck?" (includes zero), "loss" (wholly below zero). The strategy detail is the comparison with the reasoning (the one setting that differs, both values, the go-live checklist). Four heatmaps with the numbers in the cells, a Profit / Win rate switch and a week picker on W1's cells; the regime map is the scoreboard's (all weeks). Back-test is a switch, never on the same table as forward: the run's facts above the table, "not run" for strategies the engine cannot run, "not stored" for your-cost figures it lacks, compact lakh/crore figures in the cells. |
+| 6 Rule vs AI | Opens with a two-sided scorecard and a one-word verdict with the luck test drawn. Matches per company-day and pick rule, a draw when both families made the same trade. The weekly review card reads only reviews written by the cut-off (the W40 ones). The per-company comparison is summed from the trades (no per-company head-to-head scoreboard row exists; W1 answered with heatmap cells at market cost). |
+| 7 Paper portfolios | Two family boxes with the pick-rule portfolios inside, not a four-row table. Open trades grouped by strategy with family and view filters, reusing Home's row design. The euro view as four tiles with the formula in tooltips and the "fee provisional, verify" note. Adding an own paper trade is a dialog recording a pending request with the WS4 price rule. |
+| 8 Track record | The signal model's skill verdict leads as a band with the review it comes from. Every hit rate carries its Wilson interval as a bar with the always-up tick. Calibration is a chart with the diagonal plus the bands' table. Scoring bases one at a time, never pooled; legacy windows tagged. Empty states say what is missing (no range scored, no replay, the weekly series not in the read model: a request to B4). |
+| 9 News | Built on the owner's rules of 2026-10-08. The movers are a ranked band above the feed (the engine's market-moving flag first, then market-wide, results, materiality, newest; a headline stored twice shows once); the feed is one list grouped by day with filter chips and a pager; the rail holds the week's calendar and the companies in the news; market-wide stories carry "not verified per company" because verification is per company. Home's news card became the window's top 5 movers with a link to the News page. Confirmed by the owner after the first review: the ranking stays, at most 10 in the band, the outlet's publish time on every story. |
+| 10 Companies | Active and inactive companies as two tables. Every write is a dialog ending in a recorded pending request; delete behind a typed confirmation, dashboard-only (F8.5); the add flow shows the F8.7 summary step. A company deleted later is masked everywhere, command keys and record ids included (decision 12). On phones the row actions collapse into one Manage button; deactivate / reactivate take an optional reason. |
+| 11 Assistant | A chat with the sources under each answer and a records panel beside it. Every answer carries a visible state (answered / not in the data / declined). The conversation is filtered on the asking time, as every page filters on a record's write time (W1 re-dated the examples before the cut-off at the track's request). The budget is the spec's caps with an honest "spend not in the example data" note. Long record ids wrap in full. |
+| 12 Help | One scrolling page with an anchor chip row, not tabs. The strategy list, the go-live checklist and the agreement example come from the catalogue. Sample visual parts are drawn with the pages' own helpers and labelled "sample". The judge made the track correct several system statements (D = the entry session; only freely accessible vetted pages are read; which pages carry the signals band; what is hand-entered). |
+
+Shared: new named spec constants in `mockups/_shared/shell.js` (the 60-word reason limit; the assistant's 500
+characters, $0.65 a day, $20 a month, 90 days), each with its source.
+
+## Design closed (2026-10-08): handover to the API and app work
+
+The owner closed the design track on 2026-10-08 after reviewing every page through one hub: all twelve pages of
+SPEC section 6 are judged PASS and on main, with the News page built on the owner's rules of that morning. What the
+API work (WS2, `api/openapi.yaml`) and the app (WS3) take from here:
+
+- **The contract per page is its `data.json`** (the endpoint's example payload, catalogue fields only) and its
+  `notes.md` (every copied key, the selection rule per key, what the page computes itself). The endpoint and read
+  model each page assumes:
+
+| Page | Endpoint | Read model |
+|---|---|---|
+| 01-home | `GET /api/v1/markets/{market}/home` | `rm.home` |
+| 02-watchlist | `GET /api/v1/markets/{market}/watchlist` | `rm.watchlist` |
+| 03-company | `GET /api/v1/markets/{market}/stocks/{ticker}` | `rm.stock + rm.bars + rm.lifecycle + rm.trades` |
+| 04-stock-strategies | `GET /api/v1/markets/{market}/stocks/{ticker}/strategies` | `rm.stock_strategies` |
+| 05-strategy-lab | `GET /api/v1/markets/{market}/strategies` | `rm.strategies` |
+| 06-rule-vs-ai | `GET /api/v1/markets/{market}/compare` | `rm.compare + rm.review` |
+| 07-paper-portfolios | `GET /api/v1/markets/{market}/portfolios` | `rm.portfolio + rm.trades` |
+| 08-track-record | `GET /api/v1/markets/{market}/track-record` | `rm.track_record` |
+| 09-news | `GET /api/v1/markets/{market}/news` | `rm.news` |
+| 10-companies | `GET /api/v1/markets/{market}/companies` | `rm.companies` |
+| 11-assistant | `POST /api/assistant (the explain tool)` | `(none: conversations are an operational log in MotherDuck schema app, kept 90 days)` |
+| 12-help | `(static content; no endpoint)` | `(none)` |
+
+- **Open data requests** are what the `_data_requests` lists in the pages' `data.json` files leave open: the
+  Assistant's budget state (F11, not in the catalogue); a weekly series of hit rate and Brier per scoring basis for
+  Track record (B4); for Strategy lab, a back-test run on the 15-year history cache and the model-only rows (W1's
+  back-test rows cover always-up and momentum on the stored bars); for News, what the stored data cannot supply (a
+  region, confirmed or corroborated statuses on the stored items, clusters with more than one origin, summaries for
+  most US items); for Rule vs AI, reading the per-company head-to-head cut from the heatmap cells is a follow-up.
+  W1 answered the rest of requests 1-8. Issue #226 holds the News page's further findings for W1 and the owner
+  (events already past, the per-company rail beyond the catalogue's four companies, the kind word, W1's
+  market-moving rule on promotional items); they are an issue, not a `_data_requests` entry.
+- **Rules the pages encode as named constants** (`mockups/_shared/shell.js`, each with its source): the go-live bar
+  (2 months, about 300 trades), two intraday checks a session, 20 trades to rank, the 15-year back-test, the 95%
+  luck interval, the 60-word reason limit, the assistant's 500 characters / $0.65 a day / $20 a month / 90 days,
+  the News page's 10 movers, 10 a page and 24 hours, and the 0.05 sentiment band (flat between -0.05 and +0.05);
+  the News window (3 days) and cap (50) are in its build.
+- **Presentation rules** every page follows (the agreement above): the design system in `system/`, never colour
+  alone, keyboard usable, Paper labels, "No proven strong signals today" until the weekly review's `model_skill`,
+  research only. The React components of WS3 implement the mockups' layouts; the mockups' `template.html` files
+  show every state (filters, empty states, dialogs).
+- **Backlog**: the judge's cosmetic findings on the design track are GitHub issues #152-#155, #157-#177 and
+  #179-#227 labelled `cosmetic` (#159, #176 and #177 concern the shared scaffold and checks; #156 and #178 are
+  other work: the web tier's URL guard and the B1 inbox fix), held
+  for a round after the API and app work has started; none blocks the contract. #227 is fixed by the closing round
+  and is closed when it lands.
 
 ## Design system
 `system/`: scheme v2 "modern admin light" (2026-10-08; `system/README.md`): the look of modern admin templates the

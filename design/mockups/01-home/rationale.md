@@ -71,10 +71,13 @@ and the range bar. Text tones stay AA on white (figures in tokens.css).
    every family's figure), *last close* from the end-of-day analysis (family tiles with trades won and net profit,
    the leader in the accent tint and marked "led"; the analyst's summary with a link to the reasons), and *to date*
    as the head-to-head grid family x pick rule (net profit, trades, win rate, "too few to rank" under 20 trades).
-10. **News that can carry a call** (the owner's decision of the earlier round: the news card lives on Home, no
-    separate News screen): the market's stored items whose status is confirmed or corroborated, each with the
-    sentiment square, the company, the headline (link), the status badge, source, materiality, event type,
-    independent origins and filings, local time; the rest behind "Set aside: n rumour, ..." with the same rows.
+10. **Market movers · last 3 days** (the owner's decision of 2026-10-08: News gets its own page; Home shows the
+    movers of its 3-day window and links to it): the top 5 stories as the News page ranks them (the engine's
+    market-moving flag first, then market-wide, results, materiality, newest; a headline stored twice shows once),
+    each with the sentiment square, the headline (link to the article), the summary line when stored, the status
+    badge or "not verified per company" for a market-wide story, the market-moving label, the company links,
+    source, materiality and kind; under them the window's count, how many can carry a call, and the link to the
+    News page. (Earlier round: "News that can carry a call" with the rest set aside; replaced with the News page.)
 11. **Runs today**: a timeline of pre-open, intraday checks, post-close (or its next time) and news (new items),
     each with a tick / cross / clock mark and the local time; "n of N ok" label; the cut-off line.
 12. **Open paper trades** (full width): grouped by company (count, last close, unrealised total), one row per open

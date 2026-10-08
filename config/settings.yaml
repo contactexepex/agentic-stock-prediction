@@ -4,6 +4,9 @@ branch: main
 slack_channel: "#market-brief"
 slack_channel_id: C0C6REB7QS2   # notify_slack.py posts the thread here with SLACK_BOT_TOKEN (bot must be a member)
 pages_url: https://agentic-stock-prediction-reports.vercel.app   # Vercel (Root Directory reports/, Vercel Authentication on all deployments); Slack links open the HTML rendered
+# The reports site deploys only by hand from the Vercel dashboard (reports/vercel.json: git.deploymentEnabled false;
+# owner decision 2026-10-08): pushes to main deploy nothing, so a day's report and dashboard links open only once the
+# owner has deployed.
 # The AI model's training cutoff (ForecastBench leakage rule, docs/DESIGN.md section 7): ai_replay.py
 # treats only as-of dates AFTER this date as a fair test; dates on or before it are "contaminated"
 # (the model may have seen what happened), refused by `prepare` unless --allow-training-period, and

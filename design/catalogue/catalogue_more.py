@@ -224,6 +224,7 @@ def reasons(settled: list[dict]) -> tuple[list[dict], list[dict]]:
 def build_rest(write, settled, opens, eurusd, r2) -> None:
     from catalogue_bars import bar_rows
     from catalogue_calendar import calendar_events
+    from catalogue_lab import backtest, heatmap, reviews_w40
     from catalogue_news import market_status, news_impact, news_items, portfolio, research_review, results_digests
 
     write("lifecycle_event.json", "lifecycle_event", "watchlist_events", lifecycle_events())
@@ -233,11 +234,23 @@ def build_rest(write, settled, opens, eurusd, r2) -> None:
     ai_reasons, eods = reasons(settled)
     write("reason_ai.json", "ai_reason", "trade_reasons_ai", ai_reasons)
     write("eod_analysis.json", "eod_analysis", "eod_analyses", eods)
-    write("news_item.json", "news_item", None, news_items())
+    from catalogue_newsfeed import news_page_items
+
+    write("news_item.json", "news_item", None, news_page_items(news_items()))
     write("news_impact.json", "news_impact_row", "news_impact", news_impact(row))
     write("results_digest.json", "results_digest", "results_digests", results_digests(row))
     write("market_status.json", "market_status", None, market_status())
     write("calendar_event.json", "calendar_event", None, calendar_events())
     write("bar.json", "bar", None, bar_rows())
-    write("research_review.json", "research_review", "research_reviews", research_review(row))
+    write("research_review.json", "research_review", "research_reviews",
+          research_review(row) + reviews_w40(row, settled))
+    backtest_rows, backtest_runs = backtest(eurusd)
+    write("scoreboard_backtest_row.json", "scoreboard_row", None, backtest_rows, backtest_runs)
+    maps = heatmap(settled)
+    write("heatmap_cell.json", "heatmap_cell", None, maps["cells"])
+    write("cumulative_line.json", "cumulative_line", None, maps["lines"])
     write("portfolio.json", "portfolio", None, [portfolio(eurusd, r2, DEFAULT_AMOUNT)])
+    from catalogue_assistant import assistant_answers, track_records
+
+    write("track_record.json", "track_record", None, track_records(settled))
+    write("assistant_answer.json", "assistant_answer", None, assistant_answers())

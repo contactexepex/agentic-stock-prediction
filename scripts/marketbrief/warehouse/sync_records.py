@@ -86,7 +86,7 @@ def page_facts(rows: dict, invalid: list) -> dict:
             table: sum(len(row["payload"].encode()) for row in pages.values()) for table, pages in rows.items()
         },
         "invalid_pages": [
-            MSG_INVALID_PAGE.format(table=table, page_key=page_key, missing=", ".join(missing))
+            MSG_INVALID_PAGE.format(table=table, page_key=page_key, problems="; ".join(missing))
             for table, page_key, missing in invalid
         ],
     }

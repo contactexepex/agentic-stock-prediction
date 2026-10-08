@@ -112,9 +112,10 @@ body{font-size:14px;line-height:1.5;font-variant-numeric:tabular-nums}
 .nl{list-style:none;margin:0;padding:0;display:grid;gap:4px}
 .nl li{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:start;padding:9px 0;border-top:1px solid var(--md-sys-color-surface-container-high);font-size:13px;min-width:0}
 .nl li:first-child{border-top:0}
-.nl .hd{min-width:0;overflow-wrap:anywhere} .nl .hd a.t{color:inherit;text-decoration:none;font-weight:600} .nl .hd a.t:hover{text-decoration:underline}
-.nl .hd small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:11.5px;margin-top:3px}
-.nl .hd .md-badge{margin-left:4px;vertical-align:1px}
+.nl .hd{min-width:0;overflow-wrap:anywhere} .nl .hd a.t{display:block;color:inherit;text-decoration:none;font-weight:600} .nl .hd a.t:hover{text-decoration:underline}
+.nl .hd .sum{font-size:12.5px;line-height:1.45;color:var(--md-sys-color-on-surface-variant);margin-top:2px}
+.nl .hd small{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;color:var(--md-sys-color-on-surface-variant);font-size:11.5px;margin-top:4px}
+.nl .hd .md-badge,.nl .hd .mb-label,.nl .hd .tk{display:inline-flex}
 .aside{font-size:12.5px;margin:8px 0 0} .aside summary{cursor:pointer;color:var(--md-sys-color-primary);font-weight:600;font-size:12.5px}
 
 /* open trades: every column from 1360 px; Entry, Last, To target and the dates only there (.cw); the range bar from 761 px (.cm) */
@@ -206,6 +207,8 @@ const STATUS = {confirmed_primary: ['confirmed', 'A primary document (exchange f
   promotional: ['promotional', 'A paid, promotional or opinion item. Never supports a call.', 'ms-close'],
   contradicted: ['contradicted', 'A checked claim conflicts with a primary document. Can only widen a range.', 'ms-close']};
 const CAN_CARRY = ['confirmed_primary', 'corroborated'];
+/* Sentiment words: the news analyst's score (-1..1) reads positive above +0.05 and negative below -0.05 (the shell's SENTIMENT_FLAT_BAND). */
+const SENTIMENT_FLAT_BAND = 0.05;
 /* Spec constants (not data): docs/SPEC.md F7.2 go-live bar = 2 months of forward paper trading; section 7 = two intraday checks per session. */
 const GO_LIVE_MONTHS = 2, INTRADAY_CHECKS_PER_SESSION = 2;
 const DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'], DOWL = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'], MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -238,6 +241,7 @@ const viableLine = (picked) => { const mk = picked.filter(k => k.expected_gain_p
 const famLabel = (f, text) => el('span', {class:'mb-label ' + ({rule:'', baseline:'warn', ai:'info'}[f])}, el('i', {class:'sw ' + FAMILY[f][2]}), text);
 
 /* ---------- state: market from the hash; the horizon opens on N+1 (decision 39) ---------- */
+const HOME_NEWS_MAX = 5;   /* owner decision 2026-10-08: Home shows the top 5 market movers; the News page the rest */
 let market = (location.hash.slice(1) in D.markets) ? location.hash.slice(1) : 'india';
 let horizon = null;
 
@@ -459,18 +463,18 @@ function headToHead(m) {
 
 function newsCard(m) {
   const p = P(m), items = p.news, card = el('section', {class:'card', 'aria-label':'News'});
-  const can = items.filter(n => CAN_CARRY.includes(n.status)), aside = items.filter(n => !CAN_CARRY.includes(n.status));
-  card.append(el('div', {class:'head'}, el('h2', {}, 'News that can carry a call'), help('Stories about the active companies whose verification status is confirmed (a filing or company release) or corroborated (independent outlets): only these may be the main evidence of a call (DESIGN.md 3b). Rumours and promotional items never support a call; single-source and unverified items lower confidence. The company page has each company’s full feed.'), el('div', {class:'end'}, `${items.length} stored by the cut-off`)));
-  const badge = st => { const s = STATUS[st] || [st, '', null]; return el('span', {class:'md-badge ' + st, 'data-tip': s[1]}, s[2] ? icon(s[2]) : null, s[0]); };
-  const sent = v => { const s = v == null ? 'flat' : v > 0.05 ? 'up' : v < -0.05 ? 'dn' : 'flat'; return el('span', {class:'mb-dir ' + s, 'aria-label': 'sentiment ' + (v ?? 'n/a'), 'data-tip': v == null ? 'sentiment not scored' : `sentiment ${v > 0 ? '+' : ''}${v} (−1 very negative to +1 very positive), the news analyst’s score`}, icon(s === 'up' ? 'ms-arrow_upward' : s === 'dn' ? 'ms-arrow_downward' : 'ms-remove')); };
-  const item = n => el('li', {}, sent(n.enrichment.sentiment), el('div', {class:'hd'}, ...n.primary_tickers.map(t => el('a', {class:'tk', href: companyPage(t), style:'margin-right:4px'}, t)), el('a', {class:'t', href: n.url, rel:'noopener', target:'_blank'}, n.title), badge(n.status), el('small', {}, `${n.source} · ${n.enrichment.materiality} materiality · ${n.enrichment.event_type} · ${n.independent_origins} independent origin${n.independent_origins === 1 ? '' : 's'}${n.primary_ids.length ? `, ${n.primary_ids.length} filing` : ''} · ${fmtLocal(n.published_at, m, true)}`)));
-  if (can.length) { const ul = el('ul', {class:'nl'}); can.forEach(n => ul.append(item(n))); card.append(ul); }
-  else card.append(el('div', {class:'quiet'}, `Nothing that changes a call: none of the ${items.length} stored stor${items.length === 1 ? 'y' : 'ies'} is confirmed by a filing or corroborated by independent outlets.`));
-  if (aside.length) {
-    const counts = {}; for (const n of aside) counts[n.status] = (counts[n.status] || 0) + 1;
-    const det = el('details', {class:'aside'}, el('summary', {}, `Set aside: ${Object.entries(counts).map(([k, v]) => `${v} ${(STATUS[k] || [k])[0]}`).join(', ')}`));
-    const ul = el('ul', {class:'nl', style:'margin-top:6px'}); aside.forEach(n => ul.append(item(n))); det.append(ul); card.append(det);
-  }
+  /* the market movers, as the News page ranks them: the engine's market_moving flag first, then market-wide, results, materiality, newest; the same headline stored twice shows once */
+  const MAT = {high: 3, medium: 2, low: 1}, score = n => (n.market_moving ? 1000 : 0) + (n.scope === 'market' ? 100 : 0) + (n.enrichment.event_type === 'earnings' ? 50 : 0) + (MAT[n.enrichment.materiality] || 0) * 10 + (CAN_CARRY.includes(n.status) ? 5 : 0);
+  const movers = items.filter(n => n.market_moving || n.scope === 'market' || n.enrichment.event_type === 'earnings' || n.enrichment.materiality === 'high').sort((a, b) => score(b) - score(a) || b.first_seen_at.localeCompare(a.first_seen_at)).filter((n, i, arr) => arr.findIndex(x => x.title === n.title) === i).slice(0, HOME_NEWS_MAX);
+  const carry = items.filter(n => CAN_CARRY.includes(n.status)).length;
+  card.append(el('div', {class:'head'}, el('h2', {}, 'Market movers · last 3 days'), help('The stories most likely to move prices in the last three days, as the News page ranks them: the engine’s market-moving flag first (high materiality and market-wide or a results item), then market-wide stories, the watchlist’s results and high materiality, newest first. Each links to its article. Only a confirmed or corroborated story can be the main evidence of a call; market-wide stories carry no status because verification is per company. The News page has every story of the window with filters and the calendar.'), el('a', {class:'md-btn text act end', href: '../09-news/page.html'}, 'All news', icon('ms-chevron_right'))));
+  const statusBadge = st => { const s = STATUS[st] || [st, '', null]; return el('span', {class:'md-badge ' + st, 'data-tip': s[1]}, s[2] ? icon(s[2]) : null, s[0]); };
+  const sentSquare = v => { const s = v == null ? 'flat' : v > SENTIMENT_FLAT_BAND ? 'up' : v < -SENTIMENT_FLAT_BAND ? 'dn' : 'flat'; return el('span', {class:'mb-dir ' + s, 'aria-label': 'sentiment ' + (v ?? 'n/a'), 'data-tip': v == null ? 'sentiment not scored' : `sentiment ${v > 0 ? '+' : ''}${v} (−1 very negative to +1 very positive), the news analyst’s score`}, icon(s === 'up' ? 'ms-arrow_upward' : s === 'dn' ? 'ms-arrow_downward' : 'ms-remove')); };
+  const badge = n => n.status ? statusBadge(n.status) : el('span', {class:'mb-label neutral', 'data-tip':'A market-wide story carries no verification status: verification is per company.'}, 'not verified per company');
+  const item = n => el('li', {}, sentSquare(n.enrichment.sentiment), el('div', {class:'hd'}, el('a', {class:'t', href: n.url, rel:'noopener', target:'_blank'}, n.title), n.summary ? el('div', {class:'sum'}, n.summary) : null, el('small', {}, badge(n), n.market_moving ? el('span', {class:'mb-label warn'}, icon('ms-warning'), 'market moving') : null, ...n.primary_tickers.map(t => el('a', {class:'tk', href: companyPage(t)}, t)), el('span', {}, `${n.source} · ${n.enrichment.materiality} materiality · ${n.scope === 'market' ? (n.category && n.category !== 'company' && n.category !== 'general' ? n.category : 'market-wide') : n.enrichment.event_type}`))));
+  if (movers.length) { const ul = el('ul', {class:'nl'}); movers.forEach(n => ul.append(item(n))); card.append(ul); }
+  else card.append(el('div', {class:'quiet'}, `No market-moving story in the last 3 days (${items.length} stored in the window).`));
+  card.append(el('p', {class:'note', style:'margin:8px 0 0'}, `${items.length} stor${items.length === 1 ? 'y' : 'ies'} in the last 3 days, ${carry} that can carry a call (confirmed or corroborated). `, el('a', {href: '../09-news/page.html'}, 'Open the News page'), ' for all of them, the filters and the week’s calendar.'));
   return card;
 }
 

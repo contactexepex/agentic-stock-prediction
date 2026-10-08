@@ -1,0 +1,107 @@
+# The Companies page (B11; design/mockups/10-companies/notes.md). Builder: scripts/marketbrief/warehouse/rm_companies.py.
+CompaniesResponse:
+  allOf:
+    - $ref: '#/components/schemas/ReadModelMeta'
+    - type: object
+      required: [payload]
+      properties:
+        payload: {$ref: '#/components/schemas/CompaniesPayload'}
+CompaniesPayload:
+  x-source: warehouse/rm_companies.companies_pages
+  description: >-
+    The Companies page: the page shell, the default paper amount, the Company records (active first; a deleted company
+    never appears, decision 12), the lifecycle events and company commands by the cut-off (a deleted company masked in
+    commands), the news of inactive companies since they went inactive, and how many companies were deleted
+  allOf:
+    - $ref: '#/components/schemas/PageHeader'
+    - $ref: '#/components/schemas/HorizonChoice'
+    - type: object
+      required: [status, go_live, default_amount, companies, lifecycle, commands, news_inactive, deleted_count]
+      properties:
+        status: {$ref: '#/components/schemas/StatusBlock'}
+        go_live: {$ref: '#/components/schemas/GoLive'}
+        default_amount: {type: number, description: Money per paper trade unless a company sets its own (decision 26)}
+        companies:
+          type: array
+          items: {$ref: '#/components/schemas/CompanyRecord'}
+        lifecycle:
+          type: array
+          description: Newest first (recorded_at)
+          items: {$ref: '#/components/schemas/LifecycleEventRecord'}
+        commands:
+          type: array
+          description: The company commands (add, deactivate, reactivate, set amount, delete), newest first (received_at)
+          items: {$ref: '#/components/schemas/CommandRecord'}
+        news_inactive:
+          type: array
+          items: {$ref: '#/components/schemas/InactiveNewsItem'}
+        deleted_count: {type: integer, minimum: 0}
+LifecycleEventRecord:
+  type: object
+  x-source: warehouse/company_records.lifecycle_rows (kind watchlist_events)
+  description: >-
+    A lifecycle event; `required` is the core every page carries (the Companies page adds the identity, command and
+    onboarding fields its mockup lists)
+  required: [id, event, ticker, market, effective_from, recorded_at, amount, reason, requested_by, channel, supersedes]
+  properties:
+    id: {type: string}
+    event: {type: string, enum: [add, deactivate, reactivate, delete, set_amount]}
+    ticker: {type: string}
+    market: {$ref: '#/components/schemas/Market'}
+    effective_from: {$ref: '#/components/schemas/IsoTime'}
+    recorded_at: {$ref: '#/components/schemas/IsoTime'}
+    name: {type: ['string', 'null']}
+    exchange: {type: ['string', 'null']}
+    sector: {type: ['string', 'null']}
+    amount: {$ref: '#/components/schemas/NullableNumber'}
+    reason: {type: ['string', 'null']}
+    requested_by: {type: ['string', 'null']}
+    channel: {type: ['string', 'null']}
+    command_id: {type: ['string', 'null']}
+    idempotency_key: {type: ['string', 'null']}
+    onboarding:
+      type: ['object', 'null']
+      description: Each onboarding check of an add -> ok | failed | skipped
+      additionalProperties: {type: string, enum: [ok, failed, skipped]}
+    supersedes: {type: ['string', 'null']}
+CommandRecord:
+  type: object
+  x-source: warehouse/company_records.command_rows (kind command_log)
+  description: >-
+    A command of a company tool; for a company deleted by the cut-off its symbol in `arguments`, its echo in `message`,
+    its `idempotency_key` and its `record_ids` are masked (decision 12)
+  required: [id, market, received_at, channel, actor, agent, tool, kind, arguments, idempotency_key, result,
+             refusal_code, message, record_ids, budget_left, completed_at]
+  properties:
+    id: {type: string}
+    market: {$ref: '#/components/schemas/Market'}
+    received_at: {$ref: '#/components/schemas/IsoTime'}
+    channel: {type: ['string', 'null']}
+    actor: {type: ['string', 'null']}
+    agent: {type: ['string', 'null']}
+    tool: {type: string}
+    kind: {type: ['string', 'null']}
+    arguments: {type: ['object', 'null']}
+    idempotency_key: {type: ['string', 'null']}
+    result: {type: ['string', 'null'], enum: [accepted, pending, refused, duplicate, failed, null]}
+    refusal_code: {type: ['string', 'null']}
+    message: {type: ['string', 'null']}
+    record_ids: {type: array, items: {type: string}}
+    budget_left: {type: ['integer', 'null']}
+    completed_at: {type: ['string', 'null'], format: date-time}
+InactiveNewsItem:
+  type: object
+  description: A News item tagged with an inactive company, first seen since it went inactive
+  required: [id, market, tickers, primary_tickers, title, source, published_at, first_seen_at, status, enrichment]
+  properties:
+    id: {type: string}
+    market: {$ref: '#/components/schemas/Market'}
+    tickers: {type: array, items: {type: string}}
+    primary_tickers: {type: array, items: {type: string}}
+    title: {type: string}
+    source: {type: ['string', 'null']}
+    published_at: {type: ['string', 'null'], format: date-time}
+    first_seen_at: {$ref: '#/components/schemas/IsoTime'}
+    status:
+      oneOf: [{$ref: '#/components/schemas/NewsStatus'}, {type: 'null'}]
+    enrichment: {$ref: '#/components/schemas/NewsEnrichment'}

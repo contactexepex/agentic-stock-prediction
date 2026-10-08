@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Market brief · Track record</title>
+<meta name="description" content="Track record page of the personal stock cockpit: whether the signal model has shown skill, the forecaster's calls scored per basis (never pooled) with hit rates, Wilson intervals, Brier and log loss, calibration by confidence band, ranges held, and the weekly review's back-test. Research only, Paper until proven.">
+<!--@@SYSTEM_CSS@@-->
+<!--@@SHARED_CSS@@-->
+<style>
+/* Track record mockup (design track, SPEC section 6 page 8). Page-local layout only; every colour is a token. */
+.skill{display:flex;gap:12px;align-items:flex-start}
+.skill .t{font-weight:700} .skill .s{font-size:13px;color:var(--md-sys-color-on-surface-variant);margin-top:2px;line-height:1.5}
+/* interval bars (hit rate with its Wilson interval, AUC and mean return with their 95% intervals) */
+.ci{display:inline-flex;align-items:center;gap:8px;min-width:0}
+.ci svg{display:block;width:120px;height:14px;flex:none}
+.ci .track{fill:var(--md-sys-color-surface-container-highest)} .ci .band{stroke:var(--mb-chart-1);stroke-width:4;stroke-linecap:round}
+.ci .band.down{stroke:var(--mb-color-down)} .ci .band.up{stroke:var(--mb-color-up)}
+.ci .pt{fill:var(--md-sys-color-on-surface)} .ci .mid{stroke:var(--mb-chart-axis);stroke-width:1;stroke-dasharray:2 2} .ci .base{stroke:var(--mb-color-warn);stroke-width:2}
+.ci b{font-weight:700;font-variant-numeric:tabular-nums}
+.tbl td.num .ci{justify-content:flex-end}
+.tbl tr.few td{color:var(--md-sys-color-on-surface-variant)} .tbl tr.few td b{font-weight:600}
+.tbl td .mb-label{vertical-align:middle}
+/* calibration chart */
+.cal svg{display:block;width:100%;height:auto}
+.cal .grid line{stroke:var(--mb-chart-grid)} .cal .axis text{font-size:11px;fill:var(--mb-chart-label)} .cal .axis .ttl{font-size:11px;fill:var(--mb-chart-label)}
+.cal line.diag{stroke:var(--mb-chart-axis);stroke-dasharray:4 3} .cal line.wil{stroke:var(--mb-chart-1);stroke-width:3;stroke-linecap:round}
+.cal circle.pt{fill:var(--mb-chart-1);stroke:var(--md-sys-color-surface);stroke-width:2} .cal circle.pt.empty{fill:var(--md-sys-color-surface);stroke:var(--mb-chart-label);stroke-dasharray:2 2}
+.cal text.n{font-size:11px;fill:var(--md-sys-color-on-surface);font-weight:700} .cal rect.hit{fill:transparent}
+.cal rect.hit:focus-visible{outline:2px solid var(--md-sys-color-primary)}
+.chips2{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px}
+.chips2 .md-chip{cursor:default}
+.ex{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--md-sys-color-on-surface-variant);background:var(--md-sys-color-surface-container);border-radius:8px;padding:4px 8px}
+.verd{font-size:13px;line-height:1.55;margin:0 0 10px}
+.kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:0 0 12px}
+.kv div{background:var(--md-sys-color-surface-container-low);border-radius:8px;padding:8px 10px;min-width:0}
+.kv .l{font-size:11px;color:var(--md-sys-color-on-surface-variant);text-transform:uppercase;letter-spacing:.3px} .kv .v{font-weight:700;font-variant-numeric:tabular-nums}
+.x td.c3,.x th.c3{display:table-cell} .x td.c2,.x th.c2{display:table-cell}
+.tbl th .md-help{vertical-align:middle}
+@media (max-width:1439px){ .ci svg{width:96px} }
+@media (max-width:1359px){ .x td.c3,.x th.c3{display:none} }
+.x tr.grp td small{display:block}
+.x small.ph{display:none}
+@media (max-width:1000px){ .x td.c2,.x th.c2,.x td.cw,.x th.cw{display:none} .x small.ph{display:block;margin-top:3px} .ci svg{width:64px} .ci{gap:5px} .x td:first-child .mb-label{white-space:normal;height:auto;line-height:1.3;padding:2px 6px;text-align:left} }
+@media (max-width:599px){ .x td.num{white-space:normal} .ci{flex-wrap:wrap;gap:3px} .ci svg{width:48px} .kv{grid-template-columns:1fr 1fr} .x td,.x th{padding-left:6px;padding-right:6px} }
+</style>
+</head>
+<body>
+<!--@@ICONS@@-->
+<div id="tip" class="md-tooltip" role="tooltip"></div>
+
+<div class="mb-app">
+  <nav class="mb-sidebar" aria-label="Pages" id="sidebar"></nav>
+  <div class="mb-scrim" id="scrim"></div>
+  <header class="mb-topbar" id="topbar">
+    <button class="md-icon-btn mb-menu-btn" type="button" id="menu-btn" aria-label="Open the menu" aria-controls="sidebar" aria-expanded="false"><svg class="ms"><use href="#ms-menu"/></svg></button>
+    <div class="mb-topbar-title" id="title">Track record</div>
+    <div class="mb-topbar-actions">
+      <div class="md-segmented dense light" role="group" aria-label="Market" id="market-seg"></div>
+      <a class="md-btn filled" href="../11-assistant/page.html" data-tip="Ask the assistant (page 11): answers cite ids and as-of times, read-only." aria-label="Ask the assistant"><svg class="ms"><use href="#ms-bolt"/></svg><span class="ask-l">Ask</span></a>
+    </div>
+  </header>
+  <main class="mb-content"><div class="mb-content-inner" id="page"></div></main>
+  <nav class="mb-navbar" aria-label="Pages" id="navbar"></nav>
+</div>
+
+<script>const D = /*__DATA__*/null;</script>
+<!--@@SHARED_JS@@-->
+<script>
+let basisKey = null;
+shell(PAGES.track, 'Track record', {bar: [NAV[0], NAV[1], NAV[2], NAV[5]]});
+onMarketChange = () => { basisKey = null; render(); };
+
+const T = m => P(m).track;
+const f3 = x => x == null ? '—' : (Math.round(x * 1000) / 1000).toFixed(3);
+const f4 = x => x == null ? '—' : (Math.round(x * 10000) / 10000).toFixed(4);
+const sk = x => x == null ? '—' : (x > 0 ? '+' : x < 0 ? '−' : '') + f4(Math.abs(x));
+const BASELINE = {always_up: 'Always up', momentum_5d: 'Momentum (5 days)', rsi_mean_reversion: 'RSI mean reversion', benchmark_long_per_date: 'Benchmark long, per date', '–': '(no baseline)'};
+const BASIS_WORDS = {close_to_close: 'from the as-of close to the close h sessions later (calls made before the switch date in the settings)', open_to_close: 'N+k: bought at the open of the first session after the call, sold at the close of the k-th session after it (calls from the switch date on)'};
+const keyWords = key => { const m = /^(\d+)d (\w+)$/.exec(key); return m ? `${m[1]} session${m[1] === '1' ? '' : 's'} · ${call_basisLabel(m[2])}` : key; };
+const call_basisLabel = b => b === 'close_to_close' ? 'close→close' : b === 'open_to_close' ? 'open→close' : b;
+const few = (n, min) => n < min;
+const fewTag = (n, min) => el('span', {class:'mb-label neutral', 'data-tip': `Fewer than ${min} calls scored: the numbers are shown but mean little yet.`}, 'not enough history yet');
+
+/* an interval bar on a 0-1 (or lo-hi) scale: the interval as a thick line, the point as a dot, an optional reference tick */
+function ciBar(lo, hi, point, opts = {}) {
+  const {min = 0, max = 1, mid = null, base = null, cls = '', text = null, tip = ''} = opts, W = 120, H = 14;
+  const X = v => Math.max(0, Math.min(W, (v - min) / (max - min) * W));
+  const s = svgEl('svg', {viewBox:`0 0 ${W} ${H}`, 'aria-hidden':'true'});
+  s.append(svgEl('rect', {class:'track', x:0, y:5, width:W, height:4, rx:2}));
+  if (mid != null) s.append(svgEl('line', {class:'mid', x1:X(mid), x2:X(mid), y1:1, y2:13}));
+  if (base != null) s.append(svgEl('line', {class:'base', x1:X(base), x2:X(base), y1:1, y2:13}));
+  if (lo != null && hi != null) s.append(svgEl('line', {class:'band ' + cls, x1:X(lo), x2:X(hi), y1:7, y2:7}));
+  if (point != null) s.append(svgEl('circle', {class:'pt', cx:X(point), cy:7, r:3}));
+  return el('span', {class:'ci', 'data-tip': tip}, s, el('b', {}, text == null ? '—' : text));
+}
+
+function skillBand(m) {
+  const s = T(m).skill, shown = s.state === 'shown';
+  return el('section', {class:'mb-alert band ' + (shown ? 'success' : 'paper'), 'aria-label':'Signal model skill'}, icon(shown ? 'ms-check' : 'ms-info'),
+    el('div', {}, el('b', {class:'t'}, s.label), el('div', {class:'s'}, `From the weekly review ${s.review.id}, computed ${fmtLocal(s.review.computed_at, m, true)}; the back-test below says why. Nothing here is advice.`)),
+    help(s.rule));
+}
+
+function kpis(m) {
+  const p = P(m), t = T(m), c = t.calls[0], a = c ? c.all : null, min = t.min_sample;
+  const K = el('section', {class:'kpis', 'aria-label':'At a glance'});
+  const card = (ico, kind, label, value, sub, tipText) => el('div', {class:'mb-kpi', 'data-tip': tipText}, avatar(ico, kind), el('div', {}, el('div', {class:'l'}, label), el('div', {class:'v'}, value)), el('div', {class:'s'}, sub));
+  K.append(card('verified_user', t.skill.state === 'shown' ? 'success' : 'paper', 'Signal model', t.skill.state === 'shown' ? 'Skill shown' : 'No proven skill', el('span', {class:'labs'}, el('span', {class:'mb-tag paper'}, 'paper'), ` review ${t.skill.review.id}`), t.skill.rule));
+  K.append(card('history', 'info', c ? `Calls scored · ${c.label}` : 'Calls scored', a ? String(a.n) : '0', a ? el('span', {class:'labs'}, `${a.hits} hit${a.hits === 1 ? '' : 's'} · ${pct(a.share)} `, few(a.n, min) ? fewTag(a.n, min) : el('span', {class:'mb-label neutral'}, `${pct(a.wilson_lo)}–${pct(a.wilson_hi)}`)) : 'no call scored yet', a ? `${a.n} direction calls scored on the ${c.label} basis, all horizons; ${a.hits} came true. The range ${pct(a.wilson_lo)}–${pct(a.wilson_hi)} is the Wilson 95% interval of the hit rate${few(a.n, min) ? ': with this few calls it is wide' : ''}.` : 'No call has been scored yet.'));
+  K.append(card('trending_flat', a && !few(a.n, min) && a.edge > 0 ? 'success' : 'neutral', 'Against always-up', a ? delta(a.edge * 100, 1, ' pts') : '—', a ? `always-up would have hit ${pct(a.always_up)}` : 'no call scored yet', 'The hit rate minus the share of calls whose stock simply went up (the always-up baseline). Positive means the calls beat a coin that always says up.'));
+  K.append(card('query_stats', a && !few(a.n, min) && a.scores.brier_skill > 0 ? 'success' : 'neutral', 'Brier score', a ? f3(a.scores.brier) : '—', a ? el('span', {class:'labs'}, `skill ${sk(a.scores.brier_skill)} vs the base rate · log loss ${f3(a.scores.log_loss)}`) : 'no call scored yet', 'The Brier score is the mean squared error of the stated confidence (0 is perfect, 0.25 is a coin flip). Brier skill compares it with always predicting the base rate: positive is better than the base rate.'));
+  return K;
+}
+
+function basisCard(m) {
+  const p = P(m), t = T(m), min = t.min_sample, card = el('section', {class:'card', 'aria-label':'Calls by scoring basis'});
+  if (!basisKey) basisKey = t.calls.length ? t.calls[0].key : null;
+  const c = t.calls.find(x => x.key === basisKey) || null;
+  const head = el('div', {class:'head'}, el('h2', {}, 'Calls by scoring basis', help('A direction call is scored on one basis and the bases are never pooled: close→close ' + BASIS_WORDS.close_to_close + '; open→close ' + BASIS_WORDS.open_to_close + '. An old window is its own row (legacy) and is never pooled with N+k.')));
+  if (t.calls.length > 1) { const seg = el('div', {class:'md-segmented end', role:'group', 'aria-label':'Scoring basis'}); for (const x of t.calls) { const b = el('button', {type:'button', 'aria-pressed': x.key === basisKey ? 'true' : 'false'}, x.label); b.addEventListener('click', () => { basisKey = x.key; render(); }); seg.append(b); } head.append(seg); }
+  else if (c) head.append(el('span', {class:'end muted'}, `${c.label} only: no call on another basis yet`));
+  card.append(head);
+  if (t.example_parts.includes('calls')) card.append(el('div', {class:'chips2'}, el('span', {class:'ex'}, icon('ms-info'), 'example: no call is scored in the stored data yet, so this block is computed from the forecaster’s example calls by the same code')));
+  if (!c) { card.append(el('div', {class:'quiet'}, 'No direction call has been scored yet.')); return card; }
+  const rows = [['All horizons', null, c.all], ...Object.entries(c.by_horizon).sort((x, y) => x[1].h - y[1].h).map(([k, v]) => [v.name, v, v])];
+  const wrap = el('div', {class:'md-table-wrap'}), tb = el('table', {class:'md-table tbl x'});
+  tb.append(el('thead', {}, el('tr', {}, el('th', {}, 'Horizon'), el('th', {class:'num'}, 'Calls'), el('th', {class:'num'}, 'Hit rate', help('Hits over calls, with its Wilson 95% interval (the thick line); the orange tick is the always-up baseline.')), el('th', {class:'num c2'}, 'Always-up'), el('th', {class:'num c2'}, 'Edge', help('Hit rate minus always-up, in points.')), el('th', {class:'num c3'}, 'Mean confidence'), el('th', {class:'num'}, 'Brier', help('0 is perfect, 0.25 a coin flip; lower is better.')), el('th', {class:'num c3'}, 'Log loss'), el('th', {class:'num c2'}, 'Brier skill', help('Against always predicting the base rate; positive is better.')))));
+  const body = el('tbody');
+  for (const [name, v, b] of rows) {
+    const tr = el('tr', {class: few(b.n, min) ? 'few' : ''});
+    tr.append(el('td', {}, el('b', {}, name), v && v.horizon_label === 'legacy_cc' ? el('span', {class:'mb-label neutral', style:'margin-left:6px', 'data-tip':'An old close-to-close window; never pooled with N+k.'}, 'legacy') : '', few(b.n, min) ? el('div', {}, fewTag(b.n, min)) : ''));
+    tr.append(el('td', {class:'num'}, `${b.n}`, el('small', {class:'muted', style:'display:block'}, `${b.hits} hit${b.hits === 1 ? '' : 's'}`)));
+    tr.append(el('td', {class:'num'}, ciBar(b.wilson_lo, b.wilson_hi, b.share, {mid: 0.5, base: b.always_up, text: pct(b.share), tip: `${b.hits} of ${b.n} came true (${pct(b.share)}); Wilson 95% interval ${pct(b.wilson_lo)}–${pct(b.wilson_hi)}; always-up ${pct(b.always_up)}.`})));
+    tr.append(el('td', {class:'num c2'}, pct(b.always_up)));
+    tr.append(el('td', {class:'num c2'}, el('span', {class:'mb-delta ' + (b.edge > 0 ? 'up' : b.edge < 0 ? 'down' : '')}, delta(b.edge * 100, 1, ' pts'))));
+    tr.append(el('td', {class:'num c3'}, pct(b.mean_confidence, 1)));
+    tr.append(el('td', {class:'num'}, f3(b.scores.brier)));
+    tr.append(el('td', {class:'num c3'}, f3(b.scores.log_loss)));
+    tr.append(el('td', {class:'num c2'}, el('span', {class:'mb-delta ' + (b.scores.brier_skill > 0 ? 'up' : b.scores.brier_skill < 0 ? 'down' : '')}, sk(b.scores.brier_skill))));
+    body.append(tr);
+  }
+  tb.append(body); wrap.append(tb); card.append(wrap);
+  card.append(el('p', {class:'note', style:'margin-top:10px'}, `Below ${min} calls a row says "not enough history yet". Scoring basis: ${c.label}, ${BASIS_WORDS[c.basis] || c.basis}.`));
+  return card;
+}
+
+/* calibration: the reliability bands of the selected basis, all horizons */
+let calHost;
+function calibrationCard(m) {
+  const card = el('section', {class:'card', 'aria-label':'Calibration'}), t = T(m), c = t.calls.find(x => x.key === basisKey) || null;
+  card.append(el('div', {class:'head'}, el('h2', {}, 'Calibration', help('Calls are grouped by the confidence they were made with. A well-calibrated forecaster’s dots sit on the dashed diagonal: calls made with 60% confidence come true about 60% of the time. The vertical line is the Wilson 95% interval of each band’s hit rate.')), c ? el('span', {class:'end muted'}, `${c.label} · all horizons`) : ''));
+  if (!c) { card.append(el('div', {class:'quiet'}, 'No call scored yet, so no calibration.')); return card; }
+  calHost = el('div', {class:'cal'}); card.append(calHost);
+  const wrap = el('div', {class:'md-table-wrap', style:'margin-top:10px'}), tb = el('table', {class:'md-table tbl x'});
+  tb.append(el('thead', {}, el('tr', {}, el('th', {}, 'Confidence band'), el('th', {class:'num'}, 'Calls'), el('th', {class:'num c2'}, 'Mean confidence'), el('th', {class:'num'}, 'Hit rate', help('With its Wilson 95% interval.')))));
+  const body = el('tbody');
+  for (const r of c.all.reliability) {
+    const tr = el('tr', {class: r.n === 0 ? 'few' : ''});
+    tr.append(el('td', {}, el('b', {}, r.bin.replace('-', '–'))), el('td', {class:'num'}, String(r.n)), el('td', {class:'num c2'}, r.n ? pct(r.mean_conf, 1) : '—'), el('td', {class:'num'}, r.n ? ciBar(r.wilson_lo, r.wilson_hi, r.hit_rate, {mid: 0.5, text: pct(r.hit_rate), tip: `${r.n} call${r.n === 1 ? '' : 's'} made with ${r.bin} confidence: hit rate ${pct(r.hit_rate)}, Wilson 95% interval ${pct(r.wilson_lo)}–${pct(r.wilson_hi)}.`}) : el('span', {class:'muted'}, 'no calls')));
+    body.append(tr);
+  }
+  tb.append(body); wrap.append(tb); card.append(wrap);
+  return card;
+}
+function drawCalibration(m) {
+  const host = calHost; if (!host || !host.isConnected) return; host.innerHTML = '';
+  const t = T(m), c = t.calls.find(x => x.key === basisKey); if (!c) return;
+  const bands = c.all.reliability, W = Math.max(240, host.clientWidth), H = W < 480 ? 200 : 240, L = 40, R = 14, Tp = 14, B = 34;
+  const x0 = Math.min(...bands.map(b => b.lo)), x1 = Math.max(...bands.map(b => b.hi));
+  const X = v => L + (v - x0) / (x1 - x0) * (W - L - R), Y = v => Tp + (1 - v) * (H - Tp - B);
+  const s = svgEl('svg', {viewBox:`0 0 ${W} ${H}`, width: W, height: H, role:'img', 'aria-label':'Calibration: hit rate per confidence band against the stated confidence'});
+  const grid = svgEl('g', {class:'grid'}), axis = svgEl('g', {class:'axis'});
+  for (const v of [0, 0.25, 0.5, 0.75, 1]) { grid.append(svgEl('line', {x1: L, x2: W - R, y1: Y(v), y2: Y(v)})); const tx = svgEl('text', {x: L - 6, y: Y(v) + 4, 'text-anchor':'end'}); tx.textContent = pct(v); axis.append(tx); }
+  for (const b of bands) { const tx = svgEl('text', {x: X((b.lo + b.hi) / 2), y: H - B + 16, 'text-anchor':'middle'}); tx.textContent = b.bin.replace('-', '–'); axis.append(tx); }
+  const ttl = svgEl('text', {class:'ttl', x: (L + W - R) / 2, y: H - 4, 'text-anchor':'middle'}); ttl.textContent = 'stated confidence (band) → share that came true'; axis.append(ttl);
+  s.append(svgEl('line', {class:'diag', x1: X(x0), y1: Y(x0), x2: X(x1), y2: Y(x1)}));
+  for (const b of bands) {
+    const cx = b.n ? X(b.mean_conf) : X((b.lo + b.hi) / 2);
+    if (b.n) { s.append(svgEl('line', {class:'wil', x1: cx, x2: cx, y1: Y(b.wilson_lo), y2: Y(b.wilson_hi)})); s.append(svgEl('circle', {class:'pt', cx, cy: Y(b.hit_rate), r: 6})); const n = svgEl('text', {class:'n', x: cx + 10, y: Y(b.hit_rate) + 4}); n.textContent = `${b.n}`; s.append(n); }
+    else s.append(svgEl('circle', {class:'pt empty', cx, cy: Y(0), r: 5}));   /* no calls: a hollow mark on the axis; the band's tooltip and the table say so */
+    s.append(svgEl('rect', {class:'hit', x: X(b.lo), y: Tp, width: X(b.hi) - X(b.lo), height: H - Tp - B, tabindex: 0, 'data-tip': b.n ? `${b.bin} confidence: ${b.n} call${b.n === 1 ? '' : 's'}, mean confidence ${pct(b.mean_conf, 1)}, hit rate ${pct(b.hit_rate)} (Wilson ${pct(b.wilson_lo)}–${pct(b.wilson_hi)}).` : `${b.bin} confidence: no calls in this band yet.`}));
+  }
+  s.append(grid, axis); host.append(s); makeFocusable(host);
+}
+
+function rangesCard(m) {
+  const t = T(m), card = el('section', {class:'card', 'aria-label':'Ranges held'});
+  card.append(el('div', {class:'head'}, el('h2', {}, 'Ranges held', help('How often the close at the horizon landed inside the published 50% and 80% ranges, per horizon, with Wilson intervals and the interval scores. A range is scored at its exit session.'))));
+  if (!t.ranges.length) { card.append(el('div', {class:'quiet'}, 'No range is scored yet: the first published range settles at its exit session. Until then the page shows no range figure.')); return card; }
+  const wrap = el('div', {class:'md-table-wrap'}), tb = el('table', {class:'md-table tbl x'});
+  tb.append(el('thead', {}, el('tr', {}, el('th', {}, 'Horizon'), el('th', {class:'num'}, 'Ranges'), el('th', {class:'num'}, 'Inside 50%'), el('th', {class:'num'}, 'Inside 80%'))));
+  const body = el('tbody');
+  for (const r of t.ranges) body.append(el('tr', {}, el('td', {}, el('b', {}, r.name || r.key)), el('td', {class:'num'}, String(r.n)), el('td', {class:'num'}, r.hit50 ? ciBar(r.hit50.wilson_lo, r.hit50.wilson_hi, r.hit50.share, {mid: 0.5, text: pct(r.hit50.share)}) : '—'), el('td', {class:'num'}, r.hit80 ? ciBar(r.hit80.wilson_lo, r.hit80.wilson_hi, r.hit80.share, {mid: 0.8, text: pct(r.hit80.share)}) : '—')));
+  tb.append(body); wrap.append(tb); card.append(wrap);
+  return card;
+}
+
+function overTimeCard(m) {
+  const card = el('section', {class:'card', 'aria-label':'Accuracy over time'});
+  card.append(el('div', {class:'head'}, el('h2', {}, 'Accuracy over time', help('The hit rate and Brier score per week and basis, so a change in the forecaster shows as a change in the line.'))));
+  card.append(el('div', {class:'quiet'}, 'The weekly series of hit rate and Brier is not in the track-record read model yet (requested from its owner); this card stays empty until it is. The weekly paper-trade cells of the Strategy lab cover the strategies in the meantime.'));
+  return card;
+}
+
+function backtestCard(m) {
+  const t = T(m), b = t.backtest, card = el('section', {class:'card', 'aria-label':'Signal model back-test'});
+  card.append(el('div', {class:'head'}, el('h2', {}, 'Signal model back-test', help('The weekly review’s walk-forward test of the signal model on the stored history: each month’s model is fitted on the past and scored on the next month, never on what it saw. Not live, and not a paper trade.')), el('span', {class:'end muted'}, `computed ${fmtLocal(b.computed_at, m, true)}`)));
+  card.append(el('p', {class:'verd'}, el('b', {}, 'Verdict. '), b.verdict));
+  const d = b.data;
+  card.append(el('div', {class:'kv'}, el('div', {}, el('div', {class:'l'}, 'Companies'), el('div', {class:'v'}, String(d.tickers))), el('div', {}, el('div', {class:'l'}, 'Bars from'), el('div', {class:'v'}, fmtDY(d.first_bar))), el('div', {}, el('div', {class:'l'}, 'Scored days'), el('div', {class:'v'}, `${fmtDY(d.first_panel_date)} – ${fmtDY(d.last_panel_date)}`)), el('div', {}, el('div', {class:'l'}, 'Rows'), el('div', {class:'v'}, d.panel_rows.toLocaleString('en-US'))), el('div', {'data-tip':'The round-trip (buy and sell) cost in percent at a price of 100, taken off every back-test position.'}, el('div', {class:'l'}, 'Round-trip cost'), el('div', {class:'v'}, `${d.round_trip_cost_pct_at_100}%`))));
+  /* scores per horizon and basis */
+  const w1 = el('div', {class:'md-table-wrap'}), t1 = el('table', {class:'md-table tbl x'});
+  t1.append(el('thead', {}, el('tr', {}, el('th', {}, 'Horizon · basis'), el('th', {class:'num c2'}, 'Rows', help('Company-days scored, and the number of days.')), el('th', {class:'num'}, 'Brier', help('Against the Brier of always predicting the base rate (its own column on wide screens, in each row’s tooltip otherwise); skill = the gap, positive is better.')), el('th', {class:'num c3'}, 'Base rate'), el('th', {class:'num'}, 'Skill'), el('th', {class:'num'}, 'AUC', help('Area under the curve: 0.5 is no ranking ability, 1 is perfect. The line is its 95% interval; skill needs the whole interval above 0.5.')), el('th', {class:'cw'}, 'Skill shown'))));
+  const b1 = el('tbody');
+  const skillTag = r => el('span', {class:'mb-label ' + (r.skill ? 'success' : 'neutral')}, icon(r.skill ? 'ms-check' : 'ms-close'), r.skill ? 'skill shown' : 'no skill shown');
+  for (const r of b.scores) b1.append(el('tr', {}, el('td', {}, el('b', {}, keyWords(r.key)), el('small', {class:'ph'}, skillTag(r))), el('td', {class:'num c2'}, r.n.toLocaleString('en-US'), el('small', {class:'muted', style:'display:block'}, `${r.dates} days`)), el('td', {class:'num', 'data-tip': `Brier ${f4(r.brier)} against ${f4(r.brier_base_rate)} for always predicting the base rate, on ${r.n.toLocaleString('en-US')} rows over ${r.dates} days.`}, f4(r.brier)), el('td', {class:'num c3'}, f4(r.brier_base_rate)), el('td', {class:'num'}, el('span', {class:'mb-delta ' + (r.brier_skill > 0 ? 'up' : r.brier_skill < 0 ? 'down' : '')}, sk(r.brier_skill))), el('td', {class:'num'}, ciBar(r.auc95[0], r.auc95[1], r.auc, {min: 0.4, max: 0.6, mid: 0.5, text: f3(r.auc), cls: r.auc95[0] > 0.5 ? 'up' : r.auc95[1] < 0.5 ? 'down' : '', tip: `AUC ${f4(r.auc)}, 95% interval ${f4(r.auc95[0])}–${f4(r.auc95[1])} (axis 0.40–0.60).`})), el('td', {class:'cw'}, skillTag(r))));
+  t1.append(b1); w1.append(t1);
+  card.append(el('h3', {class:'sub2'}, 'Scores'), w1);
+  /* paper long vs baselines */
+  const w2 = el('div', {class:'md-table-wrap', style:'margin-top:12px'}), t2 = el('table', {class:'md-table tbl x'});
+  t2.append(el('thead', {}, el('tr', {}, el('th', {}, 'Baseline'), el('th', {class:'num c2'}, 'Bar'), el('th', {class:'num c2'}, 'Positions'), el('th', {class:'num c3'}, 'Days'), el('th', {class:'num'}, 'Mean per entry date', help('The model’s paper long minus the baseline: the return over the whole window (1 or 5 sessions), averaged per entry date, in percent, with its 95% interval; the dashed tick is zero.')), el('th', {class:'cw'}, 'Verdict'))));
+  const b2 = el('tbody'), groups = new Map();
+  for (const r of b.strategy) { if (!groups.has(r.key)) groups.set(r.key, []); groups.get(r.key).push(r); }
+  for (const [key, rows] of groups) {
+    b2.append(el('tr', {class:'grp'}, el('td', {colspan: 6}, el('b', {}, keyWords(key)), el('small', {}, ` · the model’s paper long (buy when the chance clears the bar) against each baseline`))));
+    for (const r of rows) {
+      const lo = r.ci95_pct ? r.ci95_pct[0] : null, hi = r.ci95_pct ? r.ci95_pct[1] : null, span = Math.max(1, Math.abs(lo ?? 0), Math.abs(hi ?? 0), Math.abs(r.mean_pct ?? 0)) * 1.1;
+      const v = r.verdict, vk = /beat|better|above/.test(v) ? 'success' : /lose|worse|below/.test(v) ? 'danger' : 'neutral';
+      const vtag = () => el('span', {class:'mb-label ' + vk}, v);
+      b2.append(el('tr', {class: r.positions ? '' : 'few'}, el('td', {}, el('b', {}, BASELINE[r.baseline] || r.baseline), el('small', {class:'ph'}, `bar ${pct(Number(r.threshold))} · `, vtag())), el('td', {class:'num c2'}, pct(Number(r.threshold))), el('td', {class:'num c2'}, String(r.positions)), el('td', {class:'num c3'}, String(r.dates)), el('td', {class:'num'}, r.mean_pct == null ? '—' : ciBar(lo, hi, r.mean_pct, {min: -span, max: span, mid: 0, text: sgn(r.mean_pct), cls: lo != null && lo > 0 ? 'up' : hi != null && hi < 0 ? 'down' : '', tip: lo != null ? `Mean ${sgn(r.mean_pct)} per entry date over the window, 95% interval ${sgn(lo)} to ${sgn(hi)}.` : `Mean ${sgn(r.mean_pct)} per entry date over the window; no interval.`})), el('td', {class:'cw'}, vtag())));
+    }
+  }
+  t2.append(b2); w2.append(t2);
+  card.append(el('h3', {class:'sub2', style:'margin-top:12px'}, 'Paper long against the baselines'), w2);
+  card.append(el('p', {class:'note', style:'margin-top:10px'}, `Reliability of the back-test: ${Object.keys(b.reliability).length ? 'see the bands above' : 'no bands stored in this run'}. Source file of the run: ${b.json}.`));
+  return card;
+}
+
+function replayCard(m) {
+  const t = T(m), card = el('section', {class:'card', 'aria-label':'Historical replay'});
+  card.append(el('div', {class:'head'}, el('h2', {}, 'Historical replay', help('A rule-only replay re-runs the range formula and the direction baselines on past days (no AI). It is a test, never a live record, and is shown apart.')), el('span', {class:'mb-label neutral end'}, 'not live')));
+  if (!t.replay) { card.append(el('div', {class:'quiet'}, 'No rule-only replay stored by the cut-off.')); return card; }
+  card.append(el('div', {class:'quiet'}, 'A replay is stored; its headline numbers are shown here apart from the live record.'));
+  return card;
+}
+
+function legend(m) {
+  const t = T(m);
+  return el('div', {class:'legend2'}, el('span', {}, el('span', {class:'mb-tag paper'}, 'paper'), ' every call and range is a paper record'), el('span', {}, el('b', {}, 'Wilson 95% interval'), ' where the true hit rate most likely lies given this few calls'), el('span', {}, el('b', {}, 'Brier'), ' 0 perfect, 0.25 coin flip, lower is better'), el('span', {}, el('b', {}, 'not enough history yet'), ` fewer than ${t.min_sample} calls`), el('span', {}, el('b', {}, 'legacy'), ' an old scoring window, never pooled with N+k'));
+}
+
+let calRo;
+function render() {
+  const p = P(market), t = T(market), page = $('#page'); page.innerHTML = '';
+  document.title = `Market brief · Track record · ${LABEL[market]}`; $('#title').textContent = 'Track record';
+  sideFoot(market); marketSeg(() => { basisKey = null; render(); });
+  page.append(pageHead(market, 'Track record', `${p.name} · the forecaster’s calls scored per basis, never pooled · as of ${fmtD(t.as_of, false)} · research only`));
+  page.append(skillBand(market), kpis(market));
+  page.append(basisCard(market));
+  const g = el('div', {class:'grid'}); g.append(calibrationCard(market), el('div', {class:'col'}, rangesCard(market), overTimeCard(market))); page.append(g);
+  page.append(backtestCard(market), replayCard(market), legend(market), footer(market, D.endpoint));
+  makeFocusable(page);
+  drawCalibration(market);
+  if (calRo) calRo.disconnect(); if (calHost) { calRo = new ResizeObserver(() => { const svg = calHost && calHost.querySelector('svg'); if (calHost && calHost.isConnected && (!svg || Math.abs(calHost.clientWidth - svg.clientWidth) > 2)) drawCalibration(market); }); calRo.observe(calHost); }
+}
+render();
+</script>
+</body>
+</html>

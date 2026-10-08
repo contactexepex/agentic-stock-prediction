@@ -17,21 +17,16 @@ from pathlib import Path
 
 import duckdb
 import pytest
-import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 import common  # noqa: E402
 from marketbrief.core import database  # noqa: E402
 from marketbrief.core.market_config import load_market  # noqa: E402
+from marketbrief.lab import registry  # noqa: E402
 from marketbrief.presentation.dashboard.assemble import gather_dashboard  # noqa: E402
-from marketbrief.constants.warehouse import (  # noqa: E402
-    READ_MODEL_SCHEMA_VERSION,
-    REQUIRED_KEYS,
-    WATCHLIST_ROW_REQUIRED,
-)
 from marketbrief.warehouse import cli as wh_cli  # noqa: E402
-from marketbrief.warehouse import sync  # noqa: E402
+from marketbrief.warehouse import openapi_spec, read_models, rm_registry, sync  # noqa: E402
 from marketbrief.warehouse.connection import WarehouseError  # noqa: E402
 from marketbrief.warehouse.read_models import READ_MODEL_COLUMNS  # noqa: E402
 from marketbrief.warehouse.tables import TABLES  # noqa: E402
@@ -43,7 +38,31 @@ LATE_NEWS = "feedfacefeedface"
 SECRET = "sync-secret/+="
 WAREHOUSE = Path("work/warehouse/market_brief.duckdb")
 MIRRORED = {"tickers", "bars", *(t.name for t in TABLES)}
-RM_TABLES = ("overview", "watchlist", "stock", "bars", "track_record")
+RM_TABLES = rm_registry.tables()  # every registered builder's table
+TICKER_TABLES = ("stock", "bars", "stock_strategies")  # one page per ticker (B12)
+MARKET_AND_TICKER_TABLES = ("compare", "trades")  # the market's page `_` and one page per ticker (B13, B12)
+MARKET_AND_STRATEGY_TABLES = ("strategies",)  # the market's page `_` and one page per registry strategy (B13)
+STRATEGY_IDS = [spec["id"] for spec in registry.strategies()]
+
+
+def expected_keys(tickers: list[str]) -> dict[str, list[str]]:
+    """table -> the page keys a sync of the market writes (every other table: the market's one page `_`)."""
+    out = {}
+    for table in RM_TABLES:
+        if table in TICKER_TABLES:
+            out[table] = list(tickers)
+        elif table in MARKET_AND_TICKER_TABLES:
+            out[table] = ["_", *tickers]
+        elif table in MARKET_AND_STRATEGY_TABLES:
+            out[table] = ["_", *STRATEGY_IDS]
+        else:
+            out[table] = ["_"]
+    return out
+
+
+US_TICKERS = [f"T{i}" for i in range(20)]  # only the count matters for the totals (20 US companies)
+PAGES = {table: len(keys) for table, keys in expected_keys(US_TICKERS).items()}
+TOTAL_PAGES = sum(PAGES.values())
 SPEC = REPO / "api" / "openapi.yaml"
 
 
@@ -156,8 +175,8 @@ def test_sync_is_idempotent(synced):
     assert synced["first"]["tables"] == synced["second"]["tables"]
     assert set(synced["first"]["tables"]) == MIRRORED
     assert synced["snap1"] == synced["snap2"]  # built_at and cutoff of the unchanged pages included
-    assert synced["first"]["pages_written"] == 43 and synced["first"]["pages_unchanged"] == 0
-    assert synced["second"]["pages_written"] == 0 and synced["second"]["pages_unchanged"] == 43
+    assert synced["first"]["pages_written"] == TOTAL_PAGES and synced["first"]["pages_unchanged"] == 0
+    assert synced["second"]["pages_written"] == 0 and synced["second"]["pages_unchanged"] == TOTAL_PAGES
     assert synced["first"]["tables"]["bars"] > 1000 and synced["first"]["tables"]["tickers"] == 20
 
 
@@ -166,7 +185,7 @@ def test_dry_run_writes_nothing_and_counts_the_same_rows(synced):
     assert dry["mode"] == "dry_run" and dry["written"] is False
     assert synced["dry_left_files"] == []  # no warehouse file, no stage folder, no summary
     assert dry["tables"] == synced["first"]["tables"]
-    assert dry["read_model_pages"] == {"overview": 1, "watchlist": 1, "stock": 20, "bars": 20, "track_record": 1}
+    assert dry["read_model_pages"] == PAGES
     assert dry["invalid_pages"] == [] and dry["as_of"] == synced["dashboard"]["as_of"]
 
 
@@ -179,7 +198,7 @@ def test_sync_runs_are_recorded(synced):
     assert [r[0] for r in rows[:2]] == [synced["first"]["run_id"], synced["second"]["run_id"]]
     for r in rows[:2]:
         assert r[1:5] == ("us", "replace", True, None)
-        assert r[5] == sum(synced["first"]["tables"].values()) and r[6] == 43
+        assert r[5] == sum(synced["first"]["tables"].values()) and r[6] == TOTAL_PAGES
         assert r[7] == datetime.fromisoformat(CUTOFF) and r[8] == WAREHOUSE.as_posix()
         assert set(r[9]) == MIRRORED and json.loads(r[10]) == synced["first"]["tables"] and r[11]
     summary = json.loads((synced["root"] / "work" / "warehouse" / "us-sync.json").read_text())
@@ -191,7 +210,10 @@ def test_sync_runs_are_recorded(synced):
         "FROM rm.builds ORDER BY started_at",
     )
     assert [b[0] for b in builds[:2]] == [r[0] for r in rows[:2]]
-    assert [b[1:7] for b in builds[:2]] == [("us", "daily", True, 43, 0, None), ("us", "daily", True, 0, 43, None)]
+    assert [b[1:7] for b in builds[:2]] == [
+        ("us", "daily", True, TOTAL_PAGES, 0, None),
+        ("us", "daily", True, 0, TOTAL_PAGES, None),
+    ]
     assert builds[0][7] == "unknown"  # the copied root is no git checkout
     assert builds[0][8] == datetime.fromisoformat(CUTOFF)
 
@@ -205,24 +227,21 @@ def test_read_models_keys_envelope_and_payloads(synced):
     data, root = synced["dashboard"], synced["root"]
     as_of = datetime.fromisoformat(data["as_of"]).date()
     tickers = list(synced["cfg"]["tickers"])
-    keys = {"overview": ["_"], "watchlist": ["_"], "stock": tickers, "bars": tickers, "track_record": ["_"]}
+    keys = expected_keys(tickers)
     for table, expected in keys.items():
         pages = stored_pages(root, table)
         assert sorted(pages) == sorted(expected)
         for market, page_as_of, version, sha, payload in pages.values():
-            assert (market, page_as_of, version) == ("us", as_of, "1.0.0")
+            assert (market, page_as_of, version) == ("us", as_of, openapi_spec.version())
             assert hashlib.sha256(payload.encode()).hexdigest() == sha  # the ETag hashes the stored text
             assert "generated_at" not in payload  # no cut-off inside a payload (the envelope has it)
-    jpm = json.loads(stored_pages(root, "stock")["JPM"][4])
     company = next(c for c in data["companies"] if c["ticker"] == "JPM")
-    assert {k: v for k, v in jpm.items() if k in company} == json.loads(
-        json.dumps({k: v for k, v in company.items() if k != "bars"})
-    )  # exactly the dashboard's stock data, no bars
-    assert "bars" not in jpm and jpm["as_of"] == data["as_of"] and jpm["skill"] == data["skill"]
-    assert {m["id"] for m in jpm["models"]} <= {m["model_id"] for m in company["model"]}
-    assert all(e["date"] > data["as_of"] for e in jpm["events"])
+    # 2.0: the company page (B12, rm_company.py) carries its bars; rm.bars holds the same list
+    jpm = json.loads(stored_pages(root, "stock")["JPM"][4])
+    assert jpm["ticker"] == "JPM" and jpm["company"]["ticker"] == "JPM" and jpm["as_of"] == data["as_of"]
     bars = json.loads(stored_pages(root, "bars")["JPM"][4])
-    assert bars["bars"] == json.loads(json.dumps(company["bars"])) and bars["columns"][0] == "date"
+    assert bars["bars"] == jpm["bars"] and bars["bars"][-1]["date"] == company["last"]["date"]
+    assert all(e["date"] >= jpm["status"]["session"]["session_date"] for e in jpm["events"])
     overview = json.loads(stored_pages(root, "overview")["_"][4])
     assert overview["overview"] == json.loads(json.dumps(data["overview"]))
     assert overview["disclaimer"] == data["disclaimer"] and overview["plan"] == data["plan"]
@@ -231,25 +250,13 @@ def test_read_models_keys_envelope_and_payloads(synced):
     row = next(r for r in watch["rows"] if r["ticker"] == "JPM")
     assert row["last"] == json.loads(json.dumps(company["last"])) and row["ret_1d"] == company["indicators"]["ret_1d"]
     track = json.loads(stored_pages(root, "track_record")["_"][4])
-    assert {k: track[k] for k in data["track"]} == json.loads(json.dumps(data["track"]))
+    assert {k: track["track"][k] for k in data["track"]} == json.loads(json.dumps(data["track"]))  # B13's page
 
 
-@pytest.mark.skipif(not SPEC.exists(), reason="api/openapi.yaml (wave 0) not on this branch yet")
-def test_required_keys_and_version_match_the_spec():
-    spec = yaml.safe_load(SPEC.read_text())
-    schemas = spec["components"]["schemas"]
-    names = {
-        "overview": "Overview",
-        "watchlist": "Watchlist",
-        "stock": "StockDetail",
-        "bars": "Bars",
-        "track_record": "TrackRecord",
-    }
-    for table, name in names.items():
-        assert tuple(schemas[name]["required"]) == REQUIRED_KEYS[table]
-    assert tuple(schemas["WatchlistRow"]["required"]) == WATCHLIST_ROW_REQUIRED
-    assert spec["info"]["version"] == READ_MODEL_SCHEMA_VERSION
-    meta = schemas["ReadModelMeta"]["required"]
+def test_version_and_envelope_match_the_spec():
+    spec = openapi_spec.spec()
+    assert spec["info"]["version"] == "2.0.0"
+    meta = spec["components"]["schemas"]["ReadModelMeta"]["required"]
     assert set(meta) | {"payload"} == set(READ_MODEL_COLUMNS)
 
 
@@ -282,7 +289,7 @@ def test_replace_deletes_departed_pages_and_full_rebuilds(synced):
     assert query(root, "SELECT count(*) FROM rm.stock WHERE page_key = 'OLD'") == [(0,)]
     assert query(root, "SELECT count(*) FROM information_schema.tables WHERE table_name = 'stale_table'") == [(1,)]
     full = sync.sync_market(cfg, full=True, force_local=True)
-    assert full["mode"] == "full" and full["kind"] == "full" and full["ok"] and full["pages_written"] == 43
+    assert full["mode"] == "full" and full["kind"] == "full" and full["ok"] and full["pages_written"] == TOTAL_PAGES
     assert query(root, "SELECT count(*) FROM information_schema.tables WHERE table_name = 'stale_table'") == [(0,)]
     # same payloads and hashes as the incremental build; only built_at and cutoff are new
     assert snapshot(root / WAREHOUSE, envelope=False) == synced["snap_bare"]
@@ -293,13 +300,20 @@ def test_invalid_page_keeps_its_old_row(synced, monkeypatch):
     con = duckdb.connect(str(root / WAREHOUSE))
     con.execute("UPDATE rm.track_record SET payload_sha256 = 'old', payload = '{\"old\": 1}'")  # a stale row
     con.close()
-    monkeypatch.setitem(REQUIRED_KEYS, "track_record", (*REQUIRED_KEYS["track_record"], "not_built_yet"))
+    real = read_models.page_problems
+    monkeypatch.setattr(
+        read_models,
+        "page_problems",
+        lambda builder, payload, document: (
+            ["$: missing 'not_built_yet'"] if builder.table == "track_record" else real(builder, payload, document)
+        ),
+    )
     res = sync.sync_market(cfg, force_local=True)
     assert res["ok"] and not res["build_ok"]
-    assert res["invalid_pages"] == ["track_record/_: missing not_built_yet"]
+    assert res["invalid_pages"] == ["track_record/_: $: missing 'not_built_yet'"]
     assert stored_pages(root, "track_record")["_"][3:] == ("old", '{"old": 1}')  # neither replaced nor deleted
     last = query(root, "SELECT ok, error FROM rm.builds ORDER BY started_at DESC LIMIT 1")[0]
-    assert last == (False, "track_record/_: missing not_built_yet")
+    assert last == (False, "track_record/_: $: missing 'not_built_yet'")
 
 
 def test_kill_switch_skips_without_writing(synced, monkeypatch, tmp_path):

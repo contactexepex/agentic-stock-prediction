@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: market-brief app API
-  version: 1.0.0
+  version: 2.0.0
   summary: Read API over the precomputed read models (docs/ARCHITECTURE.md section 4), plus planned governed writes.
   description: |
     Research only: nothing here places, routes or suggests a trade, and nothing is investment advice.
@@ -13,6 +13,25 @@ info:
     payload (`scripts/marketbrief/presentation/dashboard/`), the data-kind schemas
     (`scripts/marketbrief/core/schema*.py`) and the views (`sql/views.sql`); `x-source` names where each comes
     from. Everything is as of the build's cut-off (`ReadModelMeta.cutoff`); nothing stored after it is used.
+
+    Version 2.0 (owner's decision of 2026-10-08, option A): the approved mockups' page payloads replace the never-built
+    1.0 payloads on the handover paths watchlist, stocks/{ticker}, track-record and news (their page sessions B11-B13
+    replace the 1.0 schemas Watchlist, StockDetail, TrackRecord and NewsFeed); the other 1.0 endpoints stay, and the
+    1.0 write endpoints are replaced as docs/SPEC.md section 5 says.
+
+    Layout (2.0, docs/ws/b4.md "Contract layout"): this file holds the shared parts (info, security, parameters,
+    responses, the schemas every page uses) and the platform paths; each page session adds `api/paths/<page>.yaml`
+    (a map of path -> path item) and `api/schemas/<page>.yaml` (a map of schema name -> schema). The bundle
+    (`python -m marketbrief.warehouse.openapi_spec`, from scripts/) merges them into one document; every `$ref` is
+    written against that bundled document (`#/components/schemas/Market`).
+
+    Serve-time fields (2.0 page payloads): the stored payload carries no time of its build, so a rebuild of the same data
+    keeps its hash. The route adds `cutoff` and `built_at` (the row's envelope) at the top of a page payload and
+    `freshness` (`Freshness`, from `built_at` and the request time) to its `status` block; the status page gets
+    `freshness` at its top. Everything else is the stored payload verbatim (1.0 pages entirely).
+
+    Horizons are N+k (decision 37): buy at the open of D, the first session after the as-of close; sell at the close
+    of the k-th market session after D (weekends and holidays skipped); k in `config/strategies.yaml` `horizons`.
 
     Conventions:
     - `x-status: planned` marks an operation, schema or field whose data is not built yet. Planned operations
@@ -42,15 +61,20 @@ paths:
       tags: [markets]
       operationId: listMarkets
       summary: Markets with their name, currency and freshness
-      x-read-model: rm.markets
+      description: |
+        Composed by the route from the `rm.status` page of each market (two keyed reads, each cached): the envelope
+        has market `_all`, page_key `_`, the newest as_of, cutoff and built_at of the two, and the SHA-256 of the
+        composed payload (also its ETag). A market whose status page is missing is left out; none at all is a 404.
+      x-read-model: rm.status
       responses:
         '200':
-          description: The markets list read model (market `_all`, page_key `_`)
+          description: The markets list
           headers:
             ETag: {$ref: '#/components/headers/ETag'}
           content:
             application/json:
               schema: {$ref: '#/components/schemas/MarketListResponse'}
+        '404': {$ref: '#/components/responses/NotFound'}
         '503': {$ref: '#/components/responses/Unavailable'}
   /api/v1/markets/{market}/status:
     get:
@@ -106,90 +130,12 @@ paths:
               schema: {$ref: '#/components/schemas/WatchlistResponse'}
         '404': {$ref: '#/components/responses/NotFound'}
         '503': {$ref: '#/components/responses/Unavailable'}
-  /api/v1/markets/{market}/stocks/{ticker}:
-    get:
-      tags: [stocks]
-      operationId: getStockDetail
-      summary: Signal with model_prob and explanation, ranges, bull vs bear, news with status, events
-      x-read-model: rm.stock
-      parameters:
-        - $ref: '#/components/parameters/Market'
-        - $ref: '#/components/parameters/Ticker'
-      responses:
-        '200':
-          description: The stock read model (page_key = ticker)
-          headers:
-            ETag: {$ref: '#/components/headers/ETag'}
-          content:
-            application/json:
-              schema: {$ref: '#/components/schemas/StockDetailResponse'}
-        '404': {$ref: '#/components/responses/NotFound'}
-        '503': {$ref: '#/components/responses/Unavailable'}
-  /api/v1/markets/{market}/stocks/{ticker}/bars:
-    get:
-      tags: [stocks]
-      operationId: getStockBars
-      summary: Split-adjusted daily OHLCV up to the as-of date, with the published ranges for the fan
-      x-read-model: rm.bars
-      parameters:
-        - $ref: '#/components/parameters/Market'
-        - $ref: '#/components/parameters/Ticker'
-      responses:
-        '200':
-          description: The bars read model (page_key = ticker)
-          headers:
-            ETag: {$ref: '#/components/headers/ETag'}
-          content:
-            application/json:
-              schema: {$ref: '#/components/schemas/BarsResponse'}
-        '404': {$ref: '#/components/responses/NotFound'}
-        '503': {$ref: '#/components/responses/Unavailable'}
-  /api/v1/markets/{market}/track-record:
-    get:
-      tags: [record]
-      operationId: getTrackRecord
-      summary: Live calls per scoring basis (never pooled), ranges with Wilson intervals, backtest and replay
-      x-read-model: rm.track_record
-      parameters:
-        - $ref: '#/components/parameters/Market'
-      responses:
-        '200':
-          description: The track-record read model
-          headers:
-            ETag: {$ref: '#/components/headers/ETag'}
-          content:
-            application/json:
-              schema: {$ref: '#/components/schemas/TrackRecordResponse'}
-        '404': {$ref: '#/components/responses/NotFound'}
-        '503': {$ref: '#/components/responses/Unavailable'}
-  /api/v1/markets/{market}/news:
-    get:
-      tags: [markets]
-      operationId: getNews
-      summary: Newest headlines with verification status and enrichment, market-wide or for one ticker
-      x-read-model: rm.news
-      parameters:
-        - $ref: '#/components/parameters/Market'
-        - name: ticker
-          in: query
-          required: false
-          description: A watchlist ticker (page_key = ticker); omitted = the market-wide feed (page_key `_`)
-          schema: {$ref: '#/components/schemas/Ticker'}
-      responses:
-        '200':
-          description: The news read model
-          headers:
-            ETag: {$ref: '#/components/headers/ETag'}
-          content:
-            application/json:
-              schema: {$ref: '#/components/schemas/NewsFeedResponse'}
-        '404': {$ref: '#/components/responses/NotFound'}
-        '503': {$ref: '#/components/responses/Unavailable'}
   /api/v1/markets/{market}/runs:
     get:
       tags: [markets]
       operationId: listRuns
       summary: Recent daily runs, news runs and read-model builds of one market
+      x-status: planned
       x-read-model: rm.runs
       parameters:
         - $ref: '#/components/parameters/Market'
@@ -202,55 +148,6 @@ paths:
             application/json:
               schema: {$ref: '#/components/schemas/RunListResponse'}
         '404': {$ref: '#/components/responses/NotFound'}
-        '503': {$ref: '#/components/responses/Unavailable'}
-  /api/v1/markets/{market}/portfolio:
-    get:
-      tags: [portfolio]
-      operationId: getPaperPortfolio
-      summary: The paper portfolio (records only, never orders)
-      x-status: planned
-      x-owner: WS4
-      x-read-model: rm.portfolio
-      parameters:
-        - $ref: '#/components/parameters/Market'
-      responses:
-        '200':
-          description: The paper-portfolio read model
-          headers:
-            ETag: {$ref: '#/components/headers/ETag'}
-          content:
-            application/json:
-              schema: {$ref: '#/components/schemas/PaperPortfolioResponse'}
-        '404': {$ref: '#/components/responses/NotFound'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
-        '503': {$ref: '#/components/responses/Unavailable'}
-  /api/v1/markets/{market}/portfolio/paper-trades:
-    post:
-      tags: [portfolio]
-      operationId: createPaperTrade
-      summary: Submit a paper trade record (pending until the next run validates and imports it into data/)
-      description: |
-        Writes one row to the append-only inbox (docs/ARCHITECTURE.md section 9). Never an order: nothing is
-        sent to any broker. The submitter is injected from the authenticated identity, never from the body.
-        Repeating a request with the same Idempotency-Key returns the first receipt.
-      x-status: planned
-      x-owner: WS2 (endpoint), WS4 (validation and import)
-      parameters:
-        - $ref: '#/components/parameters/Market'
-        - $ref: '#/components/parameters/IdempotencyKey'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: {$ref: '#/components/schemas/PaperTradeRequest'}
-      responses:
-        '200':
-          description: Accepted into the inbox (or the receipt of an earlier request with the same key)
-          content:
-            application/json:
-              schema: {$ref: '#/components/schemas/InboxReceipt'}
-        '409': {$ref: '#/components/responses/Conflict'}
-        '422': {$ref: '#/components/responses/Invalid'}
         '501': {$ref: '#/components/responses/NotImplemented'}
         '503': {$ref: '#/components/responses/Unavailable'}
   /api/v1/company-requests:
@@ -302,8 +199,7 @@ paths:
       tags: [internal]
       operationId: revalidateReadModels
       summary: Called by the sync after a build commits; invalidates the cache tags of the changed keys
-      x-status: planned
-      x-owner: WS2 (endpoint), WS1 (caller)
+      x-owner: B4 (endpoint and caller)
       security:
         - revalidateSecret: []
       requestBody:
@@ -318,7 +214,7 @@ paths:
             application/json:
               schema: {$ref: '#/components/schemas/RevalidateResult'}
         '401': {$ref: '#/components/responses/Unauthorized'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
+        '422': {$ref: '#/components/responses/Invalid'}
 
 components:
   securitySchemes:
@@ -396,8 +292,11 @@ components:
       pattern: '^[A-Z0-9.&-]{1,20}$'
     Horizon:
       type: integer
-      enum: [1, 5]
-      description: Trading days (prediction rules)
+      minimum: 1
+      maximum: 5
+      description: >-
+        k of N+k: sell at the close of the k-th market session after D (decision 37); the list is config/strategies.yaml
+        `horizons` (1-5 today). Legacy rows keep their own label (`horizon_label` legacy_cc, legacy_5d_d4)
     IsoDate:
       type: string
       format: date
@@ -470,34 +369,6 @@ components:
           required: [payload]
           properties:
             payload: {$ref: '#/components/schemas/Watchlist'}
-    StockDetailResponse:
-      allOf:
-        - $ref: '#/components/schemas/ReadModelMeta'
-        - type: object
-          required: [payload]
-          properties:
-            payload: {$ref: '#/components/schemas/StockDetail'}
-    BarsResponse:
-      allOf:
-        - $ref: '#/components/schemas/ReadModelMeta'
-        - type: object
-          required: [payload]
-          properties:
-            payload: {$ref: '#/components/schemas/Bars'}
-    TrackRecordResponse:
-      allOf:
-        - $ref: '#/components/schemas/ReadModelMeta'
-        - type: object
-          required: [payload]
-          properties:
-            payload: {$ref: '#/components/schemas/TrackRecord'}
-    NewsFeedResponse:
-      allOf:
-        - $ref: '#/components/schemas/ReadModelMeta'
-        - type: object
-          required: [payload]
-          properties:
-            payload: {$ref: '#/components/schemas/NewsFeed'}
     RunListResponse:
       allOf:
         - $ref: '#/components/schemas/ReadModelMeta'
@@ -505,14 +376,6 @@ components:
           required: [payload]
           properties:
             payload: {$ref: '#/components/schemas/RunList'}
-    PaperPortfolioResponse:
-      x-status: planned
-      allOf:
-        - $ref: '#/components/schemas/ReadModelMeta'
-        - type: object
-          required: [payload]
-          properties:
-            payload: {$ref: '#/components/schemas/PaperPortfolio'}
 
     # ---------- payloads ----------
     MarketList:
@@ -533,55 +396,286 @@ components:
               as_of: {type: ['string', 'null'], format: date}
               last_daily_run_at: {type: ['string', 'null'], format: date-time}
               last_news_run_at: {type: ['string', 'null'], format: date-time}
+              freshness: {$ref: '#/components/schemas/Freshness'}
 
     MarketStatus:
+      x-source: warehouse/rm_platform.status_pages
+      description: >-
+        The status page (rm.status): the shared status block plus the 1.0 fields. Served with `freshness` at the top
+        (serve mode status)
+      allOf:
+        - {$ref: '#/components/schemas/StatusBlock'}
+        - type: object
+          required: [market, name, as_of, session, last_daily_run, last_news_run]
+          properties:
+            plan:
+              oneOf: [{$ref: '#/components/schemas/SessionPlan'}, {type: 'null'}]
+            last_daily_run:
+              type: ['object', 'null']
+              description: The newest features snapshot stored by the cut-off (the daily run's indicator step)
+              x-source: warehouse/rm_platform.last_daily_run
+              properties:
+                as_of_date: {$ref: '#/components/schemas/IsoDate'}
+                computed_at: {$ref: '#/components/schemas/IsoTime'}
+            last_news_run:
+              oneOf:
+                - {$ref: '#/components/schemas/NewsRun'}
+                - {type: 'null'}
+            last_build:
+              x-status: planned
+              x-owner: B4
+              oneOf:
+                - {$ref: '#/components/schemas/Build'}
+                - {type: 'null'}
+
+    # ---------- shared page blocks (2.0; warehouse/rm_common.py, docs/DATA_CATALOGUE.md) ----------
+    PageHeader:
       type: object
-      required: [market, name, as_of, session, last_daily_run, last_news_run]
+      x-source: warehouse/rm_common.header
+      description: >-
+        The top of every 2.0 page payload: the market, its name and currency, the newest indicator snapshot date;
+        `cutoff` and `built_at` are added when served (the row's envelope)
+      required: [market, name, currency, as_of]
+      properties:
+        market: {$ref: '#/components/schemas/Market'}
+        name: {type: string, description: 'The market''s name, e.g. "India (NSE)"'}
+        currency: {type: string, enum: [INR, USD]}
+        as_of: {type: ['string', 'null'], format: date}
+        cutoff: {type: string, format: date-time, description: Serve-time (the envelope's cutoff)}
+        built_at: {type: string, format: date-time, description: Serve-time (the envelope's built_at)}
+    HorizonChoice:
+      type: object
+      x-source: warehouse/rm_common.horizons
+      required: [horizons, default_horizon]
+      properties:
+        horizons:
+          type: array
+          items: {$ref: '#/components/schemas/Horizon'}
+        default_horizon:
+          description: The horizon a page opens on (N+1, decision 39), or `all` on pages that pool horizons
+          oneOf: [{$ref: '#/components/schemas/Horizon'}, {type: string, const: all}]
+    Freshness:
+      type: object
+      description: Serve-time (web/lib/data/serve.ts) from the row's built_at and the request time
+      required: [state, built_at, age_minutes]
+      properties:
+        state: {type: string, enum: [fresh, stale, unknown], description: 'stale after 480 minutes (FRESH_MINUTES)'}
+        built_at: {type: ['string', 'null'], format: date-time}
+        age_minutes: {type: ['integer', 'null']}
+    SessionStatus:
+      type: object
+      x-source: pipeline/market_status.status
+      description: pipeline/market_status.status evaluated at the build's cut-off (not at request time)
+      required: [local_time, trading_day, session_date, previous_session, calendar_covered, session_open_utc,
+                 session_close_utc, in_session, late_run]
+      properties:
+        local_time: {type: string}
+        trading_day: {type: boolean}
+        session_date: {$ref: '#/components/schemas/IsoDate'}
+        previous_session: {$ref: '#/components/schemas/IsoDate'}
+        calendar_covered: {type: boolean}
+        session_open_utc: {$ref: '#/components/schemas/IsoTime'}
+        session_close_utc: {$ref: '#/components/schemas/IsoTime'}
+        in_session: {type: boolean}
+        late_run: {type: boolean}
+    LevelBlock:
+      type: object
+      x-source: warehouse/rm_common.level_block
+      description: A market-level symbol (role benchmark or vol_index) at its last stored close
+      required: [symbol, name, close, close_date, change_pct, change_5d_pct]
+      properties:
+        symbol: {type: string}
+        name: {type: string}
+        close: {$ref: '#/components/schemas/NullableNumber'}
+        close_date: {$ref: '#/components/schemas/IsoDate'}
+        change_pct: {type: ['number', 'null'], description: '% from the previous close'}
+        change_5d_pct: {type: ['number', 'null'], description: '% from the close 5 sessions earlier'}
+    RunMark:
+      type: object
+      required: [at, ok]
+      properties:
+        at: {type: ['string', 'null'], format: date-time}
+        ok: {type: ['boolean', 'null']}
+        next_at: {type: ['string', 'null'], format: date-time, description: 'post_close: the next scheduled run (SPEC section 7)'}
+        new_items: {type: ['integer', 'null'], description: 'news: items the run stored'}
+    Runs:
+      type: object
+      x-source: warehouse/rm_common.runs
+      description: >-
+        The newest runs stored by the cut-off: pre-open (newest features snapshot), the intraday checks of the session
+        being predicted (intraday_runs, market-closed rows left out), post-close (newest settlement or end-of-day
+        analysis) and news (news_runs)
+      required: [pre_open, intraday, post_close, news]
+      properties:
+        pre_open: {$ref: '#/components/schemas/RunMark'}
+        intraday:
+          type: array
+          items: {$ref: '#/components/schemas/RunMark'}
+        post_close: {$ref: '#/components/schemas/RunMark'}
+        news: {$ref: '#/components/schemas/RunMark'}
+    StatusBlock:
+      type: object
+      x-source: warehouse/rm_common.status_block
+      description: The Market status record every 2.0 page carries as `status`; `freshness` is added when served
+      required: [market, name, currency, as_of, session, regime, benchmark, vol_index, runs, paper_label]
       properties:
         market: {$ref: '#/components/schemas/Market'}
         name: {type: string}
+        currency: {type: string, enum: [INR, USD]}
         as_of: {type: ['string', 'null'], format: date}
-        session:
+        session: {$ref: '#/components/schemas/SessionStatus'}
+        regime: {type: ['string', 'null'], description: The newest regime code stored by the cut-off}
+        benchmark:
+          oneOf: [{$ref: '#/components/schemas/LevelBlock'}, {type: 'null'}]
+        vol_index:
+          oneOf: [{$ref: '#/components/schemas/LevelBlock'}, {type: 'null'}]
+        runs: {$ref: '#/components/schemas/Runs'}
+        paper_label: {type: string, description: '"Paper only — no proven edge yet" until the weekly review''s model_skill'}
+        freshness: {$ref: '#/components/schemas/Freshness'}
+    GoLive:
+      type: object
+      x-source: warehouse/rm_common.go_live
+      description: >-
+        The reference strategy's (rule.model_news.v1) position against the go-live bar: its accuracy row, all
+        horizons, forward basis (lab/scoreboard.go_live); with no settled trade yet: not proven, 0 months, 300
+        trades needed, baseline comparison null
+      required: [proven, months_forward, trades_needed, beats_best_baseline]
+      properties:
+        proven: {type: boolean}
+        months_forward: {type: number}
+        trades_needed: {type: integer}
+        beats_best_baseline: {type: ['boolean', 'null']}
+    StrategyEntry:
+      type: object
+      x-source: warehouse/rm_common.strategies
+      description: >-
+        A registry entry (config/strategies.yaml) with `live` (live_from set and on or before the session being
+        predicted) and `settled_trades` (its settled accuracy-view trades stored by the cut-off). A page carries the
+        fields its mockup lists
+      required: [id, family, name]
+      properties:
+        id: {type: string}
+        family: {type: string, enum: [rule, baseline, ai]}
+        name: {type: string}
+        description: {type: string}
+        compared_to: {type: ['string', 'null']}
+        differs_in: {type: ['string', 'null']}
+        parameters: {type: object}
+        threshold: {$ref: '#/components/schemas/NullableNumber'}
+        horizons:
+          type: array
+          items: {$ref: '#/components/schemas/Horizon'}
+        live_from: {type: ['string', 'null'], format: date}
+        live: {type: boolean}
+        settled_trades: {type: integer}
+    StrategyMap:
+      type: object
+      description: Strategy id -> StrategyEntry
+      additionalProperties: {$ref: '#/components/schemas/StrategyEntry'}
+    BuySplit:
+      type: object
+      required: [buy, of]
+      properties:
+        buy: {type: integer, description: Strategies whose call qualifies as a trade}
+        of: {type: integer, description: Strategies that predicted it at this horizon}
+    CompanyRecord:
+      type: object
+      x-source: warehouse/rm_entities.companies
+      description: >-
+        A company as of the cut-off (catalogue entity Company): B1's accessor (active and inactive, never deleted),
+        the newest two raw closes collected by the cut-off, its N+1 agreement (active companies; null otherwise) and
+        its open paper trades (the OpenTrade records). A page carries the fields its mockup lists
+      required: [market, ticker, name, state]
+      properties:
+        market: {$ref: '#/components/schemas/Market'}
+        ticker: {$ref: '#/components/schemas/Ticker'}
+        name: {type: string}
+        exchange: {type: ['string', 'null']}
+        sector: {type: ['string', 'null']}
+        state: {type: string, enum: [active, inactive]}
+        state_since: {type: ['string', 'null'], format: date-time}
+        added_at: {type: ['string', 'null'], format: date-time}
+        amount: {$ref: '#/components/schemas/NullableNumber'}
+        amount_overridden: {type: boolean}
+        currency: {type: string, enum: [INR, USD]}
+        yahoo: {type: ['string', 'null']}
+        nse_symbol: {type: ['string', 'null']}
+        cik: {type: ['string', 'null']}
+        last_close: {$ref: '#/components/schemas/NullableNumber'}
+        last_close_date: {type: ['string', 'null'], format: date}
+        change_pct: {type: ['number', 'null'], description: '% from the previous stored close'}
+        agreement_n1:
+          oneOf: [{$ref: '#/components/schemas/BuySplit'}, {type: 'null'}]
+        open_trades: {type: integer}
+    AgreementRow:
+      type: object
+      x-source: warehouse/rm_entities.agreement
+      description: >-
+        How many strategies buy an active company at one horizon (catalogue entity Agreement), from the newest
+        predictions made by the cut-off; rank = most buyers, then the higher average probability, then the ticker
+      required: [market, as_of_date, session_date, rank, ticker, name, horizon_days, buy, of, by_family, avg_prob_up,
+                 label, paper]
+      properties:
+        market: {$ref: '#/components/schemas/Market'}
+        as_of_date: {type: ['string', 'null'], format: date}
+        session_date: {type: ['string', 'null'], format: date}
+        rank: {type: integer, minimum: 1}
+        ticker: {$ref: '#/components/schemas/Ticker'}
+        name: {type: string}
+        horizon_days: {$ref: '#/components/schemas/Horizon'}
+        buy: {type: integer}
+        of: {type: integer}
+        by_family:
           type: object
-          description: pipeline/market_status.status evaluated at the build's cut-off (not at request time)
-          x-source: pipeline/market_status.status
+          required: [rule, baseline, ai]
           properties:
-            local_time: {type: string}
-            trading_day: {type: boolean}
-            session_date: {$ref: '#/components/schemas/IsoDate'}
-            previous_session: {$ref: '#/components/schemas/IsoDate'}
-            calendar_covered: {type: boolean}
-            session_open_utc: {$ref: '#/components/schemas/IsoTime'}
-            session_close_utc: {$ref: '#/components/schemas/IsoTime'}
-            in_session: {type: boolean}
-            late_run: {type: boolean}
-        plan: {$ref: '#/components/schemas/SessionPlan'}
-        last_daily_run:
-          type: ['object', 'null']
-          description: The newest features snapshot stored by the cut-off (the daily run's indicator step)
-          x-source: features (max computed_at for the newest as_of_date)
-          properties:
-            as_of_date: {$ref: '#/components/schemas/IsoDate'}
-            computed_at: {$ref: '#/components/schemas/IsoTime'}
-        last_news_run:
-          oneOf:
-            - {$ref: '#/components/schemas/NewsRun'}
-            - {type: 'null'}
-        last_build:
-          x-status: planned
-          x-owner: WS1
-          oneOf:
-            - {$ref: '#/components/schemas/Build'}
-            - {type: 'null'}
-        freshness:
-          type: object
-          x-status: planned
-          x-owner: WS2
-          description: Computed by the API at request time from built_at; thresholds in config/warehouse.yaml (WS1)
-          properties:
-            state: {type: string, enum: [fresh, stale, unknown]}
-            age_hours: {type: ['number', 'null']}
-            stale_after_hours: {type: number}
+            rule: {$ref: '#/components/schemas/BuySplit'}
+            baseline: {$ref: '#/components/schemas/BuySplit'}
+            ai: {$ref: '#/components/schemas/BuySplit'}
+        avg_prob_up: {$ref: '#/components/schemas/NullableNumber'}
+        label: {type: string}
+        paper: {type: boolean, const: true}
+    AgreementMap:
+      type: object
+      description: Horizon k (as text, "1".."5") -> its AgreementRow list by rank
+      additionalProperties:
+        type: array
+        items: {$ref: '#/components/schemas/AgreementRow'}
+    OpenTrade:
+      type: object
+      x-source: warehouse/rm_entities.open_trades
+      description: >-
+        A paper trade that has entered and not yet settled (catalogue entity Open trade; intraday/trades.open_trades
+        as of the cut-off), valued at the newest stored close before costs on today's price basis. Paper only
+      required: [trade_id, view, prediction_id, strategy_id, family, market, ticker, horizon_days, entry_date,
+                 exit_date, entry_price, quantity, amount, currency, last_price, last_price_date, unrealised_pnl,
+                 unrealised_pct, paper]
+      properties:
+        trade_id: {type: string}
+        view: {type: string, enum: [accuracy, head_to_head]}
+        prediction_id: {type: string}
+        strategy_id: {type: string}
+        family: {type: string, enum: [rule, baseline, ai]}
+        market: {$ref: '#/components/schemas/Market'}
+        ticker: {$ref: '#/components/schemas/Ticker'}
+        horizon_days: {$ref: '#/components/schemas/Horizon'}
+        entry_date: {$ref: '#/components/schemas/IsoDate'}
+        exit_date: {$ref: '#/components/schemas/IsoDate'}
+        entry_price: {type: number}
+        quantity: {type: number, exclusiveMinimum: 0}
+        amount: {type: number}
+        currency: {type: string, enum: [INR, USD]}
+        target_price: {$ref: '#/components/schemas/NullableNumber'}
+        lo80: {$ref: '#/components/schemas/NullableNumber'}
+        lo50: {$ref: '#/components/schemas/NullableNumber'}
+        hi50: {$ref: '#/components/schemas/NullableNumber'}
+        hi80: {$ref: '#/components/schemas/NullableNumber'}
+        last_price: {type: number}
+        last_price_date: {$ref: '#/components/schemas/IsoDate'}
+        unrealised_pnl: {type: number}
+        unrealised_pct: {type: number}
+        to_target_pct: {$ref: '#/components/schemas/NullableNumber'}
+        paper: {type: boolean, const: true}
 
     Overview:
       type: object
@@ -656,7 +750,7 @@ components:
         h: {$ref: '#/components/schemas/Horizon'}
         tier: {type: string, enum: [strong_buy, strong_sell, paper_up, paper_down]}
         model_prob: {type: number, description: model_scores.prob_up of the call's id}
-        prediction_id: {type: ['string', 'null'], description: The stored call (predictions.id), if the forecaster made one}
+        prediction_id: {type: ['string', 'null'], description: 'The stored call (predictions.id), if the forecaster made one'}
         direction: {type: ['string', 'null'], enum: [up, down, null]}
         confidence: {type: ['number', 'null']}
         entry: {$ref: '#/components/schemas/IsoDate'}
@@ -687,7 +781,7 @@ components:
           oneOf: [{$ref: '#/components/schemas/LastSession'}, {type: 'null'}]
         ret_1d: {$ref: '#/components/schemas/NullableNumber'}
         ret_5d: {$ref: '#/components/schemas/NullableNumber'}
-        quality: {type: ['string', 'null'], description: features.quality (OK, PARTIAL or BLOCKED; constants/indicators.py)}
+        quality: {type: ['string', 'null'], description: 'features.quality (OK, PARTIAL or BLOCKED; constants/indicators.py)'}
         days_to_earnings: {type: ['integer', 'null']}
         earnings: {type: ['string', 'null'], format: date}
         model:
@@ -707,114 +801,6 @@ components:
         ranges:
           type: array
           items: {$ref: '#/components/schemas/RangeRow'}
-
-    StockDetail:
-      type: object
-      x-source: presentation/dashboard/assemble.company (without bars) + company_events as of the cut-off
-      required: [ticker, name, sector, as_of, skill, last, ranges, model, reasoning, calls, news, earnings, indicators]
-      properties:
-        ticker: {$ref: '#/components/schemas/Ticker'}
-        name: {type: string}
-        sector: {type: string}
-        as_of: {type: ['string', 'null'], format: date}
-        plan:
-          oneOf: [{$ref: '#/components/schemas/SessionPlan'}, {type: 'null'}]
-        skill: {$ref: '#/components/schemas/SkillStatus'}
-        last:
-          oneOf: [{$ref: '#/components/schemas/LastSession'}, {type: 'null'}]
-        ranges:
-          type: array
-          items: {$ref: '#/components/schemas/RangeRow'}
-        model:
-          type: array
-          items: {$ref: '#/components/schemas/ModelScore'}
-        models:
-          type: array
-          description: The fits behind today's scores (model_info.versions_used)
-          items: {$ref: '#/components/schemas/ModelVersion'}
-        reasoning:
-          oneOf: [{$ref: '#/components/schemas/Reasoning'}, {type: 'null'}]
-        calls:
-          type: array
-          items: {$ref: '#/components/schemas/CallRow'}
-        news:
-          type: array
-          items: {$ref: '#/components/schemas/NewsItem'}
-        earnings: {type: ['string', 'null'], format: date, description: Next earnings date after as_of}
-        events:
-          type: array
-          description: Upcoming company events (company_events rows first seen by the cut-off, date after as_of)
-          items: {$ref: '#/components/schemas/CompanyEvent'}
-        indicators: {$ref: '#/components/schemas/Indicators'}
-        cost: {type: ['number', 'null'], description: Round-trip cost fraction at the last close (config/costs.yaml)}
-
-    Bars:
-      type: object
-      x-source: presentation/dashboard/stock.bar_rows + presentation/dashboard/stock.range_rows
-      required: [ticker, as_of, columns, bars, ranges]
-      properties:
-        ticker: {$ref: '#/components/schemas/Ticker'}
-        as_of: {type: ['string', 'null'], format: date}
-        columns:
-          type: array
-          items: {type: string}
-          const: [date, open, high, low, close, volume]
-        bars:
-          type: array
-          description: Split-adjusted bars, oldest first, BAR_CALENDAR_DAYS (380) calendar days up to as_of
-          items:
-            type: array
-            minItems: 6
-            maxItems: 6
-            prefixItems:
-              - {type: string, format: date}
-              - {type: ['number', 'null']}
-              - {type: ['number', 'null']}
-              - {type: ['number', 'null']}
-              - {type: ['number', 'null']}
-              - {type: ['integer', 'null']}
-        ranges:
-          type: array
-          items: {$ref: '#/components/schemas/RangeRow'}
-        spans:
-          type: array
-          items:
-            type: object
-            properties:
-              key: {type: string}
-              label: {type: string}
-              days: {type: integer}
-        default_span: {type: string}
-
-    TrackRecord:
-      type: object
-      x-source: presentation/dashboard/track.track_record + presentation/dashboard/model_info.backtest_view + presentation/dashboard/model_info.skill_status
-      required: [skill, calls, ranges, replay, min_sample]
-      description: Live calls per scoring basis; there is deliberately no pooled block.
-      properties:
-        skill: {$ref: '#/components/schemas/SkillStatus'}
-        calls:
-          type: array
-          items: {$ref: '#/components/schemas/CallBasisBlock'}
-        ranges:
-          type: array
-          items: {$ref: '#/components/schemas/RangeBlock'}
-        replay:
-          oneOf: [{$ref: '#/components/schemas/ReplayView'}, {type: 'null'}]
-        backtest:
-          oneOf: [{$ref: '#/components/schemas/BacktestView'}, {type: 'null'}]
-        min_sample: {type: integer, description: 'view_data.MIN_SAMPLE: below it, "not enough history yet"'}
-
-    NewsFeed:
-      type: object
-      x-source: presentation/dashboard/reads.news + EvidenceStatuses + news_enriched (analyzed_at <= cutoff)
-      required: [market, ticker, items]
-      properties:
-        market: {$ref: '#/components/schemas/Market'}
-        ticker: {type: ['string', 'null'], description: null for the market-wide feed}
-        items:
-          type: array
-          items: {$ref: '#/components/schemas/NewsItem'}
 
     RunList:
       type: object
@@ -842,58 +828,24 @@ components:
           x-owner: WS1
           items: {$ref: '#/components/schemas/Build'}
 
-    PaperPortfolio:
-      type: object
-      x-status: planned
-      x-owner: WS4
-      description: Shape fixed here; WS4's data kinds supply it. Records only, never orders.
-      required: [market, as_of, label, positions, trades]
-      properties:
-        market: {$ref: '#/components/schemas/Market'}
-        as_of: {type: ['string', 'null'], format: date}
-        label: {type: string, description: 'skill.label ("Paper only — no proven edge yet" until model_skill)'}
-        positions:
-          type: array
-          items:
-            type: object
-            required: [ticker, quantity, entry_date, entry_price]
-            properties:
-              ticker: {$ref: '#/components/schemas/Ticker'}
-              quantity: {type: number}
-              entry_date: {$ref: '#/components/schemas/IsoDate'}
-              entry_price: {type: number, description: The open of entry_date from stored bars}
-              h: {$ref: '#/components/schemas/Horizon'}
-              exit_date: {type: ['string', 'null'], format: date}
-              mark_close: {$ref: '#/components/schemas/NullableNumber'}
-              unrealized_return: {$ref: '#/components/schemas/NullableNumber'}
-        trades:
-          type: array
-          items:
-            type: object
-            properties:
-              id: {type: string}
-              ticker: {$ref: '#/components/schemas/Ticker'}
-              side: {type: string, enum: [buy, sell]}
-              quantity: {type: number}
-              price: {type: number}
-              date: {$ref: '#/components/schemas/IsoDate'}
-              source: {type: string, enum: [slack, claude_code, dashboard]}
-              recorded_at: {$ref: '#/components/schemas/IsoTime'}
-        pending:
-          type: array
-          description: Inbox entries not yet imported (shown as pending, never as facts)
-          items: {$ref: '#/components/schemas/InboxReceipt'}
 
     # ---------- building blocks (dashboard payload) ----------
     SessionPlan:
       type: object
-      x-source: presentation/dashboard/assemble.session_plan
-      description: D (entry at the open) and the exits (close of D+1 for 1d, D+4 for 5d)
+      x-source: presentation/dashboard/assemble.session_plan + presentation/dashboard/assemble.plan_view
+      description: D (entry at the open) and the exit of every horizon N+k (the close of the k-th session after D)
       required: [entry, exit_1d, exit_5d, sessions]
       properties:
         entry: {$ref: '#/components/schemas/IsoDate'}
+        horizons:
+          type: array
+          items: {$ref: '#/components/schemas/Horizon'}
+        exits:
+          type: object
+          description: Horizon k (as text) -> its exit session
+          additionalProperties: {$ref: '#/components/schemas/IsoDate'}
         exit_1d: {$ref: '#/components/schemas/IsoDate'}
-        exit_5d: {$ref: '#/components/schemas/IsoDate'}
+        exit_5d: {type: string, format: date, description: 'The N+5 exit (D+5); kept from 1.0'}
         sessions:
           type: array
           items: {$ref: '#/components/schemas/IsoDate'}
@@ -1320,17 +1272,6 @@ components:
         error: {type: ['string', 'null']}
 
     # ---------- planned writes ----------
-    PaperTradeRequest:
-      type: object
-      x-status: planned
-      additionalProperties: false
-      required: [ticker, side, quantity]
-      properties:
-        ticker: {$ref: '#/components/schemas/Ticker'}
-        side: {type: string, enum: [buy, sell]}
-        quantity: {type: number, exclusiveMinimum: 0}
-        horizon_days: {$ref: '#/components/schemas/Horizon'}
-        note: {type: string, maxLength: 280}
     CompanyRequest:
       type: object
       x-status: planned
@@ -1355,7 +1296,6 @@ components:
         reason: {type: ['string', 'null'], description: Why it was rejected}
     RevalidateRequest:
       type: object
-      x-status: planned
       required: [build_id, keys]
       properties:
         build_id: {type: string}
@@ -1366,12 +1306,11 @@ components:
             type: object
             required: [table, market, page_key]
             properties:
-              table: {type: string, enum: [markets, status, overview, watchlist, stock, bars, track_record, news, runs, portfolio]}
+              table: {type: string, pattern: '^[a-z_]{1,40}$', description: 'An rm table name; the route invalidates the tag rm:<table>:<market>:<page_key> (a name no page uses invalidates nothing)'}
               market: {type: string, enum: [india, us, _all]}
               page_key: {type: string}
     RevalidateResult:
       type: object
-      x-status: planned
       required: [revalidated]
       properties:
         revalidated: {type: integer}

@@ -9,7 +9,7 @@ import pandas as pd
 
 from marketbrief.constants.kinds import KIND_NEWS_IMPACT
 from marketbrief.core.calendar import last_complete_session
-from marketbrief.lab import backtest, compare, heatmaps, news_impact, reads, registry, scoreboard
+from marketbrief.lab import backtest, backtest_probs, compare, heatmaps, news_impact, reads, registry, scoreboard
 from marketbrief.lab import costs as lab_costs
 from marketbrief.lab.run import append_new
 from marketbrief.model.history_cache import load_cache, merged_bars
@@ -73,17 +73,18 @@ def cache_asof(cached: dict[str, pd.DataFrame], cfg: dict, now: datetime) -> dic
 
 
 def run_backtest(con, cfg: dict, now: datetime, history: bool, assumed_eurusd: float | None = None) -> dict:
-    """F2.3 back-test rows of the no-news strategies on stored bars (plus the history cache with `history`). US:
+    """F2.3 back-test rows of the no-news strategies on stored bars (plus the history cache with `history`); the
+    model strategies without news use B10's walk-forward probabilities as of `now` (lab/backtest_probs.py). US:
     the BUX order fee is converted at the stored (or cached) EURUSD closes; without any, only at an explicitly
     given `assumed_eurusd` (labelled in the result), else the back-test refuses."""
     rate = lab_costs.rates(cfg["market"])
     fx_key = rate.get("eurusd_symbol")
     bars = adjusted_bars(con, cfg, now, [*cfg["tickers"], *([fx_key] if fx_key else [])])
-    splice = None
+    splice, cached = None, None
     if history:
-        cached, _ = load_cache(cfg["market"])
+        cached = cache_asof(load_cache(cfg["market"])[0], cfg, now)
         keep = set(cfg["tickers"]) | {fx_key}
-        bars, splice = merged_bars(bars, cache_asof({k: v for k, v in cached.items() if k in keep}, cfg, now))
+        bars, splice = merged_bars(bars, {k: v for k, v in cached.items() if k in keep})
     eurusd = bars.pop(fx_key)["close"] if fx_key and fx_key in bars else None
     fx_source = "stored EURUSD closes" if eurusd is not None else None
     if cfg["market"] == "us" and eurusd is None:
@@ -92,10 +93,11 @@ def run_backtest(con, cfg: dict, now: datetime, history: bool, assumed_eurusd: f
         eurusd = pd.Series([assumed_eurusd], index=pd.DatetimeIndex(["1900-01-01"]))
         fx_source = f"ASSUMED constant {assumed_eurusd} (no stored EURUSD bars)"
     stocks = {k: v for k, v in bars.items() if k in cfg["tickers"] and v is not None}
+    probs, probs_source, note = backtest_probs.model_probs(con, cfg, now, cached)
     rows = backtest.run_backtest(cfg["market"], stocks, registry.rule_and_baselines(), registry.horizons(),
-                                 {"rate": rate, "eurusd": eurusd, "probs": None})
+                                 {"rate": rate, "eurusd": eurusd, "probs": probs or None})
     return {"market": cfg["market"], "basis": "backtest", "history": history, "splice": splice, "eurusd": fx_source,
-            "note": "model-only needs B10's per-horizon walk-forward probabilities; not run",
+            "as_of_date": str(last_complete_session(cfg, now)), "probs_source": probs_source, "note": note,
             "first_date": min((str(v.index.min().date()) for v in stocks.values()), default=None),
             "last_date": max((str(v.index.max().date()) for v in stocks.values()), default=None), "rows": rows}
 

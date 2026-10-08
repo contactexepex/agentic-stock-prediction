@@ -11,6 +11,8 @@ sslmode: verify-full
 sslrootcert: system
 # Without the token (dev, tests) or with --local, the sync writes this DuckDB file instead (work/ is gitignored).
 local_path: work/warehouse/market_brief.duckdb
+# The app whose cached pages a sync to MotherDuck revalidates after it commits (warehouse/revalidate.py; B4).
+app_url: https://omenix.vercel.app
 # Kill switch (docs/ARCHITECTURE.md section 5): enabled: false skips every sync before connecting; a sync also
 # skips once this UTC month's recorded sync wall time (meta.sync_runs, an upper bound of MotherDuck compute)
 # reaches monthly_hours_ceiling. Skips are non-blocking; a ceiling skip is logged in rm.builds and
