@@ -53,17 +53,9 @@ def market_rows(cfg: dict, first: date, last: date) -> list[dict]:
     """The market's scheduled events and the weekdays its exchange is closed."""
     market = cfg["market"]
     rows = [
-        row(
-            market,
-            str(event["date"]),
-            event["type"],
-            event["name"],
-            major=event["major"],
-            widens=WIDENS_MARKET if event["major"] else None,
-            provisional=event["provisional"],
-            release=event["release"],
-            source=CALENDAR_SOURCE_CONFIG,
-        )
+        row(market, str(event["date"]), event["type"], event["name"], major=event["major"],
+            widens=WIDENS_MARKET if event["major"] else None, provisional=event["provisional"],
+            release=event["release"], source=CALENDAR_SOURCE_CONFIG)
         for event in calendar.market_events(cfg, first, last)
     ]
     names = {}
@@ -74,15 +66,8 @@ def market_rows(cfg: dict, first: date, last: date) -> list[dict]:
     while day <= last:
         if day.weekday() < 5 and not calendar.is_session(cfg, day):
             label = f": {names[day]}" if day in names else ""
-            rows.append(
-                row(
-                    market,
-                    str(day),
-                    CALENDAR_TYPE_HOLIDAY,
-                    f"{EXCHANGE_CLOSED_NAME[market]} closed{label}",
-                    source=CALENDAR_SOURCE_MARKET,
-                )
-            )
+            rows.append(row(market, str(day), CALENDAR_TYPE_HOLIDAY, f"{EXCHANGE_CLOSED_NAME[market]} closed{label}",
+                            source=CALENDAR_SOURCE_MARKET))
         day += timedelta(days=1)
     return rows
 
@@ -99,33 +84,20 @@ def company_rows(con, cfg: dict, tickers: set[str], first: date, last: date, cut
         earnings = event["type"] == EVENT_EARNINGS
         name = f"{cfg['tickers'][event['ticker']]['name']} {COMPANY_EVENT_LABEL[event['type']]}"
         reaction = [str(session) for session in affected_sessions(cfg, day, timing)] if earnings else None
-        rows.append(
-            row(
-                cfg["market"],
-                str(day),
-                event["type"],
-                name,
-                ticker=event["ticker"],
-                timing=timing,
-                reaction_sessions=reaction,
-                widens=WIDENS_COMPANY if earnings else None,
-                source=f"events ({event['source']})",
-                event_id=event["id"],
-            )
-        )
+        rows.append(row(cfg["market"], str(day), event["type"], name, ticker=event["ticker"], timing=timing,
+                        reaction_sessions=reaction, widens=WIDENS_COMPANY if earnings else None,
+                        source=f"events ({event['source']})", event_id=event["id"]))
     return rows
 
 
-def calendar_events(
-    cfg: dict, con, cutoff: datetime, from_date: date, to_date: date, tickers: list[str] | None = None
-) -> list[dict]:
+def calendar_events(cfg: dict, con, cutoff: datetime, from_date: date, to_date: date,
+                    tickers: list[str] | None = None) -> list[dict]:
     """Every calendar row from `from_date` to `to_date` as known by the cut-off: the market's rows and the company
     rows of `tickers` (None: every collected company, i.e. active and inactive at the cut-off; the market pages pass
     the active ones). Order: date, major first, market rows before company rows, type, name. Shared with the company
     page (B12), which filters it per ticker."""
     if tickers is None:
         tickers = [record["ticker"] for record in accessor.watchlist(cfg["market"], cutoff, STATE_COLLECTED)]
-    rows = market_rows(cfg, from_date, to_date) + company_rows(
-        con, cfg, set(tickers), from_date, to_date, cutoff.isoformat()
-    )
+    rows = market_rows(cfg, from_date, to_date) + company_rows(con, cfg, set(tickers), from_date, to_date,
+                                                               cutoff.isoformat())
     return sorted(rows, key=lambda r: (r["date"], not r["major"], r["ticker"] is not None, r["type"], r["name"]))

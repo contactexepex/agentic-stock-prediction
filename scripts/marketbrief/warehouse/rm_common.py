@@ -167,7 +167,8 @@ def lab_summary(ctx: BuildContext) -> dict:
         settled = settled_trades(ctx)
         return {  # no cut-off inside (lab/reports.lab_summary adds one): the envelope carries it
             "basis": BASIS_FORWARD,
-            "scoreboard": scoreboard.scoreboard(settled, BASIS_FORWARD, ctx.cutoff_time.isoformat()),
+            # as_of = the as-of date, as the catalogue's rows (a cut-off would rewrite every page each sync)
+            "scoreboard": scoreboard.scoreboard(settled, BASIS_FORWARD, ctx.as_of),
             "comparisons": compare.comparisons(settled, registry.strategies()),
             "heatmaps": heatmaps.heatmap_data(settled, BASIS_FORWARD),
         }

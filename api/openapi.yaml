@@ -752,7 +752,7 @@ components:
         A company as of the cut-off (catalogue entity Company): B1's accessor (active and inactive, never deleted),
         the newest two raw closes collected by the cut-off, its N+1 agreement (active companies; null otherwise) and
         its open paper trades (the OpenTrade records). A page carries the fields its mockup lists
-      required: [market, ticker, name, state, currency]
+      required: [market, ticker, name, state]
       properties:
         market: {$ref: '#/components/schemas/Market'}
         ticker: {$ref: '#/components/schemas/Ticker'}

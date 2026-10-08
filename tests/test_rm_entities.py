@@ -113,6 +113,25 @@ def stored(tmp_path_factory):
         "made_at": "2026-10-07T12:30:00Z",
     }  # stored after the cut-off
     append(root, "us", "strategy_predictions", "2026-09-30", [extra, late])
+    # META: a 2-for-1 split on D (2 Oct) and another after it (5 Oct), so the target (as-of basis, 1 Oct) and the
+    # entry (D's basis) need different factors (intraday/trade_rows.py)
+    append(root, "us", "strategy_predictions", "2026-10-02", [SPLIT_PREDICTION])
+    append(
+        root,
+        "us",
+        "adjustments",
+        "2026-10-06",
+        [
+            {
+                "id": f"META-{day}",
+                "ticker": "META",
+                "ex_date": day,
+                "factor": 0.5,
+                "detected_at": "2026-10-06T22:00:00Z",
+            }
+            for day in ("2026-10-02", "2026-10-05")
+        ],
+    )
     append(root, "us", "strategy_predictions", "2026-10-07", [future])
     append(
         root,
@@ -139,6 +158,28 @@ def stored(tmp_path_factory):
         common.ROOT = saved
 
 
+SPLIT_PREDICTION = {
+    "id": "rule.model_news.v1:2026-10-01-META-5d",
+    "strategy_id": "rule.model_news.v1",
+    "family": "rule",
+    "market": "us",
+    "ticker": "META",
+    "horizon_days": 5,
+    "as_of_date": "2026-10-01",
+    "session_date": "2026-10-02",
+    "exit_date": "2026-10-09",
+    "made_at": "2026-10-02T00:30:00Z",
+    "direction": "up",
+    "qualifies": True,
+    "prob_up": 0.6,
+    "target_price": 1000.0,
+    "lo50": 950.0,
+    "hi50": 1050.0,
+    "lo80": 900.0,
+    "hi80": 1100.0,
+    "amount": 1000.0,
+    "currency": "USD",
+}
 AGREEMENT_KEYS = (
     "market",
     "as_of_date",
@@ -196,6 +237,8 @@ def test_open_trades_match_the_catalogue(stored):
         assert expected
         for trade in expected:
             assert records[trade["trade_id"]] == trade, trade["trade_id"]
+        extra = {"acc:" + SPLIT_PREDICTION["id"]} if market == "us" else set()
+        assert set(records) == {t["trade_id"] for t in expected} | extra  # nothing else is open
 
 
 def test_settled_late_and_future_predictions_are_not_open(stored):
@@ -225,7 +268,8 @@ def test_open_trade_on_todays_basis_after_a_split():
         "hi50": 105.0,
         "hi80": 115.0,
     }
-    prices = {"entry": 100.0, "last": 52.0, "last_date": "2026-10-06", "factor": 0.5}  # a 2-for-1 split since D
+    # a 2-for-1 split after D (so after the as-of date too)
+    prices = {"entry": 100.0, "last": 52.0, "last_date": "2026-10-06", "factor": 0.5, "target_factor": 0.5}
     record = rm_entities.open_trade_record(trade, "us", "USD", prices)
     assert record["quantity"] == 10.0 and record["entry_price"] == 100.0 and record["last_price"] == 52.0
     assert record["unrealised_pnl"] == 40.0  # 20 shares now x 52 - 1000
@@ -277,3 +321,26 @@ def test_records_validate_against_their_shared_schemas(stored):
             assert problems(trade, "OpenTrade") == [], trade["trade_id"]
         for company in rm_common.companies(ctx):
             assert problems(company, "CompanyRecord") == [], company["ticker"]
+
+
+def test_open_trade_factors_come_from_the_stored_splits(stored):
+    """META: split ex-dates on D (2 Oct) and after it (5 Oct). D's raw open is already on the first split's basis, so
+    the entry takes only the later factor; the target was set on the as-of date (1 Oct), before both."""
+    ctx = stored["us"]
+    record = next(r for r in rm_common.open_trades(ctx) if r["ticker"] == "META")
+    bars = dict(
+        ctx.con.execute(
+            "SELECT date::VARCHAR, open FROM ohlc_raw WHERE ticker = 'META' AND date = DATE '2026-10-02'"
+        ).fetchall()
+    )
+    last_date, last = ctx.con.execute(
+        "SELECT date::VARCHAR, close FROM ohlc_raw WHERE ticker = 'META' AND date <= DATE '2026-10-06' "
+        "ORDER BY date DESC LIMIT 1"
+    ).fetchone()
+    entry = bars["2026-10-02"]
+    shares = round(1000.0 / entry, 6)
+    assert (record["entry_price"], record["last_price"], record["last_price_date"]) == (entry, last, last_date)
+    assert record["quantity"] == shares
+    assert record["unrealised_pnl"] == round(shares * (last / 0.5 - entry), 2)  # entry factor: only 5 Oct
+    assert record["unrealised_pct"] == round((last / (entry * 0.5) - 1) * 100, 2)
+    assert record["to_target_pct"] == round((1000.0 * 0.25 / last - 1) * 100, 2)  # target factor: both splits

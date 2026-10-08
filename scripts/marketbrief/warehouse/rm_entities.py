@@ -40,7 +40,8 @@ SELECT id, strategy_id, family, ticker, as_of_date, session_date, horizon_days, 
 WHERE session_date = (SELECT max(session_date) FROM p) ORDER BY ticker, horizon_days, strategy_id"""
 # each ticker's raw bars collected by the cut-off, newest collection per day, sessions of the market only
 RAW_BARS = """WITH p AS (SELECT DISTINCT ON (ticker, date) ticker, date, open, close FROM prices
-WHERE collected_at <= ?::TIMESTAMPTZ AND list_contains(?, ticker) ORDER BY ticker, date, collected_at DESC)
+WHERE collected_at <= ?::TIMESTAMPTZ AND date <= ?::DATE AND list_contains(?, ticker)
+ORDER BY ticker, date, collected_at DESC)
 SELECT * FROM p WHERE NOT EXISTS (SELECT 1 FROM own_closed_days c WHERE c.ticker = p.ticker AND c.date = p.date)"""
 CLOSES_SQL = f"""SELECT ticker, date, close FROM (SELECT *, row_number() OVER (PARTITION BY ticker ORDER BY date DESC)
 AS n FROM ({RAW_BARS}) WHERE close IS NOT NULL) WHERE n <= 2 ORDER BY ticker, n"""
@@ -141,8 +142,9 @@ def agreement(ctx: BuildContext) -> dict[str, list[dict]]:
 
 # ---------- open trades ----------
 def open_trade_record(trade: dict, market: str, currency: str, prices: dict) -> dict | None:
-    """One Open-trade record from B9's trade and `prices` = {entry, last, last_date, factor}: `factor` turns a price
-    of D into today's basis (intraday/trades.factor_after). None when no whole share is bought (India, F1.4)."""
+    """One Open-trade record from B9's trade and `prices` = {entry, last, last_date, factor, target_factor}:
+    `factor` turns a price of D (the entry) into today's basis and `target_factor` a price of the as-of date (the
+    target), as intraday/trade_rows does (intraday/trades.factor_after). None when no whole share is bought (F1.4)."""
     entry, last, factor = prices["entry"], prices["last"], prices["factor"]
     shares = trade_quantity(market, float(trade["amount"]), entry)
     if not shares:
@@ -162,14 +164,16 @@ def open_trade_record(trade: dict, market: str, currency: str, prices: dict) -> 
         "last_price_date": prices["last_date"],
         "unrealised_pnl": round(shares * (last / factor - entry), MONEY),
         "unrealised_pct": round((last / (entry * factor) - 1) * 100, PCT),
-        "to_target_pct": None if target is None else round((target * factor / last - 1) * 100, PCT),
+        "to_target_pct": None if target is None else round((target * prices["target_factor"] / last - 1) * 100, PCT),
         "paper": True,
     }
 
 
 def raw_bars(ctx: BuildContext, sql: str, tickers: list[str]) -> list[tuple]:
-    """Rows of a raw-bar query for these tickers as of the cut-off."""
-    return ctx.con.execute(sql, [ctx.cutoff, tickers]).fetchall() if tickers else []
+    """Rows of a raw-bar query for these tickers: collected by the cut-off, sessions up to the as-of date."""
+    if not tickers or ctx.as_of is None:
+        return []
+    return ctx.con.execute(sql, [ctx.cutoff, ctx.as_of, tickers]).fetchall()
 
 
 def open_trades(ctx: BuildContext) -> list[dict]:
@@ -194,11 +198,14 @@ def open_trades(ctx: BuildContext) -> list[dict]:
             last_date, last = closes.get(trade["ticker"], (None, None))
             if entry is None or last is None or last_date < trade["entry_date"].isoformat():
                 continue  # not entered yet: D's open is not stored by the cut-off
-            factor = intraday_trades.factor_after(
-                [(ex, f) for ex, f in factors.get(trade["ticker"], []) if ex.isoformat() <= last_date],
-                trade["entry_date"],
-            )
-            prices = {"entry": float(entry), "last": float(last), "last_date": last_date, "factor": factor}
+            known = [(ex, f) for ex, f in factors.get(trade["ticker"], []) if ex.isoformat() <= last_date]
+            prices = {
+                "entry": float(entry),
+                "last": float(last),
+                "last_date": last_date,
+                "factor": intraday_trades.factor_after(known, trade["entry_date"]),
+                "target_factor": intraday_trades.factor_after(known, trade["as_of_date"]),
+            }
             record = open_trade_record(trade, ctx.market, ctx.cfg["currency"], prices)
             if record is not None:
                 out.append(record)

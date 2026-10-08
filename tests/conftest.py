@@ -151,6 +151,7 @@ SLOW = {
     "tests/test_rm_entities.py": {
         "test_agreement_counts_match_the_catalogue",
         "test_companies_carry_the_agreement_and_open_trade_counts",
+        "test_open_trade_factors_come_from_the_stored_splits",
         "test_open_trades_match_the_catalogue",
         "test_records_validate_against_their_shared_schemas",
         "test_settled_late_and_future_predictions_are_not_open",
