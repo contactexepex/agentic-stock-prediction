@@ -128,6 +128,7 @@ class SyncRun:
         self.row = new_run_row(self.market, mode, started_at, cutoff_time.isoformat(), target.label())
         self.timer = PhaseTimer()
         self.warehouse = None
+        self.connected_since: float | None = None
         self.facts: dict = {}
         self.page_counts: dict = {}
         self.skipped: str | None = None
@@ -148,6 +149,7 @@ class SyncRun:
 
     def connect(self) -> None:
         """Open the warehouse for writing and make sure the bookkeeping and read-model tables exist."""
+        self.connected_since = time.monotonic()
         with self.timer.phase("connect"):
             self.warehouse = connect_warehouse(read_only=False, target=self.target)
         ensure_sync_runs_table(self.warehouse)
@@ -190,6 +192,7 @@ class SyncRun:
         build = build_row(self.row, self.kind, self.commit, self.page_counts, self.facts.get("invalid_pages", []))
         if self.warehouse is None:
             return build
+        self.row["connected_s"] = round(time.monotonic() - self.connected_since, 2)
         try:
             record_sync_run(self.warehouse, self.row)
             rm_writer.record_build(self.warehouse, build)
@@ -209,6 +212,8 @@ class SyncRun:
         fields.update(self.page_counts)
         if "write_s" in self.timer.seconds:
             fields["write_s"] = self.timer.seconds["write_s"]
+        if self.row["connected_s"] is not None:
+            fields["connected_s"] = self.row["connected_s"]
         if self.revalidated is not None:
             fields["revalidate"] = self.revalidated
         fields["build_ok"] = build["ok"]
