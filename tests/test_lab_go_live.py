@@ -52,9 +52,14 @@ def test_is_live_true_false_unknown_and_edge():
     assert registry.is_live({"id": "x"}, "2026-10-02") is False
 
 
-def test_the_shipped_registry_has_nothing_live():
-    assert not any(registry.is_live(spec, "2030-01-01", None) for spec in registry.strategies(
-        registry.load_registry()))
+def test_the_shipped_registry_goes_live_on_2026_10_12():
+    # Go-live G = 2026-10-12 (SPEC decision 23; switched on by B19 with B2's consent): every shipped strategy has
+    # live_from G, none is live on the last pre-go-live session and all are live on G.
+    specs = registry.strategies(registry.load_registry())
+    assert specs
+    assert all(str(spec["live_from"]) == "2026-10-12" for spec in specs)
+    assert not any(registry.is_live(spec, "2026-10-09", None) for spec in specs)
+    assert all(registry.is_live(spec, "2026-10-12", None) for spec in specs)
 
 
 def test_live_settlements_keeps_trades_live_on_their_entry_date():
