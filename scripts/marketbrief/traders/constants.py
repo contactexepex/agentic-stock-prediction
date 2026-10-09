@@ -60,6 +60,7 @@ CODE_TICKER = "TRADER_TICKER"              # not an active company
 CODE_DUPLICATE = "TRADER_DUPLICATE"        # the same id twice in the file
 CODE_STORED = "ALREADY_STORED"             # warning: the id is stored already, the line is skipped
 CODE_STAMPED = "MADE_AT_STAMPED"           # warning: a clockless trader stated made_at; the gate's stamp replaced it
+CODE_INPUT_UNREAD = "INPUT_UNREAD"         # input_check missing or not the check of every input part (input_parts)
 CODE_TIME = "TRADER_TIME"                  # made_at not ISO UTC, in the future, after the deadline or before inputs
 CODE_TIMEOUT = "TRADER_TIMEOUT"            # the gate ran after the deadline (open - 15 minutes)
 CODE_BLOCKED = "QUALITY_BLOCKED"
@@ -85,6 +86,8 @@ MSG_HORIZON = "horizon_days {horizon!r} is not one of this trader's horizons {ho
 MSG_TICKER = "{ticker!r} is not an active company of this market"
 MSG_DUPLICATE = "id {id} is repeated in the file"
 MSG_STORED = "id {id} is already stored: skipped"
+MSG_INPUT_UNREAD = ("input_check {got!r} is not {want!r}: read every part of your input in full (each ends with "
+                    "its check fragment) and copy the fragments, joined by '-', into input_check on every line")
 MSG_STAMPED = "this trader has no clock: its made_at was replaced by the file's write time {stamp}"
 MSG_MADE_AT = "made_at {made_at!r} is not an ISO 8601 UTC timestamp"
 MSG_FUTURE = "made_at {made_at} is after the gate's clock {now}"

@@ -20,7 +20,7 @@ from marketbrief.traders.registry import load_traders, trader, trader_problems
 NEWS, PATTERN, COMBINED, OPUS = PROMPTS
 ABSTAIN = {"strategy_id": NEWS, "ticker": "AAPL", "abstain": True, "horizons": [1, 3, 5],
            "reason": "No verified news on the company this week.", "made_at": "2026-10-07T11:45:00Z",
-           "prompt_version": "trader-news-v1"}
+           "prompt_version": "trader-news-v2"}
 
 
 def two_companies(**changes):

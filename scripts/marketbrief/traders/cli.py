@@ -5,7 +5,7 @@ and paper trade is a record, never an order. Run from the repo root:
 
 Pre-open (F4; one call per trader, in parallel):
   check                                  the registry and the agent files agree; which traders are switched on
-  prepare  --strategy ID [--pack F]      work/traders/<ID>.md: the trader's only input (pack: work/context.md)
+  prepare  --strategy ID [--pack F]      work/traders/<ID>.md (+ .part<k>.md, .check): the trader's only input
   validate --strategy ID FILE            gate the trader's file (JSON summary; exit 1 on any error)
   add      --strategy ID FILE --attempt N   store what passed; attempt 1 with errors stores nothing (exit 1),
                                          attempt 2 stores the valid predictions and abstentions for the rest;
@@ -30,7 +30,8 @@ from marketbrief.core.cli import market_arg, require_market
 from marketbrief.core.clock import clock, utc_now
 from marketbrief.core.database import connect
 from marketbrief.traders import constants as c
-from marketbrief.traders import director, director_facts, director_report, eod, eod_facts, eod_gate, outcome, prepare
+from marketbrief.traders import (director, director_facts, director_report, eod, eod_facts, eod_gate, input_parts,
+                                  outcome, prepare)
 from marketbrief.traders.inputs import InputsUnavailableError, load_inputs
 from marketbrief.traders.registry import load_traders, trader, trader_problems
 from marketbrief.traders.run import file_stamp, gate_lines, read_lines, timed_out
@@ -89,14 +90,16 @@ def trader_command(args, cfg: dict) -> int:
     if args.cmd == "prepare":
         pack = args.pack if args.pack.is_absolute() else paths.ROOT / args.pack
         text, summary = prepare.build(one, gi, pack.read_text(encoding="utf-8") if pack.exists() else "")
-        out = work_path(c.WORK_DIR, f"{one.strategy_id}.md")
-        out.write_text(text, encoding="utf-8")
-        return emit({**step, "enabled": one.enabled, "input": str(out), "bytes": len(text.encode()), **summary,
-                     "timed_out": timed_out(gi)})
+        folder = paths.ROOT / WORK / c.WORK_DIR
+        folder.mkdir(parents=True, exist_ok=True)
+        parts, check = input_parts.write_parts(folder, one.strategy_id, text)
+        return emit({**step, "enabled": one.enabled, "input": [str(p) for p in parts], "parts": len(parts),
+                     "bytes": len(text.encode()), "input_check": check, **summary, "timed_out": timed_out(gi)})
     if args.cmd == "validate":
         if timed_out(gi):
             return emit({**step, "error": c.CODE_TIMEOUT, "detail": "past the deadline: run add, which abstains"}, 1)
-        gated = gate_lines(read_lines(args.file), one, gi, file_stamp(args.file, gi))
+        gated = gate_lines(read_lines(args.file), one, gi, file_stamp(args.file, gi),
+                           input_parts.expected(args.file.parent, one.strategy_id))
         return emit({**step, "records": len(read_lines(args.file)), "valid": len(gated["rows"]),
                      "errors": gated["errors"], "warnings": gated["warnings"]}, 1 if gated["errors"] else 0)
     code, summary = outcome.add(one, gi, args.file, args.attempt)
