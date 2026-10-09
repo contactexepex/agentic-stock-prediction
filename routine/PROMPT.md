@@ -212,9 +212,9 @@ Warnings never block: list them in `data_quality`.
 6. Context: `python scripts/context.py > work/context.md`. Gate:
    `python scripts/validate.py --stage context > work/steps/validate_context.json`.
 
-7. News (start only after step 6's context pack is built, which is after d. of step 3: the news-analyst scores
-   novelty from the pack's news verification status and reports those statuses; never start it earlier, even
-   under time pressure): `python scripts/news_pending.py > work/steps/news_pending.json` writes
+7. News: start this step only after step 6's context pack is built, which is after d. of step 3. The
+   news-analyst scores novelty from the pack's news verification status and reports those statuses, so never
+   start it earlier, even under time pressure. `python scripts/news_pending.py > work/steps/news_pending.json` writes
    `work/news_pending.jsonl`: every news item and, for India, every NSE announcement (ids
    `nse-ann-<seq_id>`, the one exception to the 16-character news id) first seen since the last
    enrichment and not enriched yet, plus items whose headline changed after their enrichment
