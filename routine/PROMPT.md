@@ -158,8 +158,9 @@ Warnings never block: list them in `data_quality`.
       texts to `work/claims.jsonl`), then the gate
       `python scripts/claims.py validate work/claims.jsonl`; on exit 1 send the errors back to the
       claim-checker once and validate again. To save time, the claim-checker subagent may run in the
-      background while e., the collect gate and steps 4, 4a, 5 and 5a run: none of them reads claims or
-      news statuses. Then c. and d. must finish before step 6 builds the context pack;
+      background while e. (results digests) runs, which reads no claims or statuses. c. and d. must
+      finish before the collect gate below, which checks today's claim and status rows, and so before
+      step 5a, whose model scores weigh news by verification status. Do not run later steps alongside it;
    c. when it passes: `python scripts/claims.py add work/claims.jsonl`; if it still fails after
       the retry: `python scripts/claims.py add work/claims.jsonl --valid-only` (appends the valid
       records only) and list the dropped lines in `data_quality`. Delete `work/claims.jsonl`;
