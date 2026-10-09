@@ -4,7 +4,8 @@ The analyst writes work/eod_analysis.jsonl: one line per item of the facts
 `{"id": "<reason_id>", "trade_id", "kind", "text", "cited_ids", "prompt_version"}` and one summary line
 `{"type": "summary", "summary", "cited_ids", "prompt_version"}`. Checks:
 - every item of the facts is explained exactly once with its own id and kind, and nothing else;
-- a reason is 1-60 words, the summary 1-150; prompt_version is eod-v1;
+- a reason is 1-60 words, the summary 1-150 (one summary line, none when the facts say summary_stored);
+  prompt_version is eod-v2;
 - cited_ids of a reason: the trade id first, then only the trade's verified news ids; of the summary: ids of the
   day's items (trade ids, reason ids) and their news ids; every id written in a text is cited;
 - every number in a reason is one of its trade's stored facts (numbers.py; signed percentages with the right
@@ -105,8 +106,10 @@ def validate(lines: list, facts: dict) -> tuple[list[dict], dict | None, list[di
     by_key = {(item["trade_id"], item["kind"]): item for item in facts["items"]}
     good, summary, errors, seen = [], None, [], set()
     summaries = [rec for rec in lines if isinstance(rec, dict) and rec.get("type") == c.TYPE_SUMMARY]
-    required = not facts.get("summary_stored") and facts["settled_trades"] > 0
-    if (required and len(summaries) != 1) or len(summaries) > (0 if facts.get("summary_stored") else 1):
+    if facts.get("summary_stored") and summaries:
+        errors.append({"line": None, "id": "summary",
+                       "errors": [c.MSG_EOD_SUMMARY_STORED.format(count=len(summaries))]})
+    elif not facts.get("summary_stored") and (len(summaries) > 1 or (facts["settled_trades"] > 0 and not summaries)):
         errors.append({"line": None, "id": "summary", "errors": [c.MSG_EOD_SUMMARY.format(count=len(summaries))]})
     for number, rec in enumerate(lines, 1):
         if not isinstance(rec, dict):

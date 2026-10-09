@@ -126,7 +126,7 @@ MSG_INPUTS = "per-horizon ranges or model scores are not available yet ({detail}
 MSG_KILLED = "kill switch: {strategy_id} is disabled in {path}"
 
 # ---------- EOD analyst (F6.1) ----------
-EOD_PROMPT_VERSION = "eod-v1"
+EOD_PROMPT_VERSION = "eod-v2"
 EOD_SUMMARY_WORDS = 150
 BIGGEST_COUNT = 5
 EOD_FACTS_FILE = "eod_facts.json"
@@ -158,6 +158,8 @@ MSG_EOD_SIGN = "{number}% has the wrong sign for {what} {value}"
 MSG_EOD_ADVICE = "text must not advise or forecast (found {word!r})"
 MSG_EOD_ENUM = "{field} {value!r} not one of {allowed}"
 MSG_EOD_SUMMARY = "exactly one summary line is required (got {count})"
+MSG_EOD_SUMMARY_STORED = ("the day's summary is already stored (summary_stored true in the facts): write no "
+                          "summary line (got {count})")
 MSG_EOD_PROMPT = "prompt_version must be {want!r}"
 MSG_EOD_STORED = "{id} is already stored"
 

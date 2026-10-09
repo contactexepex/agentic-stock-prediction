@@ -42,7 +42,7 @@ def india_facts() -> dict:
 
 def reason_line(item: dict, text: str, cited=None) -> dict:
     return {"id": item["reason_id"], "trade_id": item["trade_id"], "kind": item["kind"], "text": text,
-            "cited_ids": cited or [item["trade_id"]], "prompt_version": "eod-v1"}
+            "cited_ids": cited or [item["trade_id"]], "prompt_version": "eod-v2"}
 
 
 @pytest.mark.usefixtures("root")
@@ -68,7 +68,7 @@ def test_eod_gate_accepts_the_example_reason_and_refuses_bad_ones():
     others = [reason_line(i, f"{i['ticker']} trade settled with a net result of {i['net_pnl']}.")
               for i in facts["items"][1:]]
     summary = {"type": "summary", "summary": f"{facts['settled_trades']} paper trades settled today.",
-               "cited_ids": [item["trade_id"]], "prompt_version": "eod-v1"}
+               "cited_ids": [item["trade_id"]], "prompt_version": "eod-v2"}
     valid, kept, errors = eod_gate.validate([good, *others, summary], facts)
     assert errors == [] and len(valid) == len(facts["items"]) and kept == summary
 
@@ -97,10 +97,32 @@ def test_eod_gate_accepts_the_example_reason_and_refuses_bad_ones():
 
 
 @pytest.mark.usefixtures("root")
+def test_eod_band_names_are_not_numbers_and_a_stored_summary_is_named():
+    """B19's live test (2026-10-09): "the 80% range" was refused as an unknown number, and a summary written on a day
+    whose summary was already stored got the message "exactly one summary line is required (got 1)"."""
+    facts = india_facts()
+    item = facts["items"][0]
+    others = [reason_line(i, f"{i['ticker']} settled; net {i['net_pnl']}.") for i in facts["items"][1:]]
+    summary = {"type": "summary", "summary": "Trades settled.", "cited_ids": [], "prompt_version": "eod-v2"}
+
+    def problems(text):
+        found = eod_gate.validate([reason_line(item, text), *others, summary], facts)[2]
+        return [e for e in found if e["id"] == item["reason_id"]]
+
+    assert problems(f"The exit stayed inside the 80% range and the 50 % band; net {item['net_pnl']}.") == []
+    assert "80%" in json.dumps(problems(f"It fell 80% on the day; net {item['net_pnl']}."))
+    stored = {**facts, "summary_stored": True}
+    lines = [reason_line(item, f"Net {item['net_pnl']}."), *others]
+    assert eod_gate.validate(lines, stored)[2] == []
+    (error,) = eod_gate.validate([*lines, summary], stored)[2]
+    assert error["id"] == "summary" and "already stored" in error["errors"][0]
+
+
+@pytest.mark.usefixtures("root")
 def test_eod_store_writes_reasons_and_the_analysis_from_stored_facts():
     facts = india_facts()
     lines = [reason_line(i, f"{i['ticker']} settled; net {i['net_pnl']}.") for i in facts["items"]]
-    summary = {"type": "summary", "summary": "Eleven trades.", "cited_ids": [], "prompt_version": "eod-v1"}
+    summary = {"type": "summary", "summary": "Eleven trades.", "cited_ids": [], "prompt_version": "eod-v2"}
     good, kept, errors = eod_gate.validate([*lines, summary], facts)
     assert errors == []
     written = eod.store(facts, good, kept, "2026-10-06T12:40:00Z", INDIA_DAY)
