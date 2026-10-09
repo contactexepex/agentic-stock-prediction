@@ -7,7 +7,9 @@
 # Rules:
 # - An id's behaviour never changes after its first live day (`live_from`). A change of parameters, threshold or
 #   horizons is a new id (`.v2`, ...), proposed by the weekly research director and approved by the owner (F6.2).
-# - `live_from: null` = not live yet. Wave 5 sets the first session when the new paper trading is switched on.
+# - `live_from: null` = not live yet. Wave 5 (session B19) switched the new paper trading on: every strategy below is
+#   live from 2026-10-12, the go-live date G (SPEC decision 23; the 2-month review clock starts that day).
+#   A strategy added later gets its own live_from.
 # - The initial rule set differs from the reference strategy `rule.model_news.v1` in exactly one parameter each,
 #   so a difference in results points to that parameter (F2.5): `compared_to` names the strategy it is compared
 #   with and `differs_in` the one parameter that differs (`threshold` counts as a parameter; always_up and
@@ -47,7 +49,7 @@ strategies:
                  news_materiality: [high, medium, low], cross_market: false, regime_filter: false}
     threshold: 0.55
     horizons: [1, 2, 3, 4, 5]
-    live_from: null
+    live_from: 2026-10-12
   - id: rule.model_news_half.v1
     family: rule
     name: Model + half news
@@ -59,7 +61,7 @@ strategies:
                  news_materiality: [high, medium, low], cross_market: false, regime_filter: false}
     threshold: 0.55
     horizons: [1, 2, 3, 4, 5]
-    live_from: null
+    live_from: 2026-10-12
   - id: rule.model_news_double.v1
     family: rule
     name: Model + double news
@@ -71,7 +73,7 @@ strategies:
                  news_materiality: [high, medium, low], cross_market: false, regime_filter: false}
     threshold: 0.55
     horizons: [1, 2, 3, 4, 5]
-    live_from: null
+    live_from: 2026-10-12
   - id: rule.model_news_confirmed.v1
     family: rule
     name: Model + confirmed news only
@@ -84,7 +86,7 @@ strategies:
                  news_materiality: [high, medium, low], cross_market: false, regime_filter: false}
     threshold: 0.55
     horizons: [1, 2, 3, 4, 5]
-    live_from: null
+    live_from: 2026-10-12
   - id: rule.model_news_high.v1
     family: rule
     name: Model + major news only
@@ -96,7 +98,7 @@ strategies:
                  news_materiality: [high], cross_market: false, regime_filter: false}
     threshold: 0.55
     horizons: [1, 2, 3, 4, 5]
-    live_from: null
+    live_from: 2026-10-12
   - id: rule.model_news_global.v1
     family: rule
     name: Model + news + global cues
@@ -109,7 +111,7 @@ strategies:
                  news_materiality: [high, medium, low], cross_market: true, regime_filter: false}
     threshold: 0.55
     horizons: [1, 2, 3, 4, 5]
-    live_from: null
+    live_from: 2026-10-12
   - id: rule.model_news_calm.v1
     family: rule
     name: Model + news, calm markets only
@@ -122,7 +124,7 @@ strategies:
                  news_materiality: [high, medium, low], cross_market: false, regime_filter: true}
     threshold: 0.55
     horizons: [1, 2, 3, 4, 5]
-    live_from: null
+    live_from: 2026-10-12
   - id: rule.model_news_strict.v1
     family: rule
     name: Model + news, 60% bar
@@ -135,7 +137,7 @@ strategies:
                  news_materiality: [high, medium, low], cross_market: false, regime_filter: false}
     threshold: 0.60
     horizons: [1, 2, 3, 4, 5]
-    live_from: null
+    live_from: 2026-10-12
 
   # ---------------- baselines (family baseline; the yardstick, never in the head-to-head) ----------------
   - id: base.always_up.v1
@@ -150,7 +152,7 @@ strategies:
                  regime_filter: false}
     threshold: null
     horizons: [1, 2, 3, 4, 5]
-    live_from: null
+    live_from: 2026-10-12
   - id: base.momentum.v1
     family: baseline
     name: Follow yesterday
@@ -163,7 +165,7 @@ strategies:
                  regime_filter: false}
     threshold: null
     horizons: [1, 2, 3, 4, 5]
-    live_from: null
+    live_from: 2026-10-12
   - id: base.model_only.v1
     family: baseline
     name: Model without news
@@ -176,7 +178,7 @@ strategies:
                  regime_filter: false}
     threshold: 0.55
     horizons: [1, 2, 3, 4, 5]
-    live_from: null
+    live_from: 2026-10-12
 
   # ---------------- AI traders (family ai; F4, decision 9; definitions in .claude/agents/trader-*.md, B3) -------
   - id: ai.news_results.sonnet.v1
@@ -190,7 +192,7 @@ strategies:
     parameters: {model: sonnet, sees_model_score: false, inputs: [news, results, filings, events]}
     threshold: 0.55
     horizons: [1, 3, 5]
-    live_from: null
+    live_from: 2026-10-12
   - id: ai.pattern_mood.sonnet.v1
     family: ai
     name: AI price pattern & mood (Sonnet)
@@ -202,7 +204,7 @@ strategies:
     parameters: {model: sonnet, sees_model_score: false, inputs: [prices, indicators, regime, cues, sectors]}
     threshold: 0.55
     horizons: [1, 3, 5]
-    live_from: null
+    live_from: 2026-10-12
   - id: ai.combined.sonnet.v1
     family: ai
     name: AI combined (Sonnet)
@@ -215,7 +217,7 @@ strategies:
                  inputs: [news, results, filings, events, prices, indicators, regime, cues, sectors, model_score]}
     threshold: 0.55
     horizons: [1, 3, 5]
-    live_from: null
+    live_from: 2026-10-12
   - id: ai.combined.opus.v1
     family: ai
     name: AI combined (Opus)
@@ -228,4 +230,4 @@ strategies:
                  inputs: [news, results, filings, events, prices, indicators, regime, cues, sectors, model_score]}
     threshold: 0.55
     horizons: [1, 3, 5]
-    live_from: null
+    live_from: 2026-10-12

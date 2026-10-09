@@ -46,7 +46,7 @@ questions) from the dashboard, Slack, Claude Code and the Claude app.
 | 20 | Dashboard actions | All: add, deactivate, reactivate, change amount, delete (delete dashboard-only, with confirmation). |
 | 21 | Slack posts | Morning picks, close results, alerts, weekly report. |
 | 22 | Claude app login | GitHub OAuth, the owner's account only. |
-| 23 | Go-live review | First formal review 2 months after the new paper trading starts; go-live only if the bar (F7) is met, then monthly reviews. |
+| 23 | Go-live review | First formal review 2 months after the new paper trading starts; go-live only if the bar (F7) is met, then monthly reviews. The new paper trading started on **2026-10-12** (go-live date G, every strategy's `live_from`; session B19), so the first formal review is due **2026-12-12**. |
 | 24 | Neo4j | Kept, off the critical path (nothing the dashboard needs depends on it). |
 | 25 | Old static pages | Retired 2 weeks after the new app is live; Slack then links to the new app. |
 | 26 | Amounts | Default ₹1,00,000 per trade (India) and $1,000 (US); override per company, either market. |
@@ -814,7 +814,7 @@ shared-doc edits (judged); the session wires the
 new runs into the routine prompts, create the schedules (post-close, intraday, weekly research),
 update `CUTOFF_LOCAL` in `constants/ai_replay.py` to the new pre-open times, remove `tickers:` from the
 market configs, measure the pre-open run's duration, end-to-end run of both markets, then switch on
-the new paper trading. The 2-month review clock starts that day.
+the new paper trading. The 2-month review clock starts that day: G = 2026-10-12 (B19), first formal review 2026-12-12.
 
 **After launch.** Retire the static pages 2 weeks after the new app is live (decision 25); first formal
 review at 2 months (decision 23).

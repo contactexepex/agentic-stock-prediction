@@ -18,8 +18,8 @@ Two routines, scheduled in the exchange's own timezone so daylight saving never 
 
 | Routine | Cron (exchange time) | Brief ready | Benchmark / regime |
 |---|---|---|---|
-| India (NSE) | `CRON_TZ=Asia/Kolkata 40 7 * * 1-5` (07:40 IST; 08:10 IST until 2026-10-07) | ~08:10 IST, before the 08:45 block window and 09:00 pre-open | NIFTY 50 (`^NSEI`), India VIX (`^INDIAVIX`) |
-| US (NYSE/Nasdaq) | `CRON_TZ=America/New_York 45 7 * * 1-5` (07:45 ET; 08:15 ET until 2026-10-07) | ~08:15 ET (~14:15 Amsterdam) | SPY, VIX (`^VIX`) |
+| India (NSE) | `CRON_TZ=Asia/Kolkata 40 7 * * 1-5` (07:40 IST; 08:10 IST until 2026-10-07) | ~08:05 IST (measured 08:01 and 08:03 IST on 2026-10-08/09, B19), before the 08:45 block window and 09:00 pre-open | NIFTY 50 (`^NSEI`), India VIX (`^INDIAVIX`) |
+| US (NYSE/Nasdaq) | `CRON_TZ=America/New_York 45 7 * * 1-5` (07:45 ET; 08:15 ET until 2026-10-07) | ~08:15 ET (~14:15 Amsterdam; measured 08:10 and 08:12 ET on 2026-10-08/09, B19) | SPY, VIX (`^VIX`) |
 
 News-only light runs (`routine/NEWS_PROMPT.md`, section 3 "News timing"), every 4 hours, every day
 including weekends and holidays, in UTC and at least about 2.5 hours away from the same market's
