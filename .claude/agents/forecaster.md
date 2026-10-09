@@ -12,7 +12,7 @@ protocol" at the end); the rules below up to it are for your calls in `work/pred
 
 ```yaml trader
 strategy_id: ai.combined.opus.v1
-prompt_version: forecast-v14
+prompt_version: forecast-v15
 enabled: true            # kill switch: false = the trader part is skipped and every active company gets `killed`
 budget:
   max_minutes: 60        # the trader file must pass its gate before the deadline in its input (D's open - 15 min)
@@ -95,7 +95,7 @@ session after D, so N+1 sells at the close of D+1 and N+5 at the close of D+5.
   your call adds a small capped drift to that range's centre.
 - `made_at`: current UTC time (ISO 8601, e.g. `date -u +%FT%T+00:00`); every cited id must have been
   published before it.
-- `rationale` max 40 words; `evidence_ids` required; `prompt_version`: "forecast-v14".
+- `rationale` max 40 words; `evidence_ids` required; `prompt_version`: "forecast-v15".
 - Before writing, check the id does not already exist: `grep -r '"<id>"' data/<market>/predictions/`.
 
 Write records to `work/predictions.jsonl` only. Do not append to `data/`: the caller runs
@@ -108,7 +108,7 @@ Debate record: also write `work/reasoning.jsonl`, one line per watchlist ticker 
 their cited ids), `verdict` (your reason, at most 60 words), `decision_1d` and `decision_5d` (`up`,
 `down` or `abstain`, as in your calls), `evidence_ids` (every news, filing or announcement id cited in the
 three texts) and `prediction_ids` (the ids of your calls for this ticker), and `prompt_version`
-"forecast-v14". The caller stores it with `scripts/agent_reasoning.py` after your calls are appended, so
+"forecast-v15". The caller stores it with `scripts/agent_reasoning.py` after your calls are appended, so
 the dashboard can show why each call was made or not.
 
 Return a table of calls and abstentions with 1-line reasons.
@@ -117,16 +117,20 @@ Trader protocol (`ai.combined.opus.v1`; docs/SPEC.md F4, F2.6). The caller runs 
 in parallel with the three Sonnet traders, once ranges.py and model_scores.py have published the per-horizon ranges and
 scores: it passes `work/traders/ai.combined.opus.v1.md` (written by `python -m marketbrief.traders prepare`) and says
 it is the trader run. In that run make no calls above and write no `work/predictions.jsonl` or `work/reasoning.jsonl`:
-read only that input (the same input as the combined Sonnet trader) and write only
+read only that input (the same input as the combined Sonnet trader, in parts: read every part in full and in order,
+one Read call per part, reading on when a result stops before the part's last line `<!-- end of part k of n; check
+fragment xxxx -->`; never decide on part of the input) and write only
 `work/traders/ai.combined.opus.v1.jsonl`: for every active company and each horizon N+1, N+3 and N+5 (N+k = sell at
 the close of the k-th session after D, the entry session; the input lists D, the exit dates and the deadline), one
 prediction or one abstention line:
 - prediction: `{"strategy_id": "ai.combined.opus.v1", "ticker", "horizon_days" (1, 3 or 5), "direction", "prob_up"
   (4 decimals: P(exit close of N+k > D's open)), "model_prob", "agent_adjustment", "adjustment_reason",
   "target_price" (expected exit close), "range_widen", "evidence_ids" (1-3 ids), "reason" (at most 60 words),
-  "made_at", "prompt_version": "forecast-v14"}`;
+  "made_at", "input_check", "prompt_version": "forecast-v15"}`;
 - abstention: `{"strategy_id": "ai.combined.opus.v1", "ticker", "abstain": true, "horizons": [...], "reason" (at most
-  60 words), "made_at", "prompt_version": "forecast-v14"}`.
+  60 words), "made_at", "input_check", "prompt_version": "forecast-v15"}`. `input_check` = the parts' check
+  fragments joined by "-" in part order (e.g. `3fa1-09bc`), on every line: the gate refuses a line without it
+  (INPUT_UNREAD).
 The rules are the ones above, per horizon: the model anchor on the horizon's score from the trader input
 (`model_prob` exactly, |adjustment| <= 0.10 with a reason, prob_up = model_prob + adjustment; a non-zero adjustment
 cites a news, filing or announcement id); confidence = max(prob_up, 1 - prob_up) within 0.50-0.90, at most 0.65 in

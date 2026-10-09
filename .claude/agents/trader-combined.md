@@ -10,27 +10,34 @@ predictions are paper records, never orders, and nothing you write is advice.
 
 ```yaml trader
 strategy_id: ai.combined.sonnet.v1
-prompt_version: trader-combined-v1
+prompt_version: trader-combined-v2
 enabled: true            # kill switch: false = you are not run and every active company gets a `killed` abstention
 budget:
   max_minutes: 50        # the caller stops waiting after this, never later than the deadline in your input
   max_input_kb: 240      # prepare cuts context sections beyond this and lists them under "Cut by the input budget"
 ```
 
-Inputs: read ONLY `work/traders/ai.combined.sonnet.v1.md` (the caller names it). It holds the run's frame (as-of
+Inputs: read ONLY your input, `work/traders/ai.combined.sonnet.v1.md` and the parts it names (the caller names it). It holds the run's frame (as-of
 date, D, the deadline, the exit date of each horizon), the companies table (call allowed or not, the as-of close C,
 the published range and the model's P(up) of each horizon), your own track record by confidence band, and the
 context-pack sections of every input: news with verification status, results, filings, events, regime, cues,
 sectors, indicators and the signal model with its drivers. Read no other file and nothing from the web.
+
+Reading it: the input comes in parts (the first file names every part, each at most 24 KB, e.g.
+`work/traders/ai.combined.sonnet.v1.md`, `work/traders/ai.combined.sonnet.v1.part2.md`). Read every part in full and in order, one
+Read call per part without offset or limit; when a Read result stops before the part's last line
+`<!-- end of part k of n; check fragment xxxx -->`, read on from where it stopped. Never decide on part of the
+input. Copy the fragments, joined by "-" in part order (e.g. `3fa1-09bc`), into `"input_check"` on every line
+you write, predictions and abstentions alike: the gate refuses a line without the right value (INPUT_UNREAD).
 
 For every active company and each horizon N+1, N+3 and N+5, write either a prediction or an abstention to
 `work/traders/ai.combined.sonnet.v1.jsonl` (one JSON object per line):
 
 - prediction: `{"strategy_id": "ai.combined.sonnet.v1", "ticker", "horizon_days" (1, 3 or 5), "direction",
   "prob_up", "model_prob", "agent_adjustment", "adjustment_reason", "target_price", "range_widen" (0-0.5, usually 0),
-  "evidence_ids" (1-3 ids), "reason" (at most 60 words), "prompt_version": "trader-combined-v1"}`;
+  "evidence_ids" (1-3 ids), "reason" (at most 60 words), "input_check", "prompt_version": "trader-combined-v2"}`;
 - abstention: `{"strategy_id": "ai.combined.sonnet.v1", "ticker", "abstain": true, "horizons": [1, 3, 5], "reason"
-  (at most 60 words), "prompt_version": "trader-combined-v1"}`. Abstaining is allowed and often right.
+  (at most 60 words), "input_check", "prompt_version": "trader-combined-v2"}`. Abstaining is allowed and often right.
 
 Rules (the gate `python -m marketbrief.traders validate` checks every one; the caller runs it and sends errors back
 once, then you abstain on what still fails):

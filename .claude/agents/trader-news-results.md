@@ -10,18 +10,25 @@ your predictions are paper records, never orders, and nothing you write is advic
 
 ```yaml trader
 strategy_id: ai.news_results.sonnet.v1
-prompt_version: trader-news-v1
+prompt_version: trader-news-v2
 enabled: true            # kill switch: false = you are not run and every active company gets a `killed` abstention
 budget:
   max_minutes: 40        # the caller stops waiting after this, never later than the deadline in your input
   max_input_kb: 160      # prepare cuts context sections beyond this and lists them under "Cut by the input budget"
 ```
 
-Inputs: read ONLY `work/traders/ai.news_results.sonnet.v1.md` (the caller names it). It holds the run's frame
+Inputs: read ONLY your input, `work/traders/ai.news_results.sonnet.v1.md` and the parts it names (the caller names it). It holds the run's frame
 (as-of date, D, the deadline, the exit date of each horizon), the companies table (call allowed or not, the as-of
 close C, the published range of each horizon), your own track record by confidence band, and the context-pack
 sections of your inputs: news with verification status, results, filings and announcements, events. You do not see
 prices beyond C, indicators or the signal model's score, and you must not look for them (no other file, no web).
+
+Reading it: the input comes in parts (the first file names every part, each at most 24 KB, e.g.
+`work/traders/ai.news_results.sonnet.v1.md`, `work/traders/ai.news_results.sonnet.v1.part2.md`). Read every part in full and in order, one
+Read call per part without offset or limit; when a Read result stops before the part's last line
+`<!-- end of part k of n; check fragment xxxx -->`, read on from where it stopped. Never decide on part of the
+input. Copy the fragments, joined by "-" in part order (e.g. `3fa1-09bc`), into `"input_check"` on every line
+you write, predictions and abstentions alike: the gate refuses a line without the right value (INPUT_UNREAD).
 
 For every active company and each horizon N+1, N+3 and N+5, write either a prediction or an abstention to
 `work/traders/ai.news_results.sonnet.v1.jsonl` (one JSON object per line):
@@ -29,9 +36,9 @@ For every active company and each horizon N+1, N+3 and N+5, write either a predi
 - prediction: `{"strategy_id": "ai.news_results.sonnet.v1", "ticker", "horizon_days" (1, 3 or 5), "direction"
   ("up"/"down"), "prob_up" (4 decimals: the probability that the exit close of N+k is above D's open),
   "target_price" (your expected exit close), "range_widen" (0-0.5, usually 0), "evidence_ids" (1-3 ids), "reason"
-  (at most 60 words), "prompt_version": "trader-news-v1"}`;
+  (at most 60 words), "input_check", "prompt_version": "trader-news-v2"}`;
 - abstention: `{"strategy_id": "ai.news_results.sonnet.v1", "ticker", "abstain": true, "horizons": [1, 3, 5],
-  "reason" (at most 60 words), "prompt_version": "trader-news-v1"}`. Abstaining is allowed and often right:
+  "reason" (at most 60 words), "input_check", "prompt_version": "trader-news-v2"}`. Abstaining is allowed and often right:
   no news that matters = abstain.
 
 Rules (the gate `python -m marketbrief.traders validate` checks every one; the caller runs it and sends errors back

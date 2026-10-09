@@ -157,7 +157,10 @@ Warnings never block: list them in `data_quality`.
       subagent with the market (it writes claim records quoting the stored extracts and filing
       texts to `work/claims.jsonl`), then the gate
       `python scripts/claims.py validate work/claims.jsonl`; on exit 1 send the errors back to the
-      claim-checker once and validate again;
+      claim-checker once and validate again. To save time, the claim-checker subagent may run in the
+      background while e. (results digests) runs, which reads no claims or statuses. c. and d. must
+      finish before the collect gate below, which checks today's claim and status rows, and so before
+      step 5a, whose model scores weigh news by verification status. Do not run later steps alongside it;
    c. when it passes: `python scripts/claims.py add work/claims.jsonl`; if it still fails after
       the retry: `python scripts/claims.py add work/claims.jsonl --valid-only` (appends the valid
       records only) and list the dropped lines in `data_quality`. Delete `work/claims.jsonl`;
@@ -209,7 +212,9 @@ Warnings never block: list them in `data_quality`.
 6. Context: `python scripts/context.py > work/context.md`. Gate:
    `python scripts/validate.py --stage context > work/steps/validate_context.json`.
 
-7. News: `python scripts/news_pending.py > work/steps/news_pending.json` writes
+7. News (start only after step 6's context pack is built, which is after d. of step 3: the news-analyst scores
+   novelty from the pack's news verification status and reports those statuses; never start it earlier, even
+   under time pressure): `python scripts/news_pending.py > work/steps/news_pending.json` writes
    `work/news_pending.jsonl`: every news item and, for India, every NSE announcement (ids
    `nse-ann-<seq_id>`, the one exception to the 16-character news id) first seen since the last
    enrichment and not enriched yet, plus items whose headline changed after their enrichment

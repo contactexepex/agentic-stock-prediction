@@ -24,6 +24,7 @@ from pathlib import Path
 
 from marketbrief.traders import constants as c
 from marketbrief.traders.gate import check_record
+from marketbrief.traders.input_parts import CHECK_FIELD
 from marketbrief.traders.inputs import GateInputs
 from marketbrief.traders.records import prediction_id
 from marketbrief.traders.registry import Trader
@@ -139,11 +140,38 @@ def gate_prediction(rec, one: Trader, gi: GateInputs, out: dict, state: dict, nu
     return errors
 
 
-def gate_lines(lines: list, one: Trader, gi: GateInputs, stamp: str | None = None) -> dict:
+def checked(lines: list, check: str | None) -> tuple[list, dict[int, str]]:
+    """(the lines without their input_check field, {line number: its value} where it is not `check`). check None:
+    no prepare run, nothing is refused."""
+    out, wrong = [], {}
+    for number, rec in enumerate(lines, 1):
+        if isinstance(rec, dict):
+            got = rec.get(CHECK_FIELD)
+            rec = {k: v for k, v in rec.items() if k != CHECK_FIELD}
+            if check is not None and got != check:
+                wrong[number] = got
+        out.append(rec)
+    return out, wrong
+
+
+def refuse_unread(rec: dict, gi: GateInputs, out: dict, covered: dict) -> None:
+    """A line without the right input_check: its horizons count as covered and failed (INPUT_UNREAD), so the
+    company gets gate_failed after the retry, never a stored call or a plain abstention."""
+    ticker = rec.get("ticker")
+    horizons = (rec.get("horizons") or []) if rec.get("abstain") is True else [rec.get("horizon_days")]
+    for horizon in horizons if ticker in gi.active else []:
+        if isinstance(horizon, int):
+            out["failed"][ticker][horizon] = [c.CODE_INPUT_UNREAD]
+            covered[ticker].add(horizon)
+
+
+def gate_lines(lines: list, one: Trader, gi: GateInputs, stamp: str | None = None, check: str | None = None) -> dict:
     """Every line gated, plus coverage: {rows, errors, warnings, skipped: {ticker: (horizons, reason)},
     failed: {ticker: {horizon: codes}}}. stamp: the made_at of lines without one, and of every line of a clockless
-    trader (file_stamp)."""
+    trader (file_stamp). check: the input_check every line must carry (input_parts.expected); a line without it is
+    refused, prediction or abstention: it was decided on part of the input."""
     out = {"rows": [], "errors": [], "warnings": [], "skipped": {}, "failed": defaultdict(dict)}
+    lines, unread = checked(lines, check)
     if stamp:
         lines, replaced = stamped(lines, stamp, one)
         out["warnings"] += [{"line": n, "code": c.CODE_STAMPED, "detail": c.MSG_STAMPED.format(stamp=stamp)}
@@ -151,6 +179,11 @@ def gate_lines(lines: list, one: Trader, gi: GateInputs, stamp: str | None = Non
     state = {"seen": set(), "covered": defaultdict(set), "skipped_h": defaultdict(set)}
     for number, rec in enumerate(lines, 1):
         ticker = rec.get("ticker") if isinstance(rec, dict) else None
+        if number in unread:
+            refuse_unread(rec, gi, out, state["covered"])
+            out["errors"].append({"line": number, "ticker": ticker, "code": c.CODE_INPUT_UNREAD,
+                                  "detail": c.MSG_INPUT_UNREAD.format(got=unread[number], want=check)})
+            continue
         if isinstance(rec, dict) and rec.get("abstain") is True:
             errors = gate_abstain(rec, one, gi, out, state["covered"])
             if not errors:
