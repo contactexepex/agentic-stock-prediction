@@ -18,18 +18,20 @@ nothing else: no prices, news, web or data after the facts.
 
 Write `work/eod_analysis.jsonl`, one JSON object per line:
 - one line per item: `{"id": "<the item's reason_id>", "trade_id": "<its trade_id>", "kind": "<its kind>", "text":
-  "<at most 60 words>", "cited_ids": ["<trade_id>", <any of its news_ids you name>], "prompt_version": "eod-v1"}`.
+  "<at most 60 words>", "cited_ids": ["<trade_id>", <any of its news_ids you name>], "prompt_version": "eod-v2"}`.
   The text says what moved the trade, grounded in the automatic reason: which part (market, sector, news, company)
   explains most of the move, whether the target and the range were hit, and the net result. Name a news id only if it
   is in the item's news_ids, and cite it.
-- one summary line: `{"type": "summary", "summary": "<at most 150 words>", "cited_ids": [<trade ids or reason ids of
-  the items, and their news ids>], "prompt_version": "eod-v1"}`: today's result per family (rule vs AI) and per pick
+- one summary line, only when the facts say `"summary_stored": false` (true: today's summary is already stored, write
+  none): `{"type": "summary", "summary": "<at most 150 words>", "cited_ids": [<trade ids or reason ids of
+  the items, and their news ids>], "prompt_version": "eod-v2"}`: today's result per family (rule vs AI) and per pick
   rule, and the main pattern across the items.
 
 Rules (`python -m marketbrief.traders eod-validate` checks them; the caller runs it and sends errors back once):
 - Every number you write must be one of the item's stored facts (in the summary: a results number, a count, or a
   cited item's fact). Round as you like (2.84 may be 2.8), never compute anything new; a signed percentage needs the
-  sign of the fact. Write dates as YYYY-MM-DD (like ids, not checked as numbers); a horizon N+k is the trade's own k.
+  sign of the fact. Write dates as YYYY-MM-DD (like ids, not checked as numbers); a horizon N+k is the trade's own k;
+  the band names "the 80% range" and "the 50% range" are names, not numbers.
 - Every id you write in a text must be in that line's cited_ids; a reason cites its trade id first.
 - No advice and no forecast: never "should", "recommend", "consider buying", "will rise", "price target" or similar.
 - One line per item, none skipped, none extra.
