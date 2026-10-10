@@ -12,6 +12,7 @@ from marketbrief.core import paths
 from marketbrief.core.clock import utc_today
 from marketbrief.core.market_config import benchmark_key, vol_index_key
 from marketbrief.presentation.news_events import call_status_lines
+from marketbrief.presentation.reader.links import brief_path
 from view_data import CONF_BANDS_SQL, RANGE_RECORD_EXACT
 
 # Scored records twice: since start, and the rolling last 30 days (by target date).
@@ -110,3 +111,10 @@ def report_url(settings: dict, market: str, session, app: str | None = None) -> 
     if app:
         return f"{app.rstrip('/')}/{market}"
     return f"{settings['repo_url']}/blob/{settings['branch']}/reports/{market}/{session}.html"
+
+
+def brief_url(settings: dict, market: str, session) -> str | None:
+    """The day's public brief page (C2): `brief_link_url` + brief_path(market, session); None without the setting or
+    without BRIEF_LINK_SECRET (the caller keeps report_url's link)."""
+    base, path = settings.get("brief_link_url"), brief_path(market, str(session))
+    return f"{base.rstrip('/')}{path}" if base and path else None

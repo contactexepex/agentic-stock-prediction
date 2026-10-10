@@ -335,7 +335,7 @@ def plt_close(fig):
     plt.close(fig)
 
 
-def test_slack_draft_fits_twelve_lines_and_flags_premarket_releases():
+def test_slack_draft_fits_twelve_lines_and_flags_premarket_releases(monkeypatch):
     from marketbrief.presentation.report import build
     us = load_market("us")
     rows = [{"ticker": t, "horizon_days": 1, "direction": "up", "confidence": 0.6, "base_close": 100.0,
@@ -355,6 +355,13 @@ def test_slack_draft_fits_twelve_lines_and_flags_premarket_releases():
     assert "Calls today: 9 · " in slack and "and 6 more in the report" in slack
     from marketbrief.core.settings import slack_link_url   # the link opens the market's page in the app
     assert slack.strip().splitlines()[-1] == f"Market page: {slack_link_url().rstrip('/')}/us"
+    # with C2's secret and brief_link_url the last line is the day's public brief page instead (same line count)
+    from marketbrief.presentation.reader.links import brief_path
+    monkeypatch.setenv("BRIEF_LINK_SECRET", "test-secret")
+    _, briefed, _ = build.build(us, d, {**settings, "brief_link_url": "https://gw.example"})
+    assert briefed.strip().splitlines()[-1] == "Today's brief: https://gw.example" + brief_path("us", "2026-10-05")
+    assert len(briefed.splitlines()) == len(slack.splitlines())
+    monkeypatch.delenv("BRIEF_LINK_SECRET")
     assert "market mood" not in slack.splitlines()[0]           # no regime row in this fixture
     # US CPI at 08:30 ET on the session day: the brief says the calls were made before it
     d["session"] = date(2026, 10, 14)

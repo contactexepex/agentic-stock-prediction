@@ -12,7 +12,7 @@ from marketbrief.core.settings import slack_link_url
 from marketbrief.pipeline.score_predictions import is_late
 from marketbrief.presentation.horizon_names import horizon_name
 from marketbrief.presentation.report.formatting import review_line
-from marketbrief.presentation.report.gather import report_url
+from marketbrief.presentation.report.gather import brief_url, report_url
 from marketbrief.presentation.report.report_parts import ReportParts
 from marketbrief.utils.money import format_money
 from view_data import fmt_call
@@ -45,8 +45,9 @@ def render_slack(cfg: dict, day: dict, settings: dict, parts: ReportParts) -> tu
     released = parts.released
     scored_calls = parts.scored_calls
     vol_name = parts.vol_name
-    app = slack_link_url()
-    url = report_url(settings, market, session, app)
+    app, brief = slack_link_url(), brief_url(settings, market, session)
+    url = brief or report_url(settings, market, session, app)
+    link_label = "Today's brief" if brief else "Market page" if app else "Full report (charts, filters, reasons)"
     # calls on late ranges are not forecasts (the HTML and the table label them late)
     calls = [
         (ticker_symbol, item)
@@ -95,7 +96,7 @@ def render_slack(cfg: dict, day: dict, settings: dict, parts: ReportParts) -> tu
         if one_day_count
         else "Yesterday: no ranges matured yet.",
         "<!-- AGENT:failures (only if a collector failed; otherwise delete this line) -->",
-        f"Market page: {url}" if app else f"Full report (charts, filters, reasons): {url}",
+        f"{link_label}: {url}",
     ]
     if day.get("review") and day["review"]["fresh"]:  # weekly review written in this run: one line
         slack.insert(

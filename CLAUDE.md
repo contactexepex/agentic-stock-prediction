@@ -407,7 +407,9 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   chart images in `reports/<market>/charts/<session_date>/` (`ranges`, `sectors`, `track_record`);
   `config/settings.yaml` holds the repo URL, the Slack channel id and the AI model's `model_training_cutoff`
   (ai_replay's fair vs contaminated split) and `slack_link_url`: Slack links open `<slack_link_url>/<market>`, the
-  market's page in the app (`core.settings.slack_link_url`); the daily HTML report is attached in the day's thread
+  market's page in the app (`core.settings.slack_link_url`); with `BRIEF_LINK_SECRET` set, the daily brief's link is
+  C2's public brief page `<brief_link_url>/brief/<market>/<session>-<token>` (`gather.brief_url`,
+  `reader.links.brief_path`); the daily HTML report is attached in the day's thread
   and the weekly report links to its repo file. The static reports site (`pages_url`) is retired from Slack links
   (it deploys only by hand; owner, 2026-10-10); `reports/index.html` and `reports/vercel.json` are left for the later
   static cleanup (the only files under `reports/` that build work may change; no script writes them)

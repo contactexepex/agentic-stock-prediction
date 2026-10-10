@@ -4,6 +4,9 @@ branch: main
 slack_channel: "#market-brief"
 slack_channel_id: C0C6REB7QS2   # notify_slack.py posts the thread here with SLACK_BOT_TOKEN (bot must be a member)
 slack_link_url: https://omenix.vercel.app   # Slack links open <slack_link_url>/<market> (the market's page in the app)
+# The daily Slack brief links the public brief page instead (C2, docs/ws/c2.md) when BRIEF_LINK_SECRET is set:
+# <brief_link_url>/brief/<market>/<session>-<token>; without the secret it keeps <slack_link_url>/<market>.
+brief_link_url: https://omenix-gateway.vercel.app
 # The daily HTML report is attached in the day's thread. The static reports site (pages_url) is retired from Slack
 # links: it deploys only by hand, so its pages were stale or missing (owner, 2026-10-10).
 # The AI model's training cutoff (ForecastBench leakage rule, docs/DESIGN.md section 7): ai_replay.py
