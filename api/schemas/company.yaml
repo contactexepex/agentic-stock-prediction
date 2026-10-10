@@ -57,8 +57,8 @@ CompanyPage:
     - $ref: '#/components/schemas/HorizonChoice'
     - type: object
       required: [status, reference_strategy, go_live, strategies, companies, ticker, company, lifecycle, agreement,
-                 head_to_head, predictions, open_trades, trade_checks, settled, reasons, news, results, events, bars,
-                 on_company]
+                 head_to_head, predictions, published_ranges, open_trades, trade_checks, settled, reasons, news, results,
+                 events, bars, on_company]
       properties:
         status: {$ref: '#/components/schemas/StatusBlock'}
         reference_strategy: {type: string, description: The registry's reference rule strategy (rule.model_news.v1)}
@@ -83,6 +83,12 @@ CompanyPage:
           type: array
           description: The company's strategy predictions of the as-of date, by strategy then horizon
           items: {$ref: '#/components/schemas/StrategyPrediction'}
+        published_ranges:
+          type: array
+          description: >-
+            ranges.py's published range of the as-of date per horizon, by horizon (empty when none is stored). Shown
+            whatever a strategy's live_from, so the range card and chart have it before go-live too
+          items: {$ref: '#/components/schemas/PublishedRange'}
         open_trades:
           type: array
           items: {$ref: '#/components/schemas/OpenTrade'}
@@ -236,6 +242,29 @@ CompanyBar:
     close: {type: number}
     volume: {type: ['integer', 'null']}
     adjusted: {type: boolean}
+PublishedRange:
+  type: object
+  description: >-
+    ranges.py's published range of one horizon (kind ranges; B10's horizon_records.ranges_asof: the first range of
+    the newest as-of date stored by the cut-off). target_price = base_close x exp(center), the price a strategy
+    prediction copies; the 50% and 80% ranges of the exit close
+  x-source: analytics/horizon_records.ranges_asof
+  required: [id, made_at, as_of_date, session_date, exit_date, horizon_days, base_close, target_price, lo50, hi50,
+             lo80, hi80]
+  properties:
+    id: {type: string}
+    made_at: {$ref: '#/components/schemas/IsoTime'}
+    as_of_date: {$ref: '#/components/schemas/IsoDate'}
+    session_date: {$ref: '#/components/schemas/IsoDate'}
+    exit_date: {$ref: '#/components/schemas/IsoDate'}
+    horizon_days: {$ref: '#/components/schemas/Horizon'}
+    base_close: {type: number}
+    target_price: {type: number}
+    lo50: {type: number}
+    hi50: {type: number}
+    lo80: {type: number}
+    hi80: {type: number}
+    regime: {type: ['string', 'null']}
 StrategyPrediction:
   type: object
   description: >-

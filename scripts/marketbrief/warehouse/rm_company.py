@@ -224,7 +224,8 @@ BUILDERS = (
 )
 CONTRACT_CASES = (
     ContractCase(path="/api/v1/markets/{market}/stocks/{ticker}", table=RM_STOCK, mockup=MOCKUP_COMPANY,
-                 mockup_payload=company_mockup, map_paths=("$.strategies", "$.agreement")),
+                 mockup_payload=company_mockup, map_paths=("$.strategies", "$.agreement"),
+                 extra_keys=("published_ranges",)),
     ContractCase(path="/api/v1/markets/{market}/stocks/{ticker}/bars", table=RM_BARS, mockup=MOCKUP_COMPANY,
                  mockup_payload=bars_mockup),
     ContractCase(path="/api/v1/markets/{market}/trades", table=RM_TRADES, mockup=MOCKUP_COMPANY,

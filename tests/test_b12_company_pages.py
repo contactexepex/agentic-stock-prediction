@@ -294,3 +294,47 @@ def test_a_strategy_not_live_on_its_day_is_left_out(monkeypatch):
     for ticker in company_mockup()["india"]["pages"]:
         page = company_payloads.lifecycle_payload(after, ticker, SESSION)
         assert all(row.get("strategy_id") != reference for row in page["predictions"] + page["trade_checks"])
+
+
+def published_range(ticker: str, as_of: str, horizon: int, made_at: str, center: float) -> dict:
+    """A ranges.py row (the stored ranges kind's fields) of an as-of date and horizon."""
+    session, exit_day = {"2026-10-05": ("2026-10-06", "2026-10-07"), "2026-10-06": ("2026-10-07", "2026-10-08"),
+                         "2026-10-07": ("2026-10-08", "2026-10-09")}[as_of]
+    return {"id": f"{as_of}-{ticker}-{horizon}d", "made_at": made_at, "as_of_date": as_of, "session_date": session,
+            "target_date": exit_day, "ticker": ticker, "horizon_days": horizon, "base_close": 1000.0,
+            "center": center, "sigma_h": 0.02, "lo50": 980.0, "hi50": 1020.0, "lo80": 960.0, "hi80": 1040.0,
+            "naive_lo50": 981.0, "naive_hi50": 1019.0, "naive_lo80": 961.0, "naive_hi80": 1039.0,
+            "direction": None, "confidence": None, "regime": "CALM", "calibration_id": "test", "notes": [],
+            "inputs": [], "iv_sigma_h": None, "horizon_label": "n_plus_k", "entry_date": session,
+            "exit_date": exit_day}
+
+
+def test_published_ranges_show_when_no_strategy_is_live(root, monkeypatch):
+    """ranges.py publishes a range for every company whatever a strategy's live_from: the company page carries the
+    as-of date's ranges (B10's ranges_asof as of the cut-off) when no strategy is live and its predictions are left
+    out; an older as-of date, a range stored after the cut-off and a company not collected never show."""
+    from marketbrief.lab import registry
+
+    ticker = next(iter(company_mockup()["india"]["pages"]))
+    rows = [published_range(ticker, AS_OF, 2, "2026-10-07T02:30:00Z", 0.0),
+            published_range(ticker, AS_OF, 1, "2026-10-07T02:30:00Z", 0.01),
+            published_range(ticker, "2026-10-05", 1, "2026-10-06T02:30:00Z", 0.0),
+            published_range(ticker, "2026-10-07", 1, "2026-10-08T02:30:00Z", 0.0),  # after the cut-off
+            published_range("NOTCOLLECTED", AS_OF, 1, "2026-10-07T02:30:00Z", 0.0)]
+    for as_of in ("2026-10-05", "2026-10-06", "2026-10-07"):
+        path = root / "data" / "india" / "ranges" / "2026" / "10" / f"{as_of}.jsonl"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("".join(json.dumps(row) + "\n" for row in rows if row["as_of_date"] == as_of))
+    monkeypatch.setattr(registry, "is_live", lambda _strategy, _day, **_options: False)
+    sources = sources_of("india")
+    assert not sources.predictions and not sources.all_predictions
+    assert set(sources.ranges) == {ticker}
+    page = company_payloads.stock_payload(sources, ticker, {}, EMPTY_BLOCKS)
+    assert page["predictions"] == []
+    assert [(row["id"], row["horizon_days"]) for row in page["published_ranges"]] == [
+        (f"{AS_OF}-{ticker}-1d", 1), (f"{AS_OF}-{ticker}-2d", 2)]
+    first = page["published_ranges"][0]
+    assert first == {"id": f"{AS_OF}-{ticker}-1d", "made_at": "2026-10-07T02:30:00Z", "as_of_date": AS_OF,
+                     "session_date": SESSION, "exit_date": "2026-10-08", "horizon_days": 1, "base_close": 1000.0,
+                     "target_price": 1010.0502, "lo50": 980.0, "hi50": 1020.0, "lo80": 960.0, "hi80": 1040.0,
+                     "regime": "CALM"}

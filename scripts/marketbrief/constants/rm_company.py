@@ -46,6 +46,10 @@ STRATEGIES_PICK_FIELDS = (*PICK_FIELDS, "method_version")
 PREDICTION_FIELDS = ("id", "strategy_id", "family", "ticker", "made_at", "as_of_date", "session_date", "exit_date",
                      "horizon_days", "direction", "prob_up", "qualifies", "base_close", "target_price", "lo50", "hi50",
                      "lo80", "hi80", "range_widen", "regime", "quality")
+# ranges.py's published range per horizon (B10's ranges rows; independent of a strategy's live_from); target_price =
+# base_close x exp(center), as a strategy prediction copies it
+PUBLISHED_RANGE_FIELDS = ("id", "made_at", "as_of_date", "session_date", "exit_date", "horizon_days", "base_close",
+                          "target_price", "lo50", "hi50", "lo80", "hi80", "regime")
 STRATEGIES_PREDICTION_FIELDS = ("id", "strategy_id", "family", "ticker", "made_at", "as_of_date", "session_date",
                                 "exit_date", "horizon_days", "direction", "prob_up", "confidence", "threshold",
                                 "qualifies", "base_close", "target_price", "lo50", "hi50", "lo80", "hi80",

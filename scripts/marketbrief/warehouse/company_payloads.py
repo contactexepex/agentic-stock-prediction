@@ -6,7 +6,8 @@ from __future__ import annotations
 from marketbrief.constants.rm_company import (ALL_HORIZONS, BAR_FIELDS, CALENDAR_FIELDS, CHECK_FIELDS,
                                               COMPANY_ROW_FIELDS, DIGEST_FIELDS, ENRICHMENT_FIELDS,
                                               EVENT_TYPE_HOLIDAY, HEADLINE_FIELDS, LIFECYCLE_FIELDS, NEWS_FIELDS,
-                                              OPEN_TRADE_FIELDS, PICK_FIELDS, PREDICTION_FIELDS, REASON_DETAIL_FIELDS,
+                                              OPEN_TRADE_FIELDS, PICK_FIELDS, PREDICTION_FIELDS, PUBLISHED_RANGE_FIELDS,
+                                              REASON_DETAIL_FIELDS,
                                               REASON_FIELDS, SCOPE_STRATEGY, SCOPE_STRATEGY_COMPANY,
                                               SCOREBOARD_FIELDS, SETTLED_FIELDS, STRATEGIES_PICK_FIELDS,
                                               STRATEGIES_PREDICTION_FIELDS)
@@ -32,6 +33,12 @@ def bar_rows(sources: CompanySources, ticker: str) -> list[dict]:
 def bars_payload(sources: CompanySources, ticker: str) -> dict:
     """rm.bars of one company."""
     return {"market": sources.market, "ticker": ticker, "as_of": sources.as_of, "bars": bar_rows(sources, ticker)}
+
+
+def range_rows(sources: CompanySources, ticker: str) -> list[dict]:
+    """The company's published ranges of the as-of date (ranges.py), by horizon."""
+    rows = [pick(row, PUBLISHED_RANGE_FIELDS) for row in sources.ranges.get(ticker, [])]
+    return sorted(rows, key=lambda row: row["horizon_days"])
 
 
 def open_trade_rows(open_trades: list[dict]) -> list[dict]:
@@ -189,6 +196,7 @@ def stock_payload(sources: CompanySources, ticker: str, shared: dict, blocks: di
         "agreement": blocks["agreement"],
         "head_to_head": pick_rows(sources, ticker, PICK_FIELDS),
         "predictions": prediction_rows(sources, ticker, PREDICTION_FIELDS),
+        "published_ranges": range_rows(sources, ticker),
         **trade_lists(sources, ticker, blocks["open_trades"]),
         "news": company_news(blocks["news"]),
         "results": digest_rows(sources, ticker),
