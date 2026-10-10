@@ -63,7 +63,7 @@ def company_table(company: dict, card: dict, horizon: int, symbol: str) -> str:
            f"<p>Last close {money(symbol, main['base_close'] if main else company.get('close'))}</p>"]
     if rows:
         out.append(f"<table><tr><th></th>{head}</tr>"
-                   + line("Measured at close", lambda r: escape(r["exit_label"] or "–"))
+                   + line("Close of", lambda r: escape(r["exit_label"] or "–"))
                    + line("Expected", lambda r: money(symbol, r["target"]))
                    + line("50% range", lambda r: rng(r["lo50"], r["hi50"]))
                    + line("80% range", lambda r: rng(r["lo80"], r["hi80"]))

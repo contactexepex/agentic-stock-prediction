@@ -289,7 +289,7 @@ def test_html_page_has_sections_filters_and_matching_numbers():
     v, html = page()
     for needle in ('id="glance"', 'id="changes"', 'id="paper"', 'id="legend"', 'id="cards"', 'id="track"',
                    'id="notes"', 'id="footer"', 'id="f-sector"', 'id="f-lean"', 'id="f-sort"', 'id="f-horizon"',
-                   "The day in 20 seconds", "What changed since the previous run", "How to read this page",
+                   "The day in 20 seconds", "What changed since the previous day’s forecast", "How to read this page",
                    "Chance of going up", "prefers-color-scheme: dark", ':root[data-theme="dark"]', 'name="viewport"',
                    "--md-sys-color-primary", '<symbol id="ms-warning"'):
         assert needle in html, needle
@@ -391,7 +391,7 @@ def test_html_renders_in_a_browser_with_working_filters(tmp_path):
     assert "Last close $110.00" in text and "Lean up" in text and "Chance of going up by Tue 6 Oct58%" in text
     assert "104.00–​116.00" in text and "98.25–​121.50" in text  # numbers as given, never re-derived
     assert "Why line N+1." in text and "Results in 3 days: prices can jump" in text
-    assert "Since the previous run (Fri 2 Oct, 12:00 UTC)" in text and "1 new news item counted" in text
+    assert "Since the previous day’s forecast (Fri 2 Oct, 12:00 UTC)" in text and "1 new news item counted" in text
     assert "No price range today" in text and "Some recent news was contradicted" in text
     assert "Bad link 3" in text                                          # unsafe links stay visible as plain text
     assert out["sectors"] == ["", "Tech"] and out["tech"] == 2 and out["up"] == 1   # sectors of the shown companies

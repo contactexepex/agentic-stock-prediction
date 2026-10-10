@@ -84,7 +84,7 @@ function horizonTable(c, h){
   const cols = HS.map(x => fc(c, x));
   const cell = (cls, text, on) => el('div', {class: cls + (on ? ' sel' : ''), role: 'cell'}, text);
   g.append(cell('h l', ''), ...HS.map((x, i) => cell('h', 'N+' + x, x === h)));
-  [['Measured at close', f => f && f.exit_label ? f.exit_label.replace(/^\w+ /, '') : '–'],
+  [['Close of', f => f && f.exit_label ? f.exit_label.replace(/^\w+ /, '') : '–'],
    ['Expected', f => f ? fmtNum(f.target) : '–'],
    ['50% range', f => f ? rangeText(f.lo50, f.hi50) : '–'],
    ['80% range', f => f ? rangeText(f.lo80, f.hi80) : '–'],
@@ -120,7 +120,7 @@ function card(c){
     if (ch.target_pct != null) bits.push('expected price ' + fmtPctU(ch.target_pct));
     if (ch.prob_pts != null && Math.abs(ch.prob_pts) >= 0.0005) bits.push('chance of going up ' + fmtPts(ch.prob_pts));
     if ((ch.news_added || []).length) bits.push(ch.news_added.length + ' new news item' + (ch.news_added.length === 1 ? '' : 's') + ' counted');
-    if (bits.length) a.append(el('p', {class: 'chg'}, 'Since the previous run (' + fmtTime(ch.since) + '): ' + bits.join(' · ') + '.'));
+    if (bits.length) a.append(el('p', {class: 'chg'}, 'Since the previous day’s forecast (' + fmtTime(ch.since) + '): ' + bits.join(' · ') + '.'));
   }
   const P = R.paper || {};
   if (P.live) {
@@ -151,7 +151,7 @@ function moreDetails(c){
   if (sec) { body.append(el('h4', null, c.sector + ': analysts’ view')); body.append(htmlBlock('prose', sec)); }
   if (c.record) { const parts = Object.keys(c.record.ranges || {}).map(k => c.record.ranges[k].name + ' 80% ranges: ' + c.record.ranges[k].text);
     body.append(el('h4', null, 'Track record for ' + c.ticker)); body.append(el('p', {class: 'small'}, (parts.length ? parts.join(' ') : 'No ranges checked yet.') + ' Calls: ' + ((c.record.calls || {}).text || 'none checked yet.'))); }
-  if (added.length) body.append(el('p', {class: 'small muted'}, added.length + ' news item(s) newly counted by the model since the previous run.'));
+  if (added.length) body.append(el('p', {class: 'small muted'}, added.length + ' news item(s) newly counted by the model since the previous day’s forecast.'));
   if (!body.childNodes.length) body.append(el('p', {class: 'empty'}, 'No news or events found for this company.'));
   d.append(body);
   return d;

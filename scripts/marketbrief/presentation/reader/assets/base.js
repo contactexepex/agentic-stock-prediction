@@ -120,7 +120,7 @@ function renderGlance(){
 function renderChanges(){
   const s = $('#changes'); s.replaceChildren();
   const C = R.changes || {by_horizon: {}, news: []};
-  s.append(el('h2', null, 'What changed since the previous run'));
+  s.append(el('h2', null, 'What changed since the previous day’s forecast'));
   if (C.since) s.append(el('p', {class: 'small muted'}, 'Compared with the forecasts of ' + fmtTime(C.since) + '.'));
   const rows = (C.by_horizon || {})[String(H)] || [];
   if (rows.length) {
@@ -136,7 +136,7 @@ function renderChanges(){
   } else s.append(el('p', {class: 'empty'}, 'No big moves in expected prices or chances at N+' + H + '.'));
   const news = C.news || [];
   s.append(el('div', {class: 'micro'}, 'New news the model counted' + (C.news_total ? ' (' + C.news_total + ')' : '')));
-  if (!news.length) { s.append(el('p', {class: 'empty'}, 'No new news counted since the previous run.')); return; }
+  if (!news.length) { s.append(el('p', {class: 'empty'}, 'No new news counted since the previous day’s forecast.')); return; }
   const ul = el('ul', {class: 'list plain'});
   news.forEach(n => { const li = el('li'); li.append(linkOrText(n.url, n.title || n.id));
     const meta = el('div', {class: 'small muted'}); meta.append(document.createTextNode((BY[n.ticker] ? BY[n.ticker].name : n.ticker) + ' · ' + (n.source || '') + ' '), statusTag(n.status));
