@@ -306,7 +306,7 @@ components:
         detail: {type: string}
         fallback_links:
           type: array
-          description: Static pages that work without the warehouse (reports/<market>/dashboard.html, the latest report)
+          description: Where to try again (the market's page in the live app, config/warehouse.yaml app_url)
           items: {type: string}
 
     # ---------- envelope ----------
