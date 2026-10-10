@@ -385,7 +385,8 @@ def test_forecast_history_keeps_every_run_with_its_change(root):
     write_rows(root, "ranges", [older, newer,
                                 published_range(ticker, AS_OF, 2, "2026-10-06T01:00:00Z", 0.0),  # earliest run
                                 published_range(ticker, "2026-10-07", 1, "2026-10-07T03:00:00Z", 0.0),  # after as_of
-                                published_range(ticker, "2026-10-07", 2, "2026-10-08T02:30:00Z", 0.0),  # after cut-off
+                                # in the window, made after the cut-off
+                                {**published_range(ticker, AS_OF, 2, "2026-10-07T13:00:00Z", 0.0), "lo80": 1.0},
                                 published_range("NOTCOLLECTED", AS_OF, 1, "2026-10-07T02:30:00Z", 0.0)])
     first = legacy(model_score(ticker, "2026-10-05", "2026-10-06T02:20:00Z", 0.55, (["a", "b"], 0.05)))
     write_rows(root, "model_scores", [
