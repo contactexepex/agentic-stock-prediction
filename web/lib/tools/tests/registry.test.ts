@@ -80,6 +80,25 @@ test("gateway mode serves only the Slack routes, /mcp and its OAuth routes", () 
   }
 });
 
+test("gateway mode serves the public brief by GET with a well-formed token only", () => {
+  const token = "0123456789abcdef0123456789abcdef";
+  assert.deepEqual(gatewayDecision(`/brief/india/2026-10-12-${token}`, "GET", true), { action: "next" });
+  assert.deepEqual(gatewayDecision(`/brief/us/2026-10-12-${token}`, "GET", true), { action: "next" });
+  for (const method of ["POST", "HEAD", "PUT", "DELETE", "OPTIONS"]) {
+    assert.deepEqual(gatewayDecision(`/brief/us/2026-10-12-${token}`, method, true), { action: "not_found" }, method);
+  }
+  for (const path of [
+    "/brief", "/brief/", "/brief/us", "/brief/us/", `/brief/eu/2026-10-12-${token}`, `/brief/US/2026-10-12-${token}`,
+    `/brief/us/2026-10-12-${token.slice(1)}`, `/brief/us/2026-10-12-${token}0`, `/brief/us/2026-10-12-${token.toUpperCase()}`,
+    `/brief/us/2026-10-12-${token.slice(1)}g`, `/brief/us/26-10-12-${token}`, `/brief/us/2026-10-12_${token}`,
+    `/brief/us/2026-10-12-${token}/`, `/brief/us/2026-10-12-${token}/x`, `/brief/us/../../api/v1/markets`,
+    `/x/brief/us/2026-10-12-${token}`,
+  ]) {
+    assert.deepEqual(gatewayDecision(path, "GET", true), { action: "not_found" }, path);
+  }
+  assert.deepEqual(gatewayDecision(`/brief/us/2026-10-12-${token}`, "GET", false), { action: "next" }, "dashboard: as usual");
+});
+
 test("the dashboard deployment never serves the gateway routes", () => {
   for (const path of ["/slack/commands", "/mcp", "/mcp/oauth/authorize", "/oauth/token", "/oauth/github/callback", "/.well-known/oauth-authorization-server"]) {
     assert.deepEqual(gatewayDecision(path, "POST", false), { action: "not_found" }, path);
