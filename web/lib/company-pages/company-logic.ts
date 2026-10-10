@@ -2,7 +2,7 @@
 // the page"): open-trade sums and flagged counts, the settled summary, the "why" bar parts, the chart's trade marks
 // and the company's next event. Pure functions of the payload; no formatting.
 import type { RangeBands } from "../ui/types.ts";
-import type { AiReason, CalendarEvent, OpenTrade, Prediction, SettledTrade, TradeCheck } from "./types.ts";
+import type { AiReason, CalendarEvent, OpenTrade, Prediction, PublishedRange, SettledTrade, TradeCheck } from "./types.ts";
 
 const num = (x: number | null | undefined): number => (x == null ? 0 : x);
 
@@ -140,3 +140,19 @@ export function companyEventEffect(type: string): EventEffect | null {
   };
   return null;
 }
+
+/** A range row the card and the chart draw: the horizon, its exit session, target and 50% / 80% bands. */
+export type RangeRow = Pick<PublishedRange, "horizon_days" | "exit_date" | "target_price" | "lo50" | "hi50" | "lo80" | "hi80">;
+
+/** The published ranges per horizon, sorted by horizon: B12's `published_ranges` (ranges.py, shown whatever the
+ *  strategies' live_from) when the payload carries the field, else the reference strategy's predictions (payloads
+ *  built before it existed). */
+export function publishedRanges(p: { published_ranges?: PublishedRange[] | null; predictions: Prediction[]; reference_strategy: string }): RangeRow[] {
+  const rows: RangeRow[] = Array.isArray(p.published_ranges)
+    ? p.published_ranges
+    : p.predictions.filter((r) => r.strategy_id === p.reference_strategy);
+  return [...rows].sort((a, b) => a.horizon_days - b.horizon_days);
+}
+
+/** The published range at horizon k, or null. */
+export const publishedRangeAt = (rows: RangeRow[], k: number): RangeRow | null => rows.find((r) => r.horizon_days === k) ?? null;
