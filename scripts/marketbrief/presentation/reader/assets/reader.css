@@ -1,43 +1,6 @@
-/* The reader's daily report (C2). Built on the cockpit design system's tokens (design/system/tokens.css, B7,
-   inlined before this file); only token names are used below. tokens.css is light only, so this page carries a
-   dark set of the same names (system dark mode, or data-theme="dark"). */
+/* The reader's daily report (C2). Built on the cockpit design system's tokens (design/system/tokens.css and its
+   dark set tokens-dark.css, B7, inlined before this file); only token names are used below. */
 :root{--rd-gap:16px}
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  color-scheme:dark;
-  --md-sys-color-surface-container-low:#12141d; --md-sys-color-surface-container-lowest:#1b1e2b;
-  --md-sys-color-surface-container:#242838; --md-sys-color-surface-container-high:#2c3043;
-  --md-sys-color-surface:#1b1e2b; --md-sys-color-on-surface:#e7e8f0; --md-sys-color-on-surface-variant:#a7adc0;
-  --md-sys-color-outline:#6b7186; --md-sys-color-outline-variant:#363b50;
-  --md-sys-color-primary:#9a9dff; --md-sys-color-primary-container:#2d3070; --md-sys-color-on-primary-container:#dcdcff;
-  --md-sys-color-tertiary-container:#30245a; --md-sys-color-on-tertiary-container:#d8c8ff;
-  --md-sys-color-inverse-surface:#e7e8f0; --md-sys-color-inverse-on-surface:#1b1e2b;
-  --mb-color-up:#4ade80; --mb-color-up-container:#14351f; --mb-color-on-up-container:#a3ecbc;
-  --mb-color-down:#f87171; --mb-color-down-container:#3f1818; --mb-color-on-down-container:#fcb0b0;
-  --mb-color-warn:#f5a524; --mb-color-warn-container:#3b2b0e; --mb-color-on-warn-container:#fbd38d;
-  --mb-color-neutral-container:#2a2e40; --mb-color-on-neutral-container:#c9cdda;
-  --mb-color-info-container:#0f3038; --mb-color-on-info-container:#9fe3ee;
-  --mb-chart-band-50:rgba(154,157,255,.42); --mb-chart-band-80:rgba(154,157,255,.17);
-  --mb-chart-ink:#e7e8f0; --mb-chart-grid:#2c3043; --mb-chart-label:#a7adc0;
-  --mb-card-shadow:0 0 0 1px #2c3043;
-}}
-:root[data-theme="dark"]{
-  color-scheme:dark;
-  --md-sys-color-surface-container-low:#12141d; --md-sys-color-surface-container-lowest:#1b1e2b;
-  --md-sys-color-surface-container:#242838; --md-sys-color-surface-container-high:#2c3043;
-  --md-sys-color-surface:#1b1e2b; --md-sys-color-on-surface:#e7e8f0; --md-sys-color-on-surface-variant:#a7adc0;
-  --md-sys-color-outline:#6b7186; --md-sys-color-outline-variant:#363b50;
-  --md-sys-color-primary:#9a9dff; --md-sys-color-primary-container:#2d3070; --md-sys-color-on-primary-container:#dcdcff;
-  --md-sys-color-tertiary-container:#30245a; --md-sys-color-on-tertiary-container:#d8c8ff;
-  --md-sys-color-inverse-surface:#e7e8f0; --md-sys-color-inverse-on-surface:#1b1e2b;
-  --mb-color-up:#4ade80; --mb-color-up-container:#14351f; --mb-color-on-up-container:#a3ecbc;
-  --mb-color-down:#f87171; --mb-color-down-container:#3f1818; --mb-color-on-down-container:#fcb0b0;
-  --mb-color-warn:#f5a524; --mb-color-warn-container:#3b2b0e; --mb-color-on-warn-container:#fbd38d;
-  --mb-color-neutral-container:#2a2e40; --mb-color-on-neutral-container:#c9cdda;
-  --mb-color-info-container:#0f3038; --mb-color-on-info-container:#9fe3ee;
-  --mb-chart-band-50:rgba(154,157,255,.42); --mb-chart-band-80:rgba(154,157,255,.17);
-  --mb-chart-ink:#e7e8f0; --mb-chart-grid:#2c3043; --mb-chart-label:#a7adc0;
-  --mb-card-shadow:0 0 0 1px #2c3043;
-}
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--md-sys-color-surface-container-low);color:var(--md-sys-color-on-surface);
@@ -146,3 +109,4 @@ footer{color:var(--md-sys-color-on-surface-variant);font:var(--md-sys-typescale-
 .idx .r,.idx .c{font-weight:500;color:var(--md-sys-color-on-surface-variant)}
 .idx p{color:var(--md-sys-color-on-surface-variant)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+.noscript table{margin:6px 0 12px} .noscript th{overflow-wrap:normal} .noscript h3{margin-top:16px} .noscript ul{padding-left:1.2em}

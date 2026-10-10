@@ -8,6 +8,7 @@ from datetime import date
 
 from marketbrief.analytics.horizon_records import scores_asof
 from marketbrief.constants import reader as text
+from marketbrief.contracts.horizons import horizons as configured_horizons
 from marketbrief.presentation.reader import why
 from marketbrief.utils.numbers import json_safe_float
 from marketbrief.warehouse import company_history, company_sources
@@ -23,6 +24,11 @@ def day_label(value) -> str | None:
         return None
     d = value if isinstance(value, date) else date.fromisoformat(str(value)[:10])
     return f"{d:%a} {d.day} {d:%b}"
+
+
+def shown_horizons() -> tuple[int, ...]:
+    """The horizons the page shows: READER_HORIZONS among config/strategies.yaml's `horizons` (B10's list)."""
+    return tuple(h for h in configured_horizons() if h in text.READER_HORIZONS)
 
 
 def number(value, digits: int = 4) -> float | None:
@@ -92,7 +98,7 @@ def company_forecasts(ctx: BuildContext, as_of: str, tickers: list[str], sources
     out: dict[str, list[dict]] = {}
     for ticker in tickers:
         rows = []
-        for horizon in text.READER_HORIZONS:
+        for horizon in shown_horizons():
             key = (ticker, horizon)
             if key in ranges or key in scores:
                 rows.append(forecast(ranges.get(key), scores.get(key), changes.get(key), horizon, sources))

@@ -8,6 +8,8 @@ import json
 import re
 from pathlib import Path
 
+from marketbrief.presentation.reader import static
+
 HERE = Path(__file__).resolve().parent
 ASSETS = HERE / "assets"
 SYSTEM = HERE.parents[3] / "design" / "system"   # scripts/marketbrief/presentation/reader -> repo root
@@ -17,8 +19,9 @@ SYMBOL_RE = re.compile(r'<symbol id="ms-([a-z0-9_]+)".*?</symbol>', re.S)
 
 
 def tokens_css() -> str:
-    """The design system's tokens (custom properties and type-role classes), light scheme."""
-    return (SYSTEM / "tokens.css").read_text()
+    """The design system's tokens (custom properties and type-role classes), then its dark colour roles (applied when
+    the reader's system is dark, or with data-theme="dark")."""
+    return (SYSTEM / "tokens.css").read_text() + "\n" + (SYSTEM / "tokens-dark.css").read_text()
 
 
 def icons_sprite(names: tuple[str, ...] = ICONS) -> str:
@@ -51,6 +54,6 @@ def render(title: str, meta: str, data: dict) -> str:
     """The whole page."""
     values = {"__TITLE__": html.escape(title), "__META__": meta, "__TOKENS__": tokens_css(),
               "__CSS__": (ASSETS / "reader.css").read_text(), "__ICONS__": icons_sprite(),
-              "__DATA__": payload(data), "__JS__": script()}
+              "__DATA__": payload(data), "__JS__": script(), "__NOSCRIPT__": static.noscript_html(data)}
     pattern = re.compile("|".join(re.escape(key) for key in values))
     return pattern.sub(lambda m: values[m.group(0)], (ASSETS / "page.html").read_text())

@@ -3,7 +3,8 @@ lean thresholds and every plain-language phrase the page builds from stored numb
 as advice ("lean up / lean down", never "buy" or "sell")."""
 from __future__ import annotations
 
-READER_HORIZONS = (1, 3, 5)          # N+1, N+3, N+5 per company card (owner request, 2026-10-10)
+READER_HORIZONS = (1, 3, 5)          # N+1, N+3, N+5 per company card (owner request, 2026-10-10), of the
+                                     # configured horizons only (reader.forecasts.shown_horizons)
 INDEX_LOOKBACK_DAYS = 30            # calendar days of benchmark closes read for the 1- and 5-session change
 HISTORY_SESSIONS = 20                # closes drawn before the fan
 NEWS_LOOKBACK_DAYS = 4               # contradicted-news flag: items first seen this many days before the cut-off

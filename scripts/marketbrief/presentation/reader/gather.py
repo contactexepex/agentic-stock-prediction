@@ -15,7 +15,7 @@ from marketbrief.presentation.dashboard.market import index_tile, regime_view
 from marketbrief.presentation.dashboard.model_info import skill_status
 from marketbrief.pipeline.evidence_status import EvidenceStatuses
 from marketbrief.presentation.reader import why
-from marketbrief.presentation.reader.forecasts import company_forecasts, day_label, recent_closes
+from marketbrief.presentation.reader.forecasts import company_forecasts, day_label, recent_closes, shown_horizons
 from marketbrief.presentation.reader.paper import paper_status
 from marketbrief.warehouse import rm_common
 from marketbrief.warehouse.rm_registry import BuildContext
@@ -37,7 +37,7 @@ def contradicted_tickers(ctx: BuildContext) -> set[str]:
 def glance(cards: list[dict]) -> dict[str, dict]:
     """Per horizon: how many companies lean up, down or neither, and the biggest expected moves (ticker list)."""
     out = {}
-    for horizon in text.READER_HORIZONS:
+    for horizon in shown_horizons():
         counts = {text.LEAN_UP: 0, text.LEAN_DOWN: 0, text.LEAN_NONE: 0, "no_score": 0}
         moves = []
         for card in cards:
@@ -57,7 +57,7 @@ def changes(cards: list[dict], sources: dict, statuses: EvidenceStatuses, cutoff
     """What changed since the previous run: per horizon the biggest target or P(up) moves, and the news items newly
     counted by the model (any horizon), each with its verification status as of the cut-off."""
     per_h = {}
-    for horizon in text.READER_HORIZONS:
+    for horizon in shown_horizons():
         rows = []
         for card in cards:
             row = next((f for f in card["forecasts"] if f["h"] == horizon), None)
@@ -103,7 +103,7 @@ def market_blocks(ctx: BuildContext, as_of: str) -> dict:
 def reader_data(cfg: dict, con, cutoff_time: datetime, view: dict) -> dict:
     """The reader block embedded in the page next to the view (see the module docstring)."""
     ctx = BuildContext(cfg, con, cutoff_time)
-    as_of = view["as_of"]
+    as_of, shown = view["as_of"], shown_horizons()
     by_ticker = {c["ticker"]: c for c in view["companies"]}
     active = [t for t in by_ticker if t in ctx.active]
     forecasts = company_forecasts(ctx, as_of, active, view["sources"])
@@ -117,8 +117,8 @@ def reader_data(cfg: dict, con, cutoff_time: datetime, view: dict) -> dict:
                                          ticker in contradicted)})
     statuses = EvidenceStatuses(con)
     return {
-        "horizons": list(text.READER_HORIZONS),
-        "default_horizon": DEFAULT_HORIZON if DEFAULT_HORIZON in text.READER_HORIZONS else text.READER_HORIZONS[0],
+        "horizons": list(shown),
+        "default_horizon": DEFAULT_HORIZON if DEFAULT_HORIZON in shown else (shown[0] if shown else None),
         "lean": {"slight": text.LEAN_SLIGHT, "clear": text.LEAN_CLEAR},
         "cutoff": cutoff_time.replace(microsecond=0).isoformat(),
         "as_of": as_of, "as_of_label": day_label(as_of),

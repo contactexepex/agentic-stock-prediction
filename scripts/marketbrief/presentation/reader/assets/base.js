@@ -171,7 +171,7 @@ function legendFan(){
   const s = svg('svg', {viewBox: '0 0 220 70', width: 220, height: 70, role: 'img', 'aria-label': 'Example: a price line, then a light 80% band, a darker 50% band and a dot for the expected price'});
   s.append(svg('path', {d: 'M110,35 L200,8 L200,62 Z', fill: 'var(--mb-chart-band-80)'}), svg('path', {d: 'M110,35 L200,22 L200,48 Z', fill: 'var(--mb-chart-band-50)'}));
   s.append(svg('path', {d: 'M8,44 L30,40 L52,46 L74,36 L96,38 L110,35', fill: 'none', stroke: 'var(--mb-chart-ink)', 'stroke-width': 2}));
-  s.append(svg('circle', {cx: 200, cy: 33, r: 4, fill: 'var(--md-sys-color-primary)'}));
+  s.append(svg('circle', {cx: 200, cy: 33, r: 4, fill: 'var(--mb-chart-1)'}));
   return s;
 }
 function renderLegend(){
@@ -180,7 +180,7 @@ function renderLegend(){
   const row = el('div', {style: 'display:flex;gap:14px;align-items:center;flex-wrap:wrap'});
   row.append(legendFan());
   const k = el('div', {class: 'key', style: 'flex-direction:column;gap:4px'});
-  [['var(--mb-chart-ink)', 'Line: the last 20 closing prices'], ['var(--mb-chart-band-80)', 'Light band: 80% range'], ['var(--mb-chart-band-50)', 'Dark band: 50% range'], ['var(--md-sys-color-primary)', 'Dot: expected price on the sell day']].forEach(x => {
+  [['var(--mb-chart-ink)', 'Line: the last 20 closing prices'], ['var(--mb-chart-band-80)', 'Light band: 80% range'], ['var(--mb-chart-band-50)', 'Dark band: 50% range'], ['var(--mb-chart-1)', 'Dot: expected price on the sell day']].forEach(x => {
     const sp = el('span'); const sw = el('span', {class: 'sw'}); sw.style.background = x[0]; sp.append(sw, document.createTextNode(x[1])); k.append(sp); });
   row.append(k); s.append(row);
   s.append(el('p', null, 'A range is where the price is likely to close on the sell day: inside the 80% range about 8 times in 10, inside the 50% range about half the time.'));

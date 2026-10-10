@@ -97,9 +97,29 @@ def test_page_assets_are_self_contained_and_use_the_design_tokens():
     assert not re.search(r"\b(?:fetch|XMLHttpRequest|import\()", js)
     sprite = page.icons_sprite()
     assert sprite.count("<symbol") == len(page.ICONS) and 'display:none' in sprite
-    # the page's colours are token names only: every hex colour in reader.css sits in the dark-mode token set
+    # light and dark come from B7's token files; the page's own CSS names tokens only (no colour of its own)
+    assert ':root[data-theme="dark"]' in css and "prefers-color-scheme: dark" in css
     own = (page.ASSETS / "reader.css").read_text()
-    body = own.split(':root[data-theme="dark"]{', 1)[1].split("}", 1)[1]
-    assert not re.search(r"#[0-9a-fA-F]{3,6}\b", body)
+    assert not re.search(r"#[0-9a-fA-F]{3,6}\b|rgba?\(", own)
     out = page.render("T <x>", '{"a": 1}', {"s": "</script><b>"})
     assert "<title>T &lt;x&gt;</title>" in out and "<\\/script>" in out and "__JS__" not in out
+
+
+def test_noscript_fallback_shows_the_numbers_without_javascript():
+    from marketbrief.presentation.reader import static
+    row = {"h": 1, "exit_label": "Mon 12 Oct", "base_close": 692.25, "target": 690.2143, "lo50": 680.96, "hi50": 697.53,
+           "lo80": 672.79, "hi80": 706.37, "move_pct": -0.29, "prob_up": 0.4696, "lean": "down", "strength": "slight",
+           "why": "Leans <slightly> down."}
+    data = {"symbol": "₹", "companies": [{"ticker": "HDFCBANK", "name": "HDFC Bank", "close": 692.25}],
+            "reader": {"default_horizon": 1, "paper_label": "Paper only — no proven edge yet",
+                       "mood": {"word": "Calm"}, "benchmark": {"name": "Nifty 50", "change_pct": -1.64, "close_date": "2026-10-08"},
+                       "glance": {"1": {"up": 0, "down": 1, "none": 0, "moves": ["HDFCBANK"]}},
+                       "companies": [{"ticker": "HDFCBANK", "forecasts": [row],
+                                      "flags": [{"code": "earnings", "text": "Results in 3 days: prices can jump"}]}]}}
+    out = static.noscript_html(data)
+    for needle in ("Market mood: <b>Calm</b>", "Nifty 50: <b>−1.64%</b>", "0 lean up · 0 no clear lean · 1 lean down",
+                   "HDFC Bank −0.29% to ₹690.21 by Mon 12 Oct", "HDFC Bank (HDFCBANK): slight lean down",
+                   "<td>680.96–697.53</td>", "<td>672.79–706.37</td>", "<td>47%</td>", "Leans &lt;slightly&gt; down.",
+                   "Results in 3 days", "Paper only — no proven edge yet"):
+        assert needle in out, needle
+    assert static.noscript_html({"reader": {}}).startswith("<p>Open this file")

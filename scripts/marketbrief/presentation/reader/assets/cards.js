@@ -26,9 +26,17 @@ function fanChart(c, h){
     s.append(svg('path', {d: area(1, 2), fill: 'var(--mb-chart-band-80)'}));
     if (fs.every(f => f.lo50 != null)) s.append(svg('path', {d: area(3, 4), fill: 'var(--mb-chart-band-50)'}));
     if (sel) s.append(svg('line', {x1: xs(last + off(sel)), x2: xs(last + off(sel)), y1: T, y2: Ht - B, stroke: 'var(--md-sys-color-primary)', 'stroke-width': 1, 'stroke-dasharray': '3 3'}));
-    fs.forEach(f => { if (f.target == null) return; const on = f === sel;
-      s.append(svg('circle', {cx: xs(last + off(f)), cy: ys(f.target), r: on ? 5 : 3, fill: on ? 'var(--md-sys-color-primary)' : 'var(--md-sys-color-on-surface-variant)', stroke: 'var(--md-sys-color-surface-container-lowest)', 'stroke-width': 1.5})); });
-    if (sel && sel.target != null) s.append(sText(W - Rr + 6, Math.min(Ht - B, Math.max(T + 10, ys(sel.target) + 4)), fmtNum(sel.target), {fill: 'var(--md-sys-color-primary)', 'font-weight': 700}));
+    // expected prices: dots joined by a dashed line from the last close (B15's company-page fan)
+    const tg = fs.filter(f => f.target != null);
+    if (tg.length) s.append(svg('path', {d: 'M' + xs(last) + ',' + ys(base) + tg.map(f => 'L' + xs(last + off(f)) + ',' + ys(f.target)).join(''),
+      fill: 'none', stroke: 'var(--mb-chart-1)', 'stroke-width': 1.5, 'stroke-dasharray': '4 3'}));
+    tg.forEach(f => { const on = f === sel;
+      s.append(svg('circle', {cx: xs(last + off(f)), cy: ys(f.target), r: on ? 5 : 3.5, fill: 'var(--mb-chart-1)', stroke: 'var(--md-sys-color-surface-container-lowest)', 'stroke-width': 1.5})); });
+    if (sel && sel.target != null) {   // the selected expected price as a filled tag on the price axis
+      const ty = Math.min(Ht - B - 8, Math.max(T + 8, ys(sel.target))), label = fmtNum(sel.target);
+      s.append(svg('rect', {x: W - Rr + 2, y: ty - 9, width: Math.min(Rr - 2, 8 + label.length * 6.4), height: 18, rx: 4, fill: 'var(--mb-chart-1)'}));
+      s.append(sText(W - Rr + 6, ty + 4, label, {fill: 'var(--md-sys-color-on-primary)', 'font-weight': 700}));
+    }
   }
   if (n) {
     s.append(svg('path', {d: bars.map((p, i) => (i ? 'L' : 'M') + xs(i) + ',' + ys(p.c)).join(''), fill: 'none', stroke: 'var(--mb-chart-ink)', 'stroke-width': 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round'}));

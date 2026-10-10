@@ -7,7 +7,7 @@ from marketbrief.constants import reader as text
 from marketbrief.lab import registry
 from marketbrief.portfolio import signals
 from marketbrief.portfolio.settings import load_portfolio_config
-from marketbrief.presentation.reader.forecasts import day_label
+from marketbrief.presentation.reader.forecasts import day_label, shown_horizons
 from marketbrief.warehouse import rm_common
 from marketbrief.warehouse.rm_registry import BuildContext
 
@@ -28,7 +28,7 @@ def tier_rows(ctx: BuildContext, active: set[str]) -> dict[str, dict[str, str]]:
     payload = signals.cockpit_payload(ctx.con, ctx.cutoff_time, ctx.market, load_portfolio_config())
     out: dict[str, dict[str, str]] = {}
     for row in payload["tiers"]:
-        if row["ticker"] in active and row["horizon_days"] in text.READER_HORIZONS:
+        if row["ticker"] in active and row["horizon_days"] in shown_horizons():
             out.setdefault(row["ticker"], {})[str(row["horizon_days"])] = text.TIER_WORDS.get(row["tier"], row["tier"])
     return out
 
