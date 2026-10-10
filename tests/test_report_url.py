@@ -48,4 +48,3 @@ def test_brief_link_with_the_secret_and_the_setting(monkeypatch):
     assert brief_url(settings, "us", date(2026, 10, 12)) == "https://gw.example" + path
     assert brief_url(REPO_SETTINGS, "us", date(2026, 10, 12)) is None          # no brief_link_url: no brief link
     assert load_settings()["brief_link_url"] == "https://omenix-gateway.vercel.app"
-
