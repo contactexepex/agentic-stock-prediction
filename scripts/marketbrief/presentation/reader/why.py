@@ -21,7 +21,10 @@ def lean(prob_up: float | None) -> tuple[str, str]:
 def group_phrase(group: str, points: float, news_items: int | None) -> str:
     """One feature group's push on the model's estimate in plain words, with the item count for the news group:
     'recent verified news (6 items) pushes the chance down'."""
-    label, plural = text.GROUP_LABELS.get(group, (text.GROUP_FALLBACK.format(group=group), True))
+    plain = group
+    for prefix, words in text.GROUP_PREFIXES.items():
+        plain = words + plain[len(prefix):] if plain.startswith(prefix) else plain
+    label, plural = text.GROUP_LABELS.get(group, (text.GROUP_FALLBACK.format(group=plain), True))
     items = text.WHY_NEWS_ITEMS.format(n=news_items, s="" if news_items == 1 else "s") \
         if group == "news" and news_items else ""
     return text.GROUP_PUSH.format(label=label, items=items, verb="push" if plural else "pushes",

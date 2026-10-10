@@ -32,12 +32,13 @@ GROUP_LABELS = {   # group -> (label, plural)
     "momentum": ("the model's price-trend signals", True),
     "market": ("the model's whole-market signals", True),
     "oscillator": ("the model's short-term price signals", True),
-    "regime": ("the market mood", False),
+    "regime": ("the model's market-mood signals", True),
     "relative strength": ("the model's relative-strength signals (vs the sector and the market)", True),
     "volatility": ("the model's price-swing signals", True),
     "volume": ("the model's trading-volume signals", True),
 }
-GROUP_FALLBACK = "the model's {group} signals"
+GROUP_FALLBACK = "the model's {group} signals"   # e.g. cross-market groups ("cross: fx" -> "cross-market fx")
+GROUP_PREFIXES = {"cross: ": "cross-market "}
 GROUP_PUSH = "{label}{items} {verb} the chance {side}"
 GROUP_BASELINE = "baseline"
 

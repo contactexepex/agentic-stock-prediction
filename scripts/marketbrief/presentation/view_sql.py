@@ -38,3 +38,10 @@ FILINGS_SQL = ("SELECT DISTINCT ON (id) id, ticker, form, url, accepted_at, desc
                "WHERE first_seen_at <= now() ORDER BY id, first_seen_at, ticker, form, url, accepted_at, description")
 ANNOUNCEMENTS_SQL = ("SELECT id, ticker, subject, url, published_at, source FROM announcements_latest "
                      "WHERE first_seen_at <= now() ORDER BY id")
+# the company events of the next weeks: sql/views.sql company_events (the newest row per ticker and type, history rows
+# left out) over the rows first seen by the clock, so an event collected later never shows on an earlier page
+COMPANY_EVENTS_SQL = """SELECT date, type, ticker, name, amount FROM (
+    SELECT DISTINCT ON (ticker, type) * FROM events
+    WHERE ticker IS NOT NULL AND NOT ends_with(coalesce(source, ''), '_history') AND first_seen_at <= now()
+    ORDER BY ticker, type, first_seen_at DESC, date)
+WHERE date BETWEEN ? AND ? ORDER BY date, ticker, type, name"""
