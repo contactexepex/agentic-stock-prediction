@@ -173,6 +173,13 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   `POST .../companies/preview` (summary, add_company's resolved identifiers; nothing written) and
   `.../companies/commands` (written through B5's tool layer only when `confirmed_summary` equals the server's own
   preview; delete typed; `web/lib/data/company-commands.ts`).
+- Public brief (C2, docs/ws/c2.md; owner decision 2026-10-10): the reader's daily page, read-only and without
+  login, at the gateway's `GET /brief/<market>/<session>-<token>` (`web/app/brief/[market]/[slug]/route.ts`,
+  `web/lib/brief/brief.ts`; B5's gateway allowlist). token = HMAC-SHA256(`BRIEF_LINK_SECRET`, market and session)
+  cut to 128 bits (`presentation/reader/links.py`), never stored: `warehouse/rm_brief.py` writes rm.brief
+  (page_key = session; the committed `reports/<market>/<session>.html` and the token's SHA-256, newest 30 reader
+  pages), the route checks the slug before reading and compares the SHA-256 in constant time; anything else is a
+  404. Without the secret no link and no rm.brief row. The HTML file stays attached in Slack as the offline backup.
 - Company pages (B12, docs/ws/b12.md; contract 2.0): `scripts/marketbrief/warehouse/rm_company.py` (builders),
   `company_payloads.py` (per-company slicing in the mockups' fields) and `company_sources.py` (the stored records read
   once per build as of the cut-off, collected companies only) build rm.stock (the whole 03-company page: the shared

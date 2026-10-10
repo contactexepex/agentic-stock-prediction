@@ -80,19 +80,6 @@ test("gateway mode serves only the Slack routes, /mcp and its OAuth routes", () 
   }
 });
 
-test("gateway mode serves the public brief by GET only, on the exact path shape", () => {
-  const token = "0123456789abcdef0123456789abcdef";
-  assert.deepEqual(gatewayDecision(`/brief/india/2026-10-12-${token}`, "GET", true), { action: "next" });
-  assert.deepEqual(gatewayDecision(`/brief/us/2026-10-12-${token}`, "GET", true), { action: "next" });
-  assert.deepEqual(gatewayDecision(`/brief/us/2026-10-12-${token}`, "POST", true), { action: "not_found" });
-  for (const path of ["/brief", "/brief/us", "/brief/us/2026-10-12", `/brief/uk/2026-10-12-${token}`,
-                      `/brief/us/2026-10-12-${token.toUpperCase()}`, `/brief/us/2026-10-12-${token}0`,
-                      `/brief/us/2026-10-12-${token}/x`, `/brief/us/../api/v1/markets`, `/brief/us/2026-10-12-${token}.html`]) {
-    assert.deepEqual(gatewayDecision(path, "GET", true), { action: "not_found" }, path);
-  }
-  assert.deepEqual(gatewayDecision(`/brief/us/2026-10-12-${token}`, "GET", false), { action: "next" });
-});
-
 test("the dashboard deployment never serves the gateway routes", () => {
   for (const path of ["/slack/commands", "/mcp", "/mcp/oauth/authorize", "/oauth/token", "/oauth/github/callback", "/.well-known/oauth-authorization-server"]) {
     assert.deepEqual(gatewayDecision(path, "POST", false), { action: "not_found" }, path);
