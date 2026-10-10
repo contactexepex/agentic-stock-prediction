@@ -20,7 +20,7 @@ export function problem(status: number, title: string, detail?: string, market?:
 
 export const notFound = (detail: string) => problem(404, "Not found", detail);
 export const unavailable = (market: string) =>
-  problem(503, "Data service unavailable", "The read models cannot be read right now; the static reports still work.",
+  problem(503, "Data service unavailable", "The read models cannot be read right now; try again shortly.",
     market);
 export const invalid = (detail: string) => problem(422, "Invalid request", detail);
 export const unauthorized = () => problem(401, "Unauthorized");

@@ -8,8 +8,8 @@
 // (defaultDeps from ./deps.ts: MotherDuck behind the data cache; tests pass their own store.)
 //
 // It validates the market and the page key, reads the row (one keyed SELECT behind the data cache), answers 404
-// for a missing row, 503 (with the static reports as fallback links) when the warehouse fails or the row is of
-// another major contract version, 304 when If-None-Match equals the row's ETag, and otherwise the envelope plus the
+// for a missing row, 503 (with the market's page in the live app as fallback link) when the warehouse fails or the
+// row is of another major contract version, 304 when If-None-Match equals the row's ETag, and otherwise the envelope plus the
 // served payload (serve.ts) with ETag = "<payload_sha256>", Last-Modified = built_at, Cache-Control private, no-cache.
 import { CONTRACT_MAJOR, MARKETS, PAGE_KEY_PATTERN, type ServeMode, TABLE_PATTERN, TICKER_PATTERN } from "./constants.ts";
 import { notFound, unavailable } from "./problem.ts";
