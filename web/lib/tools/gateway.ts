@@ -1,5 +1,6 @@
 // Which requests each deployment serves (docs/SPEC.md F10). Gateway mode (MB_GATEWAY=1) serves only the Slack routes,
-// /mcp and the OAuth routes its sign-in needs; everything else is a 404. The dashboard deployment never serves them.
+// /mcp, the OAuth routes its sign-in needs and GET of the public brief; everything else is a 404. The dashboard
+// deployment never serves the Slack, /mcp and OAuth routes; /brief passes there as any other page.
 // The public OAuth paths are /oauth/* and /.well-known/oauth-*; their handlers live under /mcp/oauth/ (B5's folder) and
 // are reached only through these rewrites (a rewrite does not pass the middleware again).
 
