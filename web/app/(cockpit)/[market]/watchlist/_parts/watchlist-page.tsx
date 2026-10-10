@@ -40,11 +40,18 @@ export type WatchlistPayload = PageBase & {
   open_trades: OpenTrade[];
   trade_checks: (TradeCheck & { ticker: string })[];
   ranges: PredictionRange[];
+  /** ranges.py's published range per active company and horizon for the as-of date, shown whether or not a strategy
+   *  is live (B11; the Range column). Absent in older payloads: read as none. */
+  published_ranges?: PublishedRange[];
   strategies: StrategyMap;
 };
-type Row = WatchlistRow<WatchlistPayload["companies"][number], PredictionRange>;
+export interface PublishedRange {
+  ticker: string; horizon_days: number; base_close: number | null; target_price: number | null;
+  lo50: number | null; hi50: number | null; lo80: number | null; hi80: number | null;
+}
+type Row = WatchlistRow<WatchlistPayload["companies"][number], PublishedRange>;
 
-const bandsOf = (r: PredictionRange | null) =>
+const bandsOf = (r: PublishedRange | null) =>
   r && r.lo80 != null && r.lo50 != null && r.hi50 != null && r.hi80 != null && r.target_price != null
     ? { lo80: r.lo80, lo50: r.lo50, hi50: r.hi50, hi80: r.hi80, target_price: r.target_price } : null;
 
@@ -97,7 +104,7 @@ function Table({ p, market, rows, horizon, sector, query, sort, onSort }: {
     <section className="card" aria-label="Companies">
       <div className="head">
         <h2>{`${list.length} of ${rows.length} companies`}</h2>
-        <HelpTip tip="One row per active company. Agreement = how many of the strategies that predict it at this horizon would buy (rule, baselines and AI count alike), with the buyers’ average chance of a rise. Range = the reference rule strategy’s published range for the horizon (target as the triangle, last close as the dark line). Open = this company’s open paper trades and their unrealised profit. Click a row for the company page." />
+        <HelpTip tip="One row per active company. Agreement = how many of the strategies that predict it at this horizon would buy (rule, baselines and AI count alike), with the buyers’ average chance of a rise. Range = the published range for the horizon (ranges.py; target as the triangle, last close as the dark line), shown whether or not a strategy is live. Open = this company’s open paper trades and their unrealised profit. Click a row for the company page." />
         <div className="end">{`N+${horizon} = ${horizonWords(horizon)} · as of the ${fmtDate(p.as_of, false)} close · Paper`}</div>
       </div>
       <div className="md-table-wrap">
@@ -111,7 +118,7 @@ function Table({ p, market, rows, horizon, sector, query, sort, onSort }: {
               <th scope="col" aria-sort={ariaSort("agreement")}><SortButton label={`Agreement at N+${horizon}`} k="agreement" sort={sort} onSort={onSort} /></th>
               <th scope="col" className="cw" data-tip="Average probability of a rise given by the buyers that give one; 50% is a coin flip.">Chance</th>
               <th scope="col" className="c2" data-tip="Buyers at each horizon; the selected one is dark.">Buyers N+1…5</th>
-              <th scope="col" className="cw" data-tip="The reference rule strategy’s published 50% and 80% ranges for the horizon, drawn around the last close; the triangle is its target.">{`Range at N+${horizon}`}</th>
+              <th scope="col" className="cw" data-tip="The published 50% and 80% ranges for the horizon (ranges.py), drawn around the last close; the triangle is the target.">{`Range at N+${horizon}`}</th>
               <th scope="col" className="num cm" aria-sort={ariaSort("open")}><SortButton label="Open" k="open" sort={sort} onSort={onSort} /></th>
               <th scope="col" className="c3" aria-label="Open the company page" />
             </tr>
@@ -127,7 +134,7 @@ function Table({ p, market, rows, horizon, sector, query, sort, onSort }: {
                   <td className="ag"><AgreementCell row={r.agreement} subject={`${c.name} at N+${horizon}`} /></td>
                   <td className="cw"><AgreementOdds row={r.agreement} /></td>
                   <td className="c2"><HorizonBars horizons={p.horizons} splits={p.horizons.map((k) => agreementAt(p.agreement, k, c.ticker))} selected={horizon} /></td>
-                  <td className="cw">{bands ? <RangeBar currency={cur} bands={bands} last={c.last_close ?? null} /> : <span className="muted" data-tip="No published range stored for this company at this horizon.">—</span>}</td>
+                  <td className="cw">{bands ? <RangeBar currency={cur} bands={bands} last={c.last_close ?? r.range?.base_close ?? null} /> : <span className="muted" data-tip="No published range stored for this company at this horizon.">—</span>}</td>
                   <td className="num cm ot">
                     {r.trades.length ? <span><b>{r.trades.length}</b><small><MoneyDelta currency={cur} value={r.unrealised} decimals={moneyDecimals(cur)} /></small></span> : <span className="muted">0</span>}
                     {r.flagged.length ? (
@@ -175,7 +182,7 @@ export function WatchlistView({ p, market }: { p: WatchlistPayload; market: Mark
   const [sector, setSector] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: "agreement", dir: -1 });
-  const rows: Row[] = watchlistRows(p, horizon);
+  const rows: Row[] = watchlistRows({ ...p, ranges: p.published_ranges ?? [] }, horizon);
   const sectors = sectorsOf(rows);
   const onSort = (k: SortKey) => setSort((s) => (s.key === k ? { key: k, dir: s.dir === 1 ? -1 : 1 } : { key: k, dir: defaultDirection(k) }));
   return (
