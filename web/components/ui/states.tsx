@@ -1,6 +1,6 @@
 "use client";
 // Loading, error and empty states of every page and card, and <PageState> that picks one from a usePage() result.
-// An error says what failed in plain words, offers a retry and lists the static pages that still work (the
+// An error says what failed in plain words, offers a retry and lists the links the API gives with it (the
 // problem's fallback_links, api/openapi.yaml Problem).
 import type { ReactNode } from "react";
 import type { ApiState } from "../../lib/ui/use-api.ts";
@@ -27,7 +27,7 @@ const PLAIN: Record<number, string> = {
   0: "The data service did not answer.",
   404: "There is nothing stored under this address.",
   501: "This part is planned and not built yet.",
-  503: "The page data cannot be read right now. The static reports still work.",
+  503: "The page data cannot be read right now; try again shortly.",
 };
 
 /** An error panel: what failed, a retry button and the fallback links. */

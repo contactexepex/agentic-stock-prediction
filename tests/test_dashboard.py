@@ -682,7 +682,6 @@ def test_dashboard_renders_in_a_browser(built, tmp_path):
     for item, title in zip(jpm["news"], HOSTILE, strict=False):
         item["title"] = title
     jpm["reasoning"]["bull"] = HOSTILE[0] + " " + HOSTILE[1]
-    data["pages_url"] = "https://reports.example/"   # issue #48: the market switch is absolute on the owner's site
     f = tmp_path / "dashboard.html"
     f.write_text(page.build_page(data))
     js = tmp_path / "render.js"
@@ -694,7 +693,7 @@ def test_dashboard_renders_in_a_browser(built, tmp_path):
     out = json.loads(r.stdout.strip().split("\n")[-1])  # not splitlines(): the text holds U+2028
     banks = built["cfg"]["sectors"]["Banks"]
     assert out["parsed"] is True and out["dialogs"] == 0
-    assert out["switch"] == ["https://reports.example/india/dashboard.html"]
+    assert out["switch"] == ["../india/dashboard.html"]   # relative: the static reports site is retired (2026-10-10)
     assert all(text in out["stock_text"] for text in HOSTILE[:2])  # shown as plain text, never parsed as HTML
     for width in ("1280", "375"):
         o = out[width]
@@ -724,13 +723,12 @@ def test_safe_url_encodes_quotes_and_brackets():
     assert safe_url("javascript:alert(1)") is None and safe_url("https://a b") is None and safe_url(None) is None
 
 
-def test_cli_page_carries_pages_url(built, monkeypatch):
-    """The page payload names config/settings.yaml's pages_url, which the market switch links to (issue #48)."""
-    from marketbrief.core.settings import load_settings
-
+def test_cli_page_names_no_static_site(built, monkeypatch):
+    """The static reports site is retired from links (owner, 2026-10-10): the page payload names no pages_url, so the
+    market switch stays relative and nothing links to that host."""
     monkeypatch.setattr(common, "ROOT", built["root"])
     monkeypatch.setenv("MB_NOW", CUTOFF.isoformat())
     dash_cli.run(built["cfg"])
     html = (built["root"] / "reports" / "us" / "dashboard.html").read_text()
     payload = json.loads(re.search(r'<script id="mb-data" type="application/json">(.*?)</script>', html, re.S).group(1))
-    assert payload["pages_url"] == load_settings()["pages_url"]
+    assert "pages_url" not in payload and "agentic-stock-prediction-reports" not in html

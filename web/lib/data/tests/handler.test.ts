@@ -3,6 +3,8 @@
 // is of another major contract version, and one keyed read per request.
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { APP_URL, fallbackLinks } from "../constants.ts";
 import { definePage, readPage, readTickerPage } from "../handler.ts";
 import { DownRowStore, MemoryRowStore, NOW, row } from "./fakes.ts";
 
@@ -56,16 +58,19 @@ test("a ticker page reads its ticker key", async () => {
   assert.equal((await response.json()).page_key, "M&M");
 });
 
-test("the warehouse down is a 503 with the static reports as fallback links and no driver text", async () => {
+test("the warehouse down is a 503 with the market's page in the live app as fallback link and no driver text", async () => {
   const response = await readPage(request(), PAGE, "india", "_", deps(new DownRowStore()));
   assert.equal(response.status, 503);
   assert.equal(response.headers.get("cache-control"), "no-store");
   const body = await response.json();
-  assert.deepEqual(body.fallback_links, [
-    "https://agentic-stock-prediction-reports.vercel.app/india/dashboard.html",
-    "https://agentic-stock-prediction-reports.vercel.app/india/index.html",
-  ]);
+  assert.deepEqual(body.fallback_links, ["https://omenix.vercel.app/india"]);
   assert.equal(body.status, 503);
+});
+
+test("the fallback app link is config/warehouse.yaml app_url, and nothing links to the deleted reports site", () => {
+  const config = readFileSync(new URL("../../../../config/warehouse.yaml", import.meta.url), "utf8");
+  assert.equal(config.match(/^app_url:\s*(\S+)/m)?.[1], APP_URL);
+  assert.ok(!fallbackLinks("us").some((link) => link.includes("agentic-stock-prediction-reports")));
 });
 
 test("a row of another major contract version is refused with 503", async () => {

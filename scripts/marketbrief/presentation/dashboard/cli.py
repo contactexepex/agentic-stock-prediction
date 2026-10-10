@@ -10,7 +10,6 @@ from pathlib import Path
 from marketbrief.constants.dashboard import DASHBOARD_FILE, DASHBOARD_STEP, MANIFEST_KEY, SLACK_FILES_MANIFEST
 from marketbrief.core import cli, database, paths
 from marketbrief.core.clock import clock
-from marketbrief.core.settings import load_settings
 from marketbrief.presentation.dashboard.assemble import gather_dashboard
 from marketbrief.presentation.dashboard.page import build_page
 
@@ -37,9 +36,6 @@ def add_to_manifest(market: str, page_path: Path) -> str | None:
 def run(cfg: dict, out_dir: Path | None = None) -> dict:
     """Build the page; returns the step summary."""
     data = gather_dashboard(cfg, database.connect(cfg["market"]), clock())
-    # the market-switch link is absolute on the owner's site when config/settings.yaml has pages_url, so it also
-    # works from a single downloaded page (issue #48); without it the link stays relative
-    data["pages_url"] = load_settings().get("pages_url")
     folder = out_dir or paths.ROOT / "reports" / cfg["market"]
     folder.mkdir(parents=True, exist_ok=True)
     page = build_page(data)

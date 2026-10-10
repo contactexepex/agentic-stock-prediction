@@ -3,10 +3,9 @@ repo_url: https://github.com/contactexepex/agentic-stock-prediction
 branch: main
 slack_channel: "#market-brief"
 slack_channel_id: C0C6REB7QS2   # notify_slack.py posts the thread here with SLACK_BOT_TOKEN (bot must be a member)
-pages_url: https://agentic-stock-prediction-reports.vercel.app   # Vercel (Root Directory reports/, Vercel Authentication on all deployments); Slack links open the HTML rendered
-# The reports site deploys only by hand from the Vercel dashboard (reports/vercel.json: git.deploymentEnabled false;
-# owner decision 2026-10-08): pushes to main deploy nothing, so a day's report and dashboard links open only once the
-# owner has deployed.
+slack_link_url: https://omenix.vercel.app   # Slack links open <slack_link_url>/<market> (the market's page in the app)
+# The daily HTML report is attached in the day's thread. The static reports site (pages_url) is retired from Slack
+# links: it deploys only by hand, so its pages were stale or missing (owner, 2026-10-10).
 # The AI model's training cutoff (ForecastBench leakage rule, docs/DESIGN.md section 7): ai_replay.py
 # treats only as-of dates AFTER this date as a fair test; dates on or before it are "contaminated"
 # (the model may have seen what happened), refused by `prepare` unless --allow-training-period, and
