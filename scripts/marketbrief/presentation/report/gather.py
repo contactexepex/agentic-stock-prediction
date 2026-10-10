@@ -103,10 +103,10 @@ def gather(cfg: dict, con) -> dict:
     }
 
 
-def report_url(settings: dict, market: str, session) -> str:
-    """Link to the HTML report: under `pages_url` (a static host serving reports/, if configured)
-    it opens rendered; otherwise the file in the repo (GitHub shows HTML as source, which is why
-    the Slack thread also attaches the file)."""
-    if settings.get("pages_url"):
-        return f"{settings['pages_url'].rstrip('/')}/{market}/{session}.html"
+def report_url(settings: dict, market: str, session, app: str | None = None) -> str:
+    """The Slack draft's link: the market's page in the app (`app` = config/warehouse.yaml app_url) when set;
+    otherwise the HTML report in the repo (GitHub shows HTML as source, which is why the Slack thread also
+    attaches the file)."""
+    if app:
+        return f"{app.rstrip('/')}/{market}"
     return f"{settings['repo_url']}/blob/{settings['branch']}/reports/{market}/{session}.html"

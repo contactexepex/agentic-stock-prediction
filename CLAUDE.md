@@ -392,13 +392,12 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   `reports/<market>/<session_date>.html` the self-contained reader's report linked from Slack
   (filters by sector and company; no network needed) and `reports/<market>/index.html` (all days);
   chart images in `reports/<market>/charts/<session_date>/` (`ranges`, `sectors`, `track_record`);
-  `config/settings.yaml` holds the repo URL, optional `pages_url`, the Slack channel id and the AI
-  model's `model_training_cutoff` (ai_replay's fair vs contaminated split). `pages_url` is the owner's
-  private Vercel site serving `reports/` (Vercel Authentication on all deployments), so Slack links open
-  the rendered pages. It deploys only by hand from the Vercel dashboard (`reports/vercel.json`:
-  `git.deploymentEnabled` false, owner decision 2026-10-08), so a day's links open only after the owner deploys.
-  `reports/index.html` is its hand-written landing page and `reports/vercel.json` its deployment setting (the
-  only files under `reports/` that build work may change; no script writes them)
+  `config/settings.yaml` holds the repo URL, the Slack channel id and the AI model's `model_training_cutoff`
+  (ai_replay's fair vs contaminated split). Slack links open the market's page in the app (`config/warehouse.yaml`
+  `app_url` + `/<market>`, `core.settings.app_url`); the daily HTML report is attached in the day's thread and the
+  weekly report links to its repo file. The static reports site (`pages_url`) was deleted by the owner on
+  2026-10-10; `reports/index.html` and `reports/vercel.json` are left for the later static cleanup (the only files
+  under `reports/` that build work may change; no script writes them)
 - `reports/<market>/review-YYYY-Www.md` the weekly review (record in `data/<market>/reviews/`)
 - `judgments/log.jsonl` every judge verdict on build work (append-only); daily-run verdicts are in
   `data/<market>/judgments/`

@@ -259,12 +259,16 @@ def test_close_skipped_and_empty_days():
 
 
 def test_weekly_and_onboarding_texts():
-    msg = build_weekly("us", examples("research_review")[0], {}, "USD", "https://pages.example/")
+    msg = build_weekly("us", examples("research_review")[0], {}, "USD",
+                       {"repo": "https://github.com/o/r/blob/main", "app": "https://app.example/"})
     assert "*US — weekly research report 2026-W41* (2026-10-05 to 2026-10-09)" in msg
     assert "• Rule: rule.model_news.v1, net +$61.40 on 38 paper trades" in msg
     assert "[ni-us-2026-W41-product-corroborated-high-3]" in msg
     assert "p-2026-W41-1 (threshold, config/strategies.yaml, proposed)" in msg
-    assert "Full report: https://pages.example/us/research-2026-W41.md" in msg
+    assert "Full report: https://github.com/o/r/blob/main/reports/us/research-2026-W41.md" in msg
+    assert "Market page: https://app.example/us" in msg
+    bare = build_weekly("us", examples("research_review")[0], {}, "USD")
+    assert "Full report: reports/us/research-2026-W41.md" in bare and "Market page" not in bare
     accepted, refused = examples("command_log")[0], {**examples("command_log")[0], "result": "refused",
                                                      "refusal_code": "validation_failed", "record_ids": [],
                                                      "message": "SPY is an ETF; only common stocks can be added"}

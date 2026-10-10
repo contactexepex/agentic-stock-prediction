@@ -99,9 +99,8 @@
 
   // ---------- shell: market switch, tabs, banner, footer ----------
   function shell() {
-    // absolute on the owner's site (settings pages_url) so a downloaded page still switches; else relative (#48)
-    var site = safeUrl(D.pages_url);
-    var base = site ? site.replace(/\/+$/, '') + '/' : '../';
+    // relative: the static reports site is gone (owner, 2026-10-10), so the switch opens the sibling page
+    var base = '../';
     document.getElementById('markets').innerHTML = (D.markets || [D.market]).map(function (m) {
       var label = m === 'us' ? 'US' : cap(m);
       return m === D.market ? '<span aria-current="page">' + esc(label) + '</span>' :
