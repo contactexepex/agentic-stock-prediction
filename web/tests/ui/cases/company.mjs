@@ -69,7 +69,7 @@ export const cases = [
     widths: [1280, 390],
     waitFor: ".phead",
     api: companyApi((p) => ({ ...p, predictions: [], head_to_head: [], open_trades: [], trade_checks: [], settled: [], reasons: [], news: [], results: [], events: [], lifecycle: [], agreement: {}, bars: p.bars })),
-    expectText: [PAPER, "No open paper trade on this company.", "No settled paper trade yet.", "No analyst note", "No results digest", "Nothing scheduled.", "No prediction stored for this company today."],
+    expectText: [PAPER, "No open paper trade on this company.", "No settled paper trade yet.", "No analyst note", "No results digest", "Nothing scheduled.", "No published range stored for this company at N+1 today."],
   },
   {
     name: "company-no-bars",
@@ -275,6 +275,28 @@ cases.push({
     if (/no new call/.test(plain)) problems.push("the plain line says no new call for an ex-dividend date");
     if (!/centred lower by the dividend/.test(plain)) problems.push("the plain line does not say the ranges are centred lower");
     if ((await page.textContent(".ev")).includes("widens ranges")) problems.push("an ex-dividend date is labelled as widening ranges");
+    return problems;
+  },
+});
+
+// No strategy live yet (B12, 2026-10-10): predictions are filtered out, the published ranges still come in rm.stock's
+// `published_ranges`, and the card and the chart's fan draw from them.
+cases.push({
+  name: "company-published-ranges-only",
+  path: "/india/stocks/RELIANCE",
+  widths: [1280, 390],
+  waitFor: ".chart svg",
+  api: companyApi((p) => {
+    const ref = p.predictions.filter((r) => r.strategy_id === p.reference_strategy);
+    const published = ref.map((r) => ({ id: `${r.as_of_date}-${r.ticker}-${r.horizon_days}d`, made_at: r.made_at, as_of_date: r.as_of_date, session_date: r.session_date, exit_date: r.exit_date, horizon_days: r.horizon_days, base_close: r.base_close ?? null, target_price: r.target_price, lo50: r.lo50, hi50: r.hi50, lo80: r.lo80, hi80: r.hi80, regime: r.regime ?? null }));
+    return { ...p, predictions: [], head_to_head: [], published_ranges: published };
+  }),
+  expectText: [PAPER, "no strategy prediction yet"],
+  check: async (page) => {
+    const problems = [];
+    if (!(await page.$(".chart .fan .b80"))) problems.push("no range fan drawn from published_ranges");
+    const cell = await page.textContent(".dec");
+    if (cell.includes("No published range stored")) problems.push("the range card says no range although published_ranges has one");
     return problems;
   },
 });

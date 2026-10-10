@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chartGeometry, barAt } from "../chart-geometry.ts";
 import {
-  companyEventEffect, horizonOfId, lifecycleDates, nextCompanyEvent, predictionPaths, openSummary, referencePrediction, settledSummary, tradeMarks, whyScale, whySegments,
+  companyEventEffect, horizonOfId, lifecycleDates, nextCompanyEvent, predictionPaths, publishedRangeAt, publishedRanges, openSummary, referencePrediction, settledSummary, tradeMarks, whyScale, whySegments,
 } from "../company-logic.ts";
 import { agreementAt, bestOf, expectedGainMoney, pooledRows, rankedIds } from "../strategies-logic.ts";
 import type { ScoreRow, SettledTrade } from "../types.ts";
@@ -140,4 +140,15 @@ test("a company event's effect: results widen and block calls, an ex-dividend da
   assert.ok(exDiv && exDiv.label === "shifts ranges");
   assert.doesNotMatch(exDiv.tip + exDiv.plain, /widen|no new call/);
   assert.equal(companyEventEffect("holiday"), null);
+});
+
+test("published ranges: B12's published_ranges when present (even with no prediction), else the reference strategy's rows", () => {
+  const pr = { id: "2026-10-08-ADANIPORTS-1d", as_of_date: "2026-10-08", exit_date: "2026-10-12", horizon_days: 1, target_price: 1706.0489, lo50: 1670.2231, hi50: 1734.5735, lo80: 1638.7892, hi80: 1769.2925 };
+  const rows = publishedRanges({ published_ranges: [{ ...pr, horizon_days: 2, id: "x-2d" }, pr], predictions: [], reference_strategy: india.reference_strategy });
+  assert.deepEqual(rows.map((r) => r.horizon_days), [1, 2], "sorted by horizon");
+  assert.equal(publishedRangeAt(rows, 1)?.target_price, 1706.0489);
+  assert.equal(publishedRangeAt(rows, 3), null);
+  assert.deepEqual(publishedRanges({ published_ranges: [], predictions: reliance.predictions, reference_strategy: india.reference_strategy }), [], "an empty published_ranges is trusted, never filled from predictions");
+  const old = publishedRanges({ predictions: reliance.predictions, reference_strategy: india.reference_strategy });
+  assert.ok(old.length && old.every((r) => (r as { strategy_id?: string }).strategy_id === india.reference_strategy), "older payloads fall back to the reference strategy");
 });
