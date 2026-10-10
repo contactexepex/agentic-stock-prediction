@@ -48,7 +48,7 @@ export function envelope(market, pageKey, payload) {
 
 const json = (status, body, headers = {}) => ({ status, contentType: status < 400 ? "application/json" : "application/problem+json", headers, body: JSON.stringify(body) });
 export const problem = (status, title, detail, market) =>
-  json(status, { title, status, detail, ...(status === 503 && market ? { fallback_links: [`https://agentic-stock-prediction-reports.vercel.app/${market}/dashboard.html`] } : {}) });
+  json(status, { title, status, detail, ...(status === 503 && market ? { fallback_links: [`https://omenix.vercel.app/${market}`] } : {}) });
 
 const ROUTES = PAGES.filter((p) => p.endpoint).map((p) => ({
   page: p,
@@ -61,7 +61,7 @@ export async function apiFixture(url, c) {
   if (!m) return problem(404, "Not found", "No fixture for " + pathname);
   const [, market, rest] = m;
   if (c.apiStatus === "slow") await new Promise((r) => setTimeout(r, 4000)); // the page shows its loading state first
-  if (typeof c.apiStatus === "number") return problem(c.apiStatus, c.apiStatus === 503 ? "Data service unavailable" : "Request failed", c.apiStatus === 503 ? "The read models cannot be read right now; the static reports still work." : undefined, market);
+  if (typeof c.apiStatus === "number") return problem(c.apiStatus, c.apiStatus === 503 ? "Data service unavailable" : "Request failed", c.apiStatus === 503 ? "The read models cannot be read right now; try again shortly." : undefined, market);
   if (c.api) {
     const own = await c.api(rest, market, url);
     if (own) return json(own.status ?? 200, own.body);

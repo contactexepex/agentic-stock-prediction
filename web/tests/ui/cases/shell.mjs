@@ -24,7 +24,7 @@ export const cases = [
   { name: "shell-home-us", path: "/us", market: "us", mockup: "01-home", widths: [1280], waitFor: ".phead", expectText: [PAPER], check: shellChecks },
   { name: "shell-watchlist", path: "/india/watchlist", mockup: "02-watchlist", waitFor: ".phead", expectText: [PAPER, "Watchlist"], check: shellChecks },
   { name: "shell-company", path: "/india/stocks/RELIANCE", mockup: "03-company", waitFor: ".phead", expectText: ["Company"], check: shellChecks },
-  { name: "state-error-503", path: "/india/watchlist", apiStatus: 503, allowConsole: [HTTP_ERROR_LINE], widths: [1280, 390], waitFor: '[role="alert"]', expectText: ["Data service unavailable", "Try again", "dashboard.html"] },
+  { name: "state-error-503", path: "/india/watchlist", apiStatus: 503, allowConsole: [HTTP_ERROR_LINE], widths: [1280, 390], waitFor: '[role="alert"]', expectText: ["Data service unavailable", "Try again", "omenix.vercel.app/india"] },
   { name: "state-loading", path: "/india/news", apiStatus: "slow", widths: [1280], waitFor: '[aria-busy="true"]', expectText: ["Loading the page data"] },
   { name: "state-bad-ticker", path: "/india/stocks/not-a-ticker", widths: [1280], waitFor: '[role="alert"]', expectText: ["Not found"] },
   { name: "unknown-market-404", path: "/mars", status: 404, allowConsole: [HTTP_ERROR_LINE], widths: [1280], keyboard: false, expectText: ["Page not found"] },
