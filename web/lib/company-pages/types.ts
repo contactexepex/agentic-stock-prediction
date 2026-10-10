@@ -103,6 +103,35 @@ export interface PublishedRange {
   lo80: number | null; hi80: number | null; regime?: string | null;
 }
 
+/** One stored ranges.py run of the forecast history (schema HistoryRange): target_price = base_close x exp(center);
+ *  `change` against the previous run of the same horizon (null for the first). */
+export interface HistoryRange {
+  id: string; ticker: string; made_at: IsoTime; as_of_date: IsoDate; session_date: IsoDate; exit_date: IsoDate;
+  horizon_days: number; base_close: number; target_price: number; center?: number | null; sigma_h?: number | null;
+  lo50: number; hi50: number; lo80: number; hi80: number; regime?: string | null; calibration_id?: string | null;
+  inputs: string[]; notes: string[];
+  change: { from_id: string; from_made_at: IsoTime; target_pct: number | null; width80_pct: number | null; changed: string[] } | null;
+}
+
+export interface ScoreDriver { feature: string; points: number; text?: string | null }
+
+/** One stored signal-model run (schema HistoryScore): the points per group add up to 100 x (prob_up - base_rate);
+ *  change.prob_up is a fraction (0.01 = one percentage point). */
+export interface HistoryScore {
+  id: string; ticker: string; computed_at: IsoTime; as_of_date: IsoDate; entry_date: IsoDate; exit_date: IsoDate;
+  horizon_days: number; prob_up: number | null; prob_model?: number | null; base_rate?: number | null;
+  news_score?: number | null; model_version: string | null; model_id?: string | null; trained_until?: string | null;
+  groups: Record<string, number>; drivers_up: ScoreDriver[]; drivers_down: ScoreDriver[]; news_items?: number | null;
+  news_ids: string[];
+  change: {
+    from_id: string; from_computed_at: IsoTime; prob_up: number | null; groups: Record<string, number>;
+    news_added: string[]; news_dropped: string[]; changed: string[];
+  } | null;
+}
+
+/** rm.stock `forecast_history` (B12, owner 2026-10-10): every stored run of the last 10 as-of dates. */
+export interface ForecastHistory { ranges: HistoryRange[]; scores: HistoryScore[] }
+
 export interface CompanyPayload extends PageBase {
   horizons: number[]; default_horizon: number | "all"; reference_strategy: string; go_live: GoLive | null;
   strategies: StrategyMap; companies: CompanyRecord[]; ticker: string; company: CompanyRecord;
@@ -111,6 +140,8 @@ export interface CompanyPayload extends PageBase {
   news: NewsItem[]; results: ResultsDigest[]; events: CalendarEvent[]; bars: Bar[]; on_company: ScoreRow[];
   /** Absent in payloads built before B12 added it; then the reference strategy's predictions stand in. */
   published_ranges?: PublishedRange[] | null;
+  /** Absent in payloads built before B12 added it. */
+  forecast_history?: ForecastHistory | null;
 }
 
 export interface StockStrategiesPayload extends PageBase {

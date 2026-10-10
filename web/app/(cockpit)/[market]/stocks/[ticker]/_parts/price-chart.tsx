@@ -17,7 +17,7 @@ import { plural } from "./labels.ts";
 
 const horizonList = (rows: Array<{ horizon_days: number }>) => horizonsOf(rows).map((k) => `N+${k}`).join(", ");
 
-function useWidth<T extends HTMLElement>(): [React.RefObject<T | null>, number] {
+export function useWidth<T extends HTMLElement>(): [React.RefObject<T | null>, number] {
   const ref = useRef<T>(null);
   const [width, setWidth] = useState(0);
   useEffect(() => {

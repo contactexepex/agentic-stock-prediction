@@ -113,3 +113,22 @@ dialog .dact{display:flex;justify-content:flex-end;gap:8px;padding:0 24px 20px}
 .ot th.num,.sd th.num{white-space:normal}
 @media (min-width:1280px){ .ot small.dates{display:block;white-space:nowrap} }
 @media (max-width:760px){ .ot th,.ot td,.sd th,.sd td{padding-left:4px;padding-right:4px} }
+/* forecast history (owner, 2026-10-10) */
+.fh-chart .b80{fill:var(--mb-chart-band-80)} .fh-chart .b50{fill:var(--mb-chart-band-50)}
+.fh-chart .tl{stroke:var(--mb-chart-1);stroke-width:1.5;fill:none}
+.fh-chart .tg{fill:var(--mb-chart-1);stroke:var(--md-sys-color-surface-container-lowest);stroke-width:1.5}
+.fh-chart .base{stroke:var(--mb-chart-ink);stroke-width:1;stroke-dasharray:2 3;fill:none} .fh-chart .bs{fill:var(--mb-chart-ink)}
+.fh-chart .half{stroke:var(--mb-chart-axis);stroke-dasharray:4 3}
+.fh-chart .pl{stroke:var(--mb-chart-2);stroke-width:1.5;fill:none}
+.fh-chart .pp{fill:var(--mb-chart-2);stroke:var(--md-sys-color-surface-container-lowest);stroke-width:1.5}
+.fh-chart circle:focus-visible{outline:none;stroke:var(--md-sys-color-primary);stroke-width:3}
+.fh-chart .ax text.ttl{font-weight:600;fill:var(--md-sys-color-on-surface-variant)}
+.chleg .fh-bs{width:7px;height:7px;background:var(--mb-chart-ink)} .chleg .fh-pp{width:9px;height:9px;border-radius:50%;background:var(--mb-chart-2)}
+.fh-runs{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:8px}
+.fh-run{display:grid;grid-template-columns:150px 1fr;gap:4px 12px;padding:8px 0;border-top:1px solid var(--md-sys-color-outline-variant);font-size:13px}
+.fh-when{font-variant-numeric:tabular-nums;color:var(--md-sys-color-on-surface-variant)} .fh-when small{display:block;font-size:11.5px}
+.fh-what{min-width:0} .fh-what b{display:block} .fh-chg{display:block;color:var(--md-sys-color-on-surface-variant);overflow-wrap:anywhere}
+.fh-what summary{cursor:pointer;font-size:12.5px;color:var(--md-sys-color-primary);margin-top:4px}
+.fh-how{margin:6px 0 0;padding-left:18px;font-size:12.5px;overflow-wrap:anywhere} .fh-how li{margin:2px 0}
+.fh-more{margin-top:8px} .fh-more>summary{cursor:pointer;font-size:13px;color:var(--md-sys-color-primary)}
+@media (max-width:560px){ .fh-run{grid-template-columns:1fr} }
