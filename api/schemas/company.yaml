@@ -304,9 +304,10 @@ HistoryScore:
   type: object
   description: >-
     One stored signal-model run (kind model_scores): P(up), its model, the points per feature group, the strongest
-    drivers each way and the news items counted (the score's explanation); `change` against the previous run: P(up)
-    in probability points, the groups whose points moved, the news ids added and dropped, and the model fields that
-    changed (model_version, model_id, trained_until)
+    drivers each way and the news items counted (the score's explanation); `change` against the previous run: the
+    P(up) move as a fraction (0.01 = one percentage point), the groups whose points moved, the news ids added and
+    dropped, and the model fields that changed (model_version, model_id, trained_until). Old open-to-close 1-day
+    scores count as N+1 (B10's rule)
   required: [id, ticker, computed_at, as_of_date, entry_date, exit_date, horizon_days, prob_up, model_version, groups,
              drivers_up, drivers_down, news_ids, change]
   properties:

@@ -8,21 +8,30 @@ from __future__ import annotations
 
 import json
 
+from marketbrief.analytics.horizon_records import with_window
+from marketbrief.constants.horizons import LABEL_N_PLUS_K, SQL_LABEL_MODEL_SCORES, SQL_LABEL_RANGES
 from marketbrief.constants.rm_company import (HISTORY_RANGE_CHANGED, HISTORY_RANGE_FIELDS, HISTORY_SCORE_CHANGED,
                                               HISTORY_SCORE_FIELDS)
 from marketbrief.lab.strategies import target_price
 from marketbrief.warehouse.news_items import iso
 from marketbrief.warehouse.rm_registry import BuildContext
 
-# every stored run (each id once per made_at / computed_at) of the N+k rows of the window, stored by the cut-off
-RANGES_SQL = """SELECT DISTINCT ON (id, made_at) * FROM ranges
-                WHERE horizon_label = 'n_plus_k' AND made_at <= $cutoff::TIMESTAMPTZ
-                  AND as_of_date BETWEEN $first::DATE AND $as_of::DATE
-                ORDER BY id, made_at"""
-SCORES_SQL = """SELECT DISTINCT ON (id, computed_at) * FROM model_scores
-                WHERE horizon_label = 'n_plus_k' AND computed_at <= $cutoff::TIMESTAMPTZ
-                  AND as_of_date BETWEEN $first::DATE AND $as_of::DATE
-                ORDER BY id, computed_at"""
+# every stored run (each id once per made_at / computed_at) of the window's N+k rows, stored by the cut-off; the
+# horizon label is B10's rule (old open-to-close 1-day scores count as N+1, analytics/horizon_records.py)
+RANGES_SQL = f"""
+WITH runs AS (
+    SELECT DISTINCT ON (id, made_at) * REPLACE ({SQL_LABEL_RANGES} AS horizon_label) FROM ranges
+    WHERE made_at <= $cutoff::TIMESTAMPTZ AND as_of_date BETWEEN $first::DATE AND $as_of::DATE
+    ORDER BY id, made_at, lo80, hi80
+)
+SELECT * FROM runs WHERE horizon_label = '{LABEL_N_PLUS_K}' ORDER BY id, made_at"""
+SCORES_SQL = f"""
+WITH runs AS (
+    SELECT DISTINCT ON (id, computed_at) * REPLACE ({SQL_LABEL_MODEL_SCORES} AS horizon_label) FROM model_scores
+    WHERE computed_at <= $cutoff::TIMESTAMPTZ AND as_of_date BETWEEN $first::DATE AND $as_of::DATE
+    ORDER BY id, computed_at, prob_up, model_id
+)
+SELECT * FROM runs WHERE horizon_label = '{LABEL_N_PLUS_K}' ORDER BY id, computed_at"""
 PCT = 100.0
 DIGITS = 4
 
@@ -83,8 +92,9 @@ def score_row(rec: dict) -> dict:
 
 
 def score_change(row: dict, previous: dict | None) -> dict | None:
-    """How a score run differs from the previous run of its company and horizon (None for the first): P(up) in
-    points of probability, the feature groups whose points moved, the news ids added and dropped."""
+    """How a score run differs from the previous run of its company and horizon (None for the first): the P(up)
+    move as a fraction (0.01 = one percentage point), the feature groups whose points moved, the news ids added
+    and dropped."""
     if previous is None:
         return None
     groups = sorted(set(row["groups"]) | set(previous["groups"]))
@@ -116,8 +126,10 @@ def forecast_history(ctx: BuildContext, first_day: str | None, as_of: str | None
     if not (first_day and as_of):
         return {}
     params = {"cutoff": ctx.cutoff, "first": first_day, "as_of": as_of}
-    ranges = [range_row(rec) for rec in records(ctx.con, RANGES_SQL, params) if rec["ticker"] in ctx.collected]
-    scores = [score_row(rec) for rec in records(ctx.con, SCORES_SQL, params) if rec["ticker"] in ctx.collected]
+    ranges = [range_row(with_window(ctx.cfg, rec)) for rec in records(ctx.con, RANGES_SQL, params)
+              if rec["ticker"] in ctx.collected]
+    scores = [score_row(with_window(ctx.cfg, rec)) for rec in records(ctx.con, SCORES_SQL, params)
+              if rec["ticker"] in ctx.collected]
     history: dict[str, dict] = {}
     for kind, rows in (("ranges", with_changes(ranges, "made_at", range_change)),
                        ("scores", with_changes(scores, "computed_at", score_change))):
