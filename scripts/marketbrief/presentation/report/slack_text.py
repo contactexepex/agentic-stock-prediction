@@ -8,7 +8,7 @@ from marketbrief.analytics.call_basis import label as basis_label
 from marketbrief.analytics.scoring import basis_key
 from marketbrief.constants.horizon_names import NAME_LEGACY_SLACK_CALL
 from marketbrief.constants.report import MSG_RANGES_LATE
-from marketbrief.core.settings import app_url
+from marketbrief.core.settings import slack_link_url
 from marketbrief.pipeline.score_predictions import is_late
 from marketbrief.presentation.horizon_names import horizon_name
 from marketbrief.presentation.report.formatting import review_line
@@ -45,7 +45,7 @@ def render_slack(cfg: dict, day: dict, settings: dict, parts: ReportParts) -> tu
     released = parts.released
     scored_calls = parts.scored_calls
     vol_name = parts.vol_name
-    app = app_url()
+    app = slack_link_url()
     url = report_url(settings, market, session, app)
     # calls on late ranges are not forecasts (the HTML and the table label them late)
     calls = [

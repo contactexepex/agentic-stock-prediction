@@ -104,7 +104,7 @@ def gather(cfg: dict, con) -> dict:
 
 
 def report_url(settings: dict, market: str, session, app: str | None = None) -> str:
-    """The Slack draft's link: the market's page in the app (`app` = config/warehouse.yaml app_url) when set;
+    """The Slack draft's link: the market's page in the app (`app` = config/settings.yaml slack_link_url) when set;
     otherwise the HTML report in the repo (GitHub shows HTML as source, which is why the Slack thread also
     attaches the file)."""
     if app:

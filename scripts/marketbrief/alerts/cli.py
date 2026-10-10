@@ -47,7 +47,7 @@ from marketbrief.core import paths
 from marketbrief.core.cli import market_arg, require_market
 from marketbrief.core.clock import clock
 from marketbrief.core.database import connect
-from marketbrief.core.settings import app_url, load_settings
+from marketbrief.core.settings import load_settings, slack_link_url
 from marketbrief.pipeline.market_status import status
 
 
@@ -105,7 +105,7 @@ def build(args, cfg: dict) -> Message | None:
         settings = load_settings() or {}
         repo = f"{settings['repo_url']}/blob/{settings.get('branch', 'main')}" if settings.get("repo_url") else None
         return Message(POST_WEEKLY, f"{POST_WEEKLY}:{market}:{review['iso_week']}",
-                       build_weekly(market, review, names, currency, {"repo": repo, "app": app_url()}))
+                       build_weekly(market, review, names, currency, {"repo": repo, "app": slack_link_url()}))
     market_status = status(cfg, now)
     day = args.date or (market_status["previous_session"] if args.post == "close" else market_status["session_date"])
     thread = f"{market}:{day}"

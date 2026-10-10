@@ -353,8 +353,8 @@ def test_slack_draft_fits_twelve_lines_and_flags_premarket_releases():
     assert len(filled.strip().splitlines()) <= 12               # 9 calls used to give 15 lines
     # the summary names the number of calls and at most three of them; details are in the report
     assert "Calls today: 9 · " in slack and "and 6 more in the report" in slack
-    from marketbrief.core.settings import app_url   # the link opens the market's page in the app (pages_url is gone)
-    assert slack.strip().splitlines()[-1] == f"Market page: {app_url().rstrip('/')}/us"
+    from marketbrief.core.settings import slack_link_url   # the link opens the market's page in the app
+    assert slack.strip().splitlines()[-1] == f"Market page: {slack_link_url().rstrip('/')}/us"
     assert "market mood" not in slack.splitlines()[0]           # no regime row in this fixture
     # US CPI at 08:30 ET on the session day: the brief says the calls were made before it
     d["session"] = date(2026, 10, 14)

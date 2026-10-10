@@ -9,7 +9,8 @@ from marketbrief.alerts.constants import FAMILY_LABELS, LABEL_PAPER_ONLY, MSG_FO
 def build_weekly(market: str, review: dict, names: dict | None = None, currency: str | None = None,
                  links: dict | None = None) -> str:
     """The weekly post of one stored research review. `links`: `repo` (the repo's blob base, e.g.
-    https://github.com/o/r/blob/main) for the report file, `app` (config/warehouse.yaml app_url) for the market page."""
+    https://github.com/o/r/blob/main) for the report file, `app` (config/settings.yaml slack_link_url) for the
+    market page."""
     links = links or {}
     names = names or {}
     currency = currency or fmt.MARKET_CURRENCY.get(market, "")

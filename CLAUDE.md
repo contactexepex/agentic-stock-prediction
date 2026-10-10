@@ -393,11 +393,11 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   (filters by sector and company; no network needed) and `reports/<market>/index.html` (all days);
   chart images in `reports/<market>/charts/<session_date>/` (`ranges`, `sectors`, `track_record`);
   `config/settings.yaml` holds the repo URL, the Slack channel id and the AI model's `model_training_cutoff`
-  (ai_replay's fair vs contaminated split). Slack links open the market's page in the app (`config/warehouse.yaml`
-  `app_url` + `/<market>`, `core.settings.app_url`); the daily HTML report is attached in the day's thread and the
-  weekly report links to its repo file. The static reports site (`pages_url`) was deleted by the owner on
-  2026-10-10; `reports/index.html` and `reports/vercel.json` are left for the later static cleanup (the only files
-  under `reports/` that build work may change; no script writes them)
+  (ai_replay's fair vs contaminated split) and `slack_link_url`: Slack links open `<slack_link_url>/<market>`, the
+  market's page in the app (`core.settings.slack_link_url`); the daily HTML report is attached in the day's thread
+  and the weekly report links to its repo file. The static reports site (`pages_url`) is retired from Slack links
+  (it deploys only by hand; owner, 2026-10-10); `reports/index.html` and `reports/vercel.json` are left for the later
+  static cleanup (the only files under `reports/` that build work may change; no script writes them)
 - `reports/<market>/review-YYYY-Www.md` the weekly review (record in `data/<market>/reviews/`)
 - `judgments/log.jsonl` every judge verdict on build work (append-only); daily-run verdicts are in
   `data/<market>/judgments/`

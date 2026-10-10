@@ -3,8 +3,9 @@ repo_url: https://github.com/contactexepex/agentic-stock-prediction
 branch: main
 slack_channel: "#market-brief"
 slack_channel_id: C0C6REB7QS2   # notify_slack.py posts the thread here with SLACK_BOT_TOKEN (bot must be a member)
-# Slack links open the market's page in the app (config/warehouse.yaml app_url); the HTML report is attached in the
-# day's thread. The static reports site (pages_url) was deleted by the owner on 2026-10-10.
+slack_link_url: https://omenix.vercel.app   # Slack links open <slack_link_url>/<market> (the market's page in the app)
+# The daily HTML report is attached in the day's thread. The static reports site (pages_url) is retired from Slack
+# links: it deploys only by hand, so its pages were stale or missing (owner, 2026-10-10).
 # The AI model's training cutoff (ForecastBench leakage rule, docs/DESIGN.md section 7): ai_replay.py
 # treats only as-of dates AFTER this date as a fair test; dates on or before it are "contaminated"
 # (the model may have seen what happened), refused by `prepare` unless --allow-training-period, and

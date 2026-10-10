@@ -99,7 +99,7 @@
 
   // ---------- shell: market switch, tabs, banner, footer ----------
   function shell() {
-    // relative: the static reports site is gone (owner, 2026-10-10), so the switch opens the sibling page
+    // relative: the static reports site (pages_url) is retired (owner, 2026-10-10), so the switch opens the sibling page
     var base = '../';
     document.getElementById('markets').innerHTML = (D.markets || [D.market]).map(function (m) {
       var label = m === 'us' ? 'US' : cap(m);
