@@ -14,7 +14,7 @@ import { Card, CardHead, Delta, FamilyLabel, Label, MoneyDelta, Odds } from "../
 import { FAMILY, FAMILY_SHORT, PICK_RULE, type Family } from "../../../../../../lib/ui/constants.ts";
 import { fmtDate, fmtDateYear, money, pct, price, signed } from "../../../../../../lib/ui/format.ts";
 import { stockStrategiesPath } from "../../../../../../lib/ui/routes.ts";
-import { bandsOf, companyEventEffect, nextCompanyEvent, openSummary, referencePrediction } from "../../../../../../lib/company-pages/company-logic.ts";
+import { bandsOf, companyEventEffect, nextCompanyEvent, openSummary, publishedRangeAt, publishedRanges, referencePrediction } from "../../../../../../lib/company-pages/company-logic.ts";
 import { agreementAt, buyShare, expectedGainMoney } from "../../../../../../lib/company-pages/strategies-logic.ts";
 import type { CompanyPayload, HeadToHeadPick } from "../../../../../../lib/company-pages/types.ts";
 import type { PageCtx } from "./context.ts";
@@ -85,8 +85,10 @@ export function DecisionCard({ p, ctx, horizon, onHorizon }: { p: CompanyPayload
   const next = nextCompanyEvent(p.events, co.ticker);
   const effect = next ? companyEventEffect(next.type) : null;
   const check0 = p.trade_checks[0];
-  const withPredictions = p.predictions.length > 0;
-  const bands = pr ? bandsOf(pr) : null;
+  // The published range (ranges.py) is shown whatever the strategies' live_from; the chance of a rise and "would
+  // buy" are the reference strategy's own and appear only when it has a prediction at this horizon.
+  const range = publishedRangeAt(publishedRanges(p), horizon);
+  const bands = range ? bandsOf(range) : null;
   return (
     <Card label="At a glance">
       <CardHead
@@ -135,20 +137,21 @@ export function DecisionCard({ p, ctx, horizon, onHorizon }: { p: CompanyPayload
         <div className="cell">
           <div className="l">
             <Icon name="query_stats" />Published range at N+{horizon}
-            <button className="md-help" type="button" aria-label="Explain" data-tip={`The reference rule strategy’s (${reference.name}) prediction for this horizon, computed by ranges.py: the target is the expected exit close; the 50% and 80% ranges are where the close is expected to land that often. Drawn on the chart.`}>?</button>
+            <button className="md-help" type="button" aria-label="Explain" data-tip={`The published range for this horizon, computed by ranges.py: the target is the expected exit close; the 50% and 80% ranges are where the close is expected to land that often. Drawn on the chart. The chance of a rise is the reference rule strategy’s (${reference.name}), when it has a prediction.`}>?</button>
           </div>
-          {pr && bands ? (
+          {range && bands ? (
             <>
-              <div className="v">{price(ctx.currency, pr.target_price)}<small> target</small></div>
+              <div className="v">{price(ctx.currency, range.target_price)}<small> target</small></div>
               <RangeBar currency={ctx.currency} bands={bands} last={co.last_close ?? null} />
               <div className="s">
-                80% range {price(ctx.currency, pr.lo80)}–{price(ctx.currency, pr.hi80)} · exit {fmtDate(pr.exit_date)} · chance of a rise {pct(pr.prob_up)}{pr.qualifies ? " · would buy" : " · no trade"}
+                80% range {price(ctx.currency, range.lo80)}–{price(ctx.currency, range.hi80)} · exit {fmtDate(range.exit_date)}
+                {pr ? ` · chance of a rise ${pct(pr.prob_up)}${pr.qualifies ? " · would buy" : " · no trade"}` : " · no strategy prediction yet"}
               </div>
             </>
           ) : (
             <>
               <div className="v muted">—</div>
-              <div className="s">{withPredictions ? `The reference strategy has no range stored at N+${horizon} today.` : co.state !== "active" ? "Inactive companies get no prediction." : "No prediction stored for this company today."}</div>
+              <div className="s">{co.state !== "active" ? "Inactive companies get no published range." : `No published range stored for this company at N+${horizon} today.`}</div>
             </>
           )}
         </div>

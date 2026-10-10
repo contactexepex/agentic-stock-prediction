@@ -7,6 +7,15 @@ WatchlistResponse:
       required: [payload]
       properties:
         payload: {$ref: '#/components/schemas/WatchlistPayload'}
+WatchlistPublishedRange:
+  description: B12's PublishedRange of one company (the company page's rows) with its ticker
+  x-source: warehouse/rm_watchlist.published_ranges
+  allOf:
+    - $ref: '#/components/schemas/PublishedRange'
+    - type: object
+      required: [ticker]
+      properties:
+        ticker: {$ref: '#/components/schemas/Ticker'}
 WatchlistPayload:
   x-source: warehouse/rm_watchlist.watchlist_pages
   description: >-
@@ -17,7 +26,7 @@ WatchlistPayload:
     - $ref: '#/components/schemas/PageHeader'
     - $ref: '#/components/schemas/HorizonChoice'
     - type: object
-      required: [status, go_live, companies, agreement, open_trades, trade_checks, ranges, strategies]
+      required: [status, go_live, companies, agreement, open_trades, trade_checks, ranges, published_ranges, strategies]
       properties:
         status: {$ref: '#/components/schemas/StatusBlock'}
         go_live: {$ref: '#/components/schemas/GoLive'}
@@ -35,6 +44,13 @@ WatchlistPayload:
         ranges:
           type: array
           items: {$ref: '#/components/schemas/PredictionRange'}
+        published_ranges:
+          type: array
+          description: >-
+            ranges.py's published range of the as-of date per active company and horizon, by ticker then horizon
+            (empty when none is stored). Shown whatever a strategy's live_from, so the Range column has it before
+            go-live too; `ranges` keeps the live predictions' signal
+          items: {$ref: '#/components/schemas/WatchlistPublishedRange'}
         strategies: {$ref: '#/components/schemas/StrategyMap'}
 PredictionRange:
   type: object

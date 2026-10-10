@@ -1,19 +1,21 @@
 """The stored records behind the company pages (B12; docs/ws/b12.md), read once per market as of the build's cut-off
 and sliced per company: lifecycle events, head-to-head picks, strategy predictions, settled paper trades, intraday
-trade checks, AI reasons, results digests, the scoreboard and the split-adjusted bars. Every read keeps only what was
-stored by the cut-off (no look-ahead) and only the collected companies' rows; nothing is recomputed that an engine
-or a shared block already computes (B2's lab readers, the settled trades and scoreboard of rm_common, B11's
-lifecycle-event rows, WS6's results macro, the dashboard's as-of bar rule). Times are ISO UTC `YYYY-MM-DDTHH:MM:SSZ`,
-as in B11's and B4's records."""
+trade checks, AI reasons, results digests, the scoreboard, ranges.py's published ranges and the split-adjusted bars.
+Every read keeps only what was stored by the cut-off (no look-ahead) and only the collected companies' rows; nothing
+is recomputed that an engine or a shared block already computes (B2's lab readers, the settled trades and scoreboard
+of rm_common, B11's lifecycle-event rows, WS6's results macro, B10's ranges reader, the dashboard's as-of bar rule).
+Times are ISO UTC `YYYY-MM-DDTHH:MM:SSZ`, as in B11's and B4's records."""
 from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 
+from marketbrief.analytics.horizon_records import ranges_asof
 from marketbrief.constants.rm_company import BAR_LOOKBACK_DAYS, BAR_SESSIONS
 from marketbrief.core.schemas import SCHEMAS
 from marketbrief.lab import reads as lab_reads
+from marketbrief.lab.strategies import target_price
 from marketbrief.presentation.dashboard import reads as dashboard_reads
 from marketbrief.warehouse import rm_common
 from marketbrief.warehouse.company_records import lifecycle_rows
@@ -83,6 +85,8 @@ class CompanySources:
     digests: dict[str, list[dict]] = field(default_factory=dict)
     scoreboard: list[dict] = field(default_factory=list)
     bars: dict[str, list[dict]] = field(default_factory=dict)
+    ranges: dict[str, list[dict]] = field(default_factory=dict)
+    history: dict[str, dict] = field(default_factory=dict)  # company_history.forecast_history
 
 
 def bar_rows(con, as_of: str, cutoff: datetime) -> dict[str, list[dict]]:
@@ -97,13 +101,25 @@ def bar_rows(con, as_of: str, cutoff: datetime) -> dict[str, list[dict]]:
     return {ticker: rows[-BAR_SESSIONS:] for ticker, rows in grouped.items()}
 
 
+def published_ranges(ctx: BuildContext, as_of: str) -> list[dict]:
+    """ranges.py's published range per ticker and horizon of the as-of date, stored by the cut-off (B10's
+    horizon_records.ranges_asof), of the collected companies; published for every company whatever a strategy's
+    live_from, so the page shows them before go-live too."""
+    rows = ranges_asof(ctx.market, ctx.cutoff_time, con=ctx.con)
+    return [{**row, "as_of_date": str(row["as_of_date"]), "session_date": str(row["session_date"]),
+             "exit_date": str(row["exit_date"]), "made_at": iso(row["made_at"]),
+             "target_price": target_price(row, None)}
+            for row in rows if row["ticker"] in ctx.collected and str(row["as_of_date"]) == as_of]
+
+
 def read_sources(ctx: BuildContext, as_of: str | None, session_date: str | None) -> CompanySources:
     """Every record the company pages need, as of the build's cut-off, of the collected companies only (a deleted
     company is never shown). `as_of` is the market's as-of date and `session_date` the session being predicted (the
     shared header's and status block's), both YYYY-MM-DD or None. Settled trades and the scoreboard are the shared
     blocks' (rm_common.settled_trades, lab_summary), so every page shows the same rows. Picks, predictions (by their
     session D) and trade checks (by the trade's entry D) are kept only for strategies live on that D
-    (rm_common.live_rows, lab/registry.is_live)."""
+    (rm_common.live_rows, lab/registry.is_live); ranges.py's published ranges of the as-of date are kept whatever
+    the strategies' live_from."""
     con, cutoff, collected = ctx.con, ctx.cutoff_time, ctx.collected
     mine = lambda rows: [row for row in rows if row["ticker"] in collected]  # noqa: E731
     sources = CompanySources(market=ctx.market, as_of=as_of, session_date=session_date)
@@ -130,5 +146,6 @@ def read_sources(ctx: BuildContext, as_of: str | None, session_date: str | None)
     if as_of:
         sources.picks = by_ticker([row for row in picks if row["session_date"] == session_date])
         sources.predictions = by_ticker([row for row in predictions if row["as_of_date"] == as_of])
+        sources.ranges = by_ticker(published_ranges(ctx, as_of))
         sources.bars = {ticker: rows for ticker, rows in bar_rows(con, as_of, cutoff).items() if ticker in collected}
     return sources
