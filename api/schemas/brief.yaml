@@ -1,0 +1,13 @@
+# The public brief (C2; docs/ws/c2.md). Builder: scripts/marketbrief/warehouse/rm_brief.py. Not an /api/v1 page: the
+# gateway's GET /brief/{market}/{session}-{token} serves `html` when the token's SHA-256 matches `token_sha256`.
+BriefPayload:
+  x-source: warehouse/rm_brief.brief_pages
+  description: >-
+    One report day's reader page (html_report.py's self-contained HTML, the Slack attachment) and the SHA-256 of its
+    link token; the token itself is never stored
+  type: object
+  required: [session, token_sha256, html]
+  properties:
+    session: {$ref: '#/components/schemas/IsoDate'}
+    token_sha256: {type: string, pattern: '^[0-9a-f]{64}$'}
+    html: {type: string}

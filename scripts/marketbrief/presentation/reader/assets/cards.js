@@ -223,7 +223,10 @@ function renderNotes(){
   const ft = $('#footer');
   ft.append(el('p', null, 'Research log, not investment advice. Numbers come from the stored data as of ' + fmtTime(R.cutoff || D.generated_at) + '; the text is written by research agents, checked by automated validation and sampled weekly by a separate judge agent.'));
   const fl2 = el('p'); fl2.append(document.createTextNode('Built ' + String(D.generated_at).replace('T', ' ').replace('+00:00', ' UTC') + ' · '));
-  fl2.append(el('a', {href: D.links.index}, 'All report days'), document.createTextNode(' · '), el('a', {href: D.links.md}, 'Text version')); ft.append(fl2);
+  if (location.protocol === 'file:' || !safeUrl(D.links.app)) {   // the attached file: links to its neighbours
+    fl2.append(el('a', {href: D.links.index}, 'All report days'), document.createTextNode(' · '), el('a', {href: D.links.md}, 'Text version'));
+  } else fl2.append(el('a', {href: safeUrl(D.links.app), rel: 'noopener'}, 'Open full app'));   // the public brief: one plain link
+  ft.append(fl2);
 }
 
 function renderAll(){ renderGlance(); renderChanges(); renderPaper(); renderCards(); }

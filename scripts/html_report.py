@@ -21,6 +21,7 @@ from marketbrief.core import cli, database, paths
 from marketbrief.core.clock import clock
 from marketbrief.presentation.reader import page as reader_page
 from marketbrief.presentation.reader.gather import reader_data
+from marketbrief.presentation.reader.links import app_link
 
 META_RE = re.compile(r"<!-- report-meta: (\{.*?\}) -->")
 CHART_FILES = ("ranges.png", "sectors.png", "track_record.png")   # charts.py, in thread order
@@ -191,7 +192,7 @@ def run(cfg: dict) -> dict:
     parsed = parse_report(md_path.read_text(), list(cfg.get("sectors") or {}))
     narrative, _ = narrative_html(parsed, view["sources"])
     charts = folder / "charts" / view["session"]
-    links = {"md": md_path.name, "index": "index.html",
+    links = {"md": md_path.name, "index": "index.html", "app": app_link(cfg["market"]),
              "charts": [f"charts/{view['session']}/{f}" for f in CHART_FILES if (charts / f).exists()]}
     page = build_page(view, narrative, links, reader_data(cfg, con, now, view))
     out = folder / f"{view['session']}.html"

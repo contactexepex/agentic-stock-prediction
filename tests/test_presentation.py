@@ -291,7 +291,7 @@ def test_html_page_has_sections_filters_and_matching_numbers():
                    'id="notes"', 'id="footer"', 'id="f-sector"', 'id="f-lean"', 'id="f-sort"', 'id="f-horizon"',
                    "The day in 20 seconds", "What changed since the previous run", "How to read this page",
                    "Chance of going up", "prefers-color-scheme: dark", ':root[data-theme="dark"]', 'name="viewport"',
-                   "--md-sys-color-primary", '<symbol id="ms-warning"'):
+                   "--md-sys-color-primary", '<symbol id="ms-warning"', '<meta name="robots" content="noindex, nofollow">'):
         assert needle in html, needle
     assert "<!-- AGENT" not in html and "AGENT:" not in html
     assert not re.search(r'<(?:script|link|img)[^>]+(?:src|href)="https?://', html)   # nothing loaded from the network

@@ -1,8 +1,9 @@
 // Gateway mode (MB_GATEWAY=1, the second Vercel project without Vercel Authentication; docs/SPEC.md F10): only
 // /slack/* (each request verified with Slack's signing secret and refused when older than 5 minutes), /mcp (GitHub
 // OAuth, the owner's account only) and the OAuth routes of the MCP sign-in (/oauth/*, /.well-known/oauth-*, rewritten
-// to their handlers under /mcp/oauth/); everything else is a 404. In the dashboard
-// deployment (behind Vercel Authentication) those routes are a 404 and everything else passes.
+// to their handlers under /mcp/oauth/) and the public brief (GET /brief/{market}/{session}-{token}, C2); everything
+// else is a 404. In the dashboard deployment (behind Vercel Authentication) the Slack, /mcp and OAuth routes are a 404
+// and everything else (the brief included) passes.
 import { NextResponse, type NextRequest } from "next/server";
 import { gatewayDecision } from "./lib/tools/gateway.ts";
 import { verifySlackRequest } from "./app/slack/_lib/verify.ts";

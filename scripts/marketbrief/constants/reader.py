@@ -63,3 +63,13 @@ TIER_WORDS = {"Strong Buy": "Strong lean up", "Buy": "Lean up", "Hold/No call": 
 SIMULATED = "SIMULATED"
 PAPER_NOT_LIVE = "Paper trading (simulated, no real money) starts on {day}."
 PAPER_NO_START = "Paper trading (simulated, no real money) has no start date yet."
+
+# the public brief (C2 batch 2, owner decision 2026-10-10): the page served read-only by the gateway at
+# /brief/<market>/<session>-<token>; the token is HMAC-SHA256(BRIEF_LINK_SECRET, "brief:<market>:<session>") cut to
+# 128 bits, so nothing secret is stored (the repo is public); rm.brief keeps only the token's SHA-256
+ENV_BRIEF_SECRET = "BRIEF_LINK_SECRET"
+BRIEF_TOKEN_HEX = 32                 # 128 bits
+BRIEF_PATH = "/brief/{market}/{session}-{token}"
+BRIEF_SESSIONS = 30                  # report days kept in rm.brief (older links answer 404)
+RM_BRIEF = "brief"
+BRIEF_MARKER = '"reader":{'          # a page built by the reader layer (older report pages are not served)
