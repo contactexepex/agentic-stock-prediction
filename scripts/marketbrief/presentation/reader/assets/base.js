@@ -93,7 +93,7 @@ function renderGlance(){
   tiles.append(t1, t2); g.append(tiles);
   const gl = (R.glance || {})[String(H)] || {up: 0, down: 0, none: 0, no_score: 0, moves: []};
   const ex = exitOf(H), tot = gl.up + gl.down + gl.none + gl.no_score;
-  g.append(el('div', {class: 'micro'}, 'Leaning up or down · N+' + H + (ex ? ' (sell at the close of ' + ex.exit_label + ')' : '')));
+  g.append(el('div', {class: 'micro'}, 'Leaning up or down · N+' + H + (ex ? ' (measured at the close of ' + ex.exit_label + ')' : '')));
   const bar = el('div', {class: 'leanbar', role: 'img', 'aria-label': gl.up + ' lean up, ' + gl.none + ' no clear lean, ' + gl.down + ' lean down'});
   [['u', gl.up], ['n', gl.none + gl.no_score], ['d', gl.down]].forEach(x => { if (x[1]) { const s = el('span', {class: x[0]}); s.style.width = (100 * x[1] / Math.max(1, tot)) + '%'; bar.append(s); } });
   g.append(bar);
@@ -120,7 +120,7 @@ function renderGlance(){
 function renderChanges(){
   const s = $('#changes'); s.replaceChildren();
   const C = R.changes || {by_horizon: {}, news: []};
-  s.append(el('h2', null, 'What changed since the previous run'));
+  s.append(el('h2', null, 'What changed since the previous day’s forecast'));
   if (C.since) s.append(el('p', {class: 'small muted'}, 'Compared with the forecasts of ' + fmtTime(C.since) + '.'));
   const rows = (C.by_horizon || {})[String(H)] || [];
   if (rows.length) {
@@ -136,7 +136,7 @@ function renderChanges(){
   } else s.append(el('p', {class: 'empty'}, 'No big moves in expected prices or chances at N+' + H + '.'));
   const news = C.news || [];
   s.append(el('div', {class: 'micro'}, 'New news the model counted' + (C.news_total ? ' (' + C.news_total + ')' : '')));
-  if (!news.length) { s.append(el('p', {class: 'empty'}, 'No new news counted since the previous run.')); return; }
+  if (!news.length) { s.append(el('p', {class: 'empty'}, 'No new news counted since the previous day’s forecast.')); return; }
   const ul = el('ul', {class: 'list plain'});
   news.forEach(n => { const li = el('li'); li.append(linkOrText(n.url, n.title || n.id));
     const meta = el('div', {class: 'small muted'}); meta.append(document.createTextNode((BY[n.ticker] ? BY[n.ticker].name : n.ticker) + ' · ' + (n.source || '') + ' '), statusTag(n.status));
@@ -188,10 +188,10 @@ function renderLegend(){
   const lean = R.lean || {slight: 0.02, clear: 0.05};
   const d = el('details'); d.append(el('summary', null, 'All definitions'));
   const dl = el('dl', {class: 'gloss'});
-  [['N+1, N+3, N+5', 'Bought at the next opening price, sold at the close of the 1st, 3rd or 5th trading day after that day. Weekends and holidays are skipped.'],
+  [['N+1, N+3, N+5', 'Measured from the next opening price to the close of the 1st, 3rd or 5th trading day after that day. Weekends and holidays are skipped.'],
    ['Expected price', 'The middle of the range: the most likely closing price on the sell day. Not a promise.'],
    ['Lean', 'Lean up when the chance of going up is ' + pct0(0.5 + lean.clear) + ' or more, lean down at ' + pct0(0.5 - lean.clear) + ' or less; “slight” between ' + pct0(0.5 + lean.slight) + ' and ' + pct0(0.5 + lean.clear) + ' (or the same distance below 50%). Closer to 50%: no clear lean.'],
-   ['Why', 'The model’s strongest reasons in plain words, from its stored scores, news and events.'],
+   ['Why', 'The model’s strongest pushes on its estimate in plain words (its stored points per group of signals, recent verified news included). Warnings add results dates and news status.'],
    ['Warnings', 'Results soon (prices can jump), a data problem (no forecast trusted), or news that other sources contradicted.'],
    ['News status', 'Confirmed by a filing or by 2+ independent outlets, single source, not verified, rumour, promotional or contradicted.'],
    ['Paper / SIMULATED', 'Paper trades are records kept to test the forecasts: no money, no orders. “Paper only — no proven edge yet” stays until the weekly review shows the model has real skill.'],
