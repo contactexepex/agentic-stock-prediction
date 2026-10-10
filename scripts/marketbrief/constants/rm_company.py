@@ -46,6 +46,21 @@ STRATEGIES_PICK_FIELDS = (*PICK_FIELDS, "method_version")
 PREDICTION_FIELDS = ("id", "strategy_id", "family", "ticker", "made_at", "as_of_date", "session_date", "exit_date",
                      "horizon_days", "direction", "prob_up", "qualifies", "base_close", "target_price", "lo50", "hi50",
                      "lo80", "hi80", "range_widen", "regime", "quality")
+# the company page's forecast history (owner, 2026-10-10): every stored run of the last FORECAST_HISTORY_SESSIONS
+# as-of dates (two weeks); the fields of a range run and of a score run, and the fields whose change a run names
+FORECAST_HISTORY_SESSIONS = 10
+HISTORY_RANGE_FIELDS = ("id", "ticker", "made_at", "as_of_date", "session_date", "exit_date", "horizon_days",
+                        "base_close", "target_price", "center", "sigma_h", "lo50", "hi50", "lo80", "hi80", "regime",
+                        "calibration_id", "inputs", "notes")
+HISTORY_RANGE_CHANGED = ("regime", "calibration_id", "inputs")
+HISTORY_SCORE_FIELDS = ("id", "ticker", "computed_at", "as_of_date", "entry_date", "exit_date", "horizon_days",
+                        "prob_up", "prob_model", "base_rate", "news_score", "model_version", "model_id",
+                        "trained_until")
+HISTORY_SCORE_CHANGED = ("model_version", "model_id", "trained_until")
+# ranges.py's published range per horizon (B10's ranges rows; independent of a strategy's live_from); target_price =
+# base_close x exp(center), as a strategy prediction copies it
+PUBLISHED_RANGE_FIELDS = ("id", "made_at", "as_of_date", "session_date", "exit_date", "horizon_days", "base_close",
+                          "target_price", "lo50", "hi50", "lo80", "hi80", "regime")
 STRATEGIES_PREDICTION_FIELDS = ("id", "strategy_id", "family", "ticker", "made_at", "as_of_date", "session_date",
                                 "exit_date", "horizon_days", "direction", "prob_up", "confidence", "threshold",
                                 "qualifies", "base_close", "target_price", "lo50", "hi50", "lo80", "hi80",

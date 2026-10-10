@@ -19,9 +19,9 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
-from marketbrief.constants.rm_company import (COMPANY_FIELDS, EVENT_DAYS, LIFECYCLE_SESSIONS, MOCKUP_COMPANY,
-                                              MOCKUP_STOCK_STRATEGIES, NEWS_DAYS, NEWS_MAX, OWNER, RM_LIFECYCLE,
-                                              RM_STOCK_STRATEGIES, RM_TRADES, STRATEGIES_COMPANY_FIELDS,
+from marketbrief.constants.rm_company import (COMPANY_FIELDS, EVENT_DAYS, FORECAST_HISTORY_SESSIONS, LIFECYCLE_SESSIONS,
+                                              MOCKUP_COMPANY, MOCKUP_STOCK_STRATEGIES, NEWS_DAYS, NEWS_MAX, OWNER,
+                                              RM_LIFECYCLE, RM_STOCK_STRATEGIES, RM_TRADES, STRATEGIES_COMPANY_FIELDS,
                                               STRATEGIES_STRATEGY_FIELDS, STRATEGY_FIELDS, TRADES_MARKET_SESSIONS,
                                               TRADES_TICKER_SESSIONS)
 from marketbrief.constants.warehouse import MARKET_PAGE_KEY, REFERENCE_STRATEGY, RM_BARS, RM_STOCK, SERVE_VERBATIM
@@ -32,14 +32,22 @@ from marketbrief.warehouse.company_payloads import (bars_payload, check_rows, co
                                                     market_trades_payload, pick, stock_payload,
                                                     stock_strategies_payload, trades_payload)
 from marketbrief.warehouse.company_sources import CompanySources, read_sources
+from marketbrief.warehouse.company_history import forecast_history
 from marketbrief.warehouse.news_items import news_items
 from marketbrief.warehouse.rm_registry import BuildContext, ContractCase, PageBuilder
 
 
 def sources(ctx: BuildContext) -> CompanySources:
-    """The market's records for the company pages, read once per build."""
-    session_date = rm_common.status_block(ctx)["session"]["session_date"]
-    return ctx.shared("company_sources", lambda: read_sources(ctx, ctx.as_of, session_date))
+    """The market's records for the company pages, read once per build, with the forecast history of the last
+    FORECAST_HISTORY_SESSIONS as-of dates."""
+
+    def compute() -> CompanySources:
+        data = read_sources(ctx, ctx.as_of, rm_common.status_block(ctx)["session"]["session_date"])
+        first = first_of(sessions_back(ctx.cfg, ctx.as_of, FORECAST_HISTORY_SESSIONS))
+        data.history = forecast_history(ctx, first, ctx.as_of)
+        return data
+
+    return ctx.shared("company_sources", compute)
 
 
 def company_blocks(ctx: BuildContext) -> dict:
@@ -224,7 +232,8 @@ BUILDERS = (
 )
 CONTRACT_CASES = (
     ContractCase(path="/api/v1/markets/{market}/stocks/{ticker}", table=RM_STOCK, mockup=MOCKUP_COMPANY,
-                 mockup_payload=company_mockup, map_paths=("$.strategies", "$.agreement")),
+                 mockup_payload=company_mockup, map_paths=("$.strategies", "$.agreement"),
+                 extra_keys=("published_ranges", "forecast_history")),
     ContractCase(path="/api/v1/markets/{market}/stocks/{ticker}/bars", table=RM_BARS, mockup=MOCKUP_COMPANY,
                  mockup_payload=bars_mockup),
     ContractCase(path="/api/v1/markets/{market}/trades", table=RM_TRADES, mockup=MOCKUP_COMPANY,

@@ -95,12 +95,22 @@ export interface ScoreRow {
   } | null;
 }
 
+/** ranges.py's published range of one horizon for the as-of date (B12's rm.stock `published_ranges`, schema
+ *  PublishedRange): shown whatever the strategies' live_from. */
+export interface PublishedRange {
+  id: string; made_at?: IsoTime | null; as_of_date: IsoDate; session_date?: IsoDate | null; exit_date: IsoDate | null;
+  horizon_days: number; base_close?: number | null; target_price: number | null; lo50: number | null; hi50: number | null;
+  lo80: number | null; hi80: number | null; regime?: string | null;
+}
+
 export interface CompanyPayload extends PageBase {
   horizons: number[]; default_horizon: number | "all"; reference_strategy: string; go_live: GoLive | null;
   strategies: StrategyMap; companies: CompanyRecord[]; ticker: string; company: CompanyRecord;
   lifecycle: LifecycleEvent[]; agreement: AgreementMap; head_to_head: HeadToHeadPick[]; predictions: Prediction[];
   open_trades: OpenTrade[]; trade_checks: TradeCheck[]; settled: SettledTrade[]; reasons: AiReason[];
   news: NewsItem[]; results: ResultsDigest[]; events: CalendarEvent[]; bars: Bar[]; on_company: ScoreRow[];
+  /** Absent in payloads built before B12 added it; then the reference strategy's predictions stand in. */
+  published_ranges?: PublishedRange[] | null;
 }
 
 export interface StockStrategiesPayload extends PageBase {
