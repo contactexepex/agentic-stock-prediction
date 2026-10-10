@@ -17,6 +17,7 @@ import { CommandDialog, type Intent, type Recorded } from "../../../../../../com
 import { EventsCard, NewsCard, ReasonsCard, ResultsCard, WatchlistCard } from "./cards.tsx";
 import { pageCtx } from "./context.ts";
 import { CompanyLine, DecisionCard } from "./decision.tsx";
+import { ForecastHistoryCard } from "./forecast-history.tsx";
 import { CompanyLegend } from "./legend.tsx";
 import { PriceChart } from "./price-chart.tsx";
 import { OpenTradesTable, SettledCard } from "./trades.tsx";
@@ -63,6 +64,7 @@ function CompanyBody({ p }: { p: CompanyPayload }) {
       <SignalsBand page={p} goLive={p.go_live} strategies={Object.keys(p.strategies).length} />
       <DecisionCard p={p} ctx={ctx} horizon={horizon} onHorizon={setHorizon} />
       <PriceChart p={p} ctx={ctx} horizon={horizon} />
+      <div style={{ marginTop: 16 }}><ForecastHistoryCard p={p} ctx={ctx} horizon={horizon} onHorizon={setHorizon} /></div>
       <div style={{ marginTop: 16 }}><OpenTradesTable p={p} ctx={ctx} /></div>
       <div style={{ marginTop: 16 }}><SettledCard settled={p.settled} ctx={ctx} paperLabel={p.status.paper_label} ticker={co.ticker} /></div>
       <div className="grid even">
