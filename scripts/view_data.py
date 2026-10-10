@@ -28,9 +28,9 @@ from marketbrief.presentation.horizon_names import horizon_name, primary_horizon
 from marketbrief.utils.money import format_money
 from marketbrief.utils.numbers import json_safe_float
 from marketbrief.pipeline.score_predictions import is_late
-from marketbrief.presentation.view_sql import (ANNOUNCEMENTS_SQL, BANDS_SQL, CONF_BANDS_SQL, FEATURES_SQL,  # noqa: F401
-                                               FILINGS_SQL, PREDICTIONS_SQL, RANGE_RECORD_EXACT, RANGES_SQL,
-                                               REGIME_SQL, SCORED_CALLS_SQL)
+from marketbrief.presentation.view_sql import (  # noqa: F401 (BANDS/CONF_BANDS/RANGE_RECORD_EXACT re-exported)
+    ANNOUNCEMENTS_SQL, BANDS_SQL, COMPANY_EVENTS_SQL, CONF_BANDS_SQL, FEATURES_SQL, FILINGS_SQL, PREDICTIONS_SQL,
+    RANGE_RECORD_EXACT, RANGES_SQL, REGIME_SQL, SCORED_CALLS_SQL)
 
 CURRENCY = CURRENCY_SYMBOLS
 HISTORY_DAYS = 20        # trading days of closes shown before the forecast fan
@@ -139,9 +139,7 @@ def gather_view(cfg: dict, con, now: datetime | None = None) -> dict:
                 LEFT JOIN news_enriched_asof(coalesce($at, now())) e USING (id) ORDER BY id""", {"at": now})
     filings = q(FILINGS_SQL) if _has_rows(con, "filings") else pd.DataFrame()
     anns = q(ANNOUNCEMENTS_SQL) if _has_rows(con, "announcements") else pd.DataFrame()
-    cevents = q("SELECT date, type, ticker, name, amount FROM company_events WHERE date BETWEEN ? AND ? "
-                "ORDER BY date, ticker, type, name",
-                [as_of, as_of + timedelta(days=21)])
+    cevents = q(COMPANY_EVENTS_SQL, [as_of, as_of + timedelta(days=21)])
 
     # every source an agent may cite: news, SEC filings, NSE announcements -> headline + link
     sources: dict[str, dict] = {}

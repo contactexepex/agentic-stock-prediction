@@ -232,5 +232,22 @@ def test_view_reads_are_bounded_by_the_frozen_clock():
     assert con.execute(view_sql.RANGES_SQL).fetchall() == raw.execute("SELECT * FROM ranges_latest WHERE id = 'a'").fetchall()
     assert con.execute(view_sql.REGIME_SQL).fetchall()[0][1] == "CALM"
     assert con.execute(view_sql.FEATURES_SQL, ["2026-10-07"]).fetchall()[0][2] == "OK"   # the later recompute is not seen
-    for sql in (view_sql.PREDICTIONS_SQL, view_sql.FILINGS_SQL, view_sql.ANNOUNCEMENTS_SQL):
-        assert "<= now()" in sql
+    raw.execute("CREATE TABLE predictions AS SELECT * FROM (VALUES ('p1', DATE '2026-10-07', TIMESTAMPTZ '2026-10-08 02:30:00+00'),"
+                " ('p2', DATE '2026-10-07', TIMESTAMPTZ '2026-10-09 02:30:00+00')) t(id, as_of_date, made_at)")
+    raw.execute("CREATE TABLE filings AS SELECT * FROM (VALUES ('f1', 'ITC', '8-K', 'u', NULL, 'd', TIMESTAMPTZ '2026-10-08 00:00:00+00'),"
+                " ('f2', 'ITC', '8-K', 'u', NULL, 'd', TIMESTAMPTZ '2026-10-09 02:00:00+00'))"
+                " t(id, ticker, form, url, accepted_at, description, first_seen_at)")
+    raw.execute("CREATE TABLE announcements_latest AS SELECT * FROM (VALUES ('a1', 'ITC', 's', 'u', NULL, 'NSE', TIMESTAMPTZ '2026-10-08 00:00:00+00'),"
+                " ('a2', 'ITC', 's', 'u', NULL, 'NSE', TIMESTAMPTZ '2026-10-09 02:00:00+00'))"
+                " t(id, ticker, subject, url, published_at, source, first_seen_at)")
+    raw.execute("CREATE TABLE events AS SELECT * FROM (VALUES"
+                " ('e1', DATE '2026-10-12', 'earnings', 'ITC', 'Q2 results', 'nse', TIMESTAMPTZ '2026-10-08 00:00:00+00', NULL),"
+                " ('e2', DATE '2026-10-13', 'earnings', 'ITC', 'Q2 results moved', 'nse', TIMESTAMPTZ '2026-10-09 02:00:00+00', NULL),"
+                " ('e3', DATE '2026-10-14', 'earnings', 'TCS', 'Q2 results', 'nse', TIMESTAMPTZ '2026-10-09 02:00:00+00', NULL))"
+                " t(id, date, type, ticker, name, source, first_seen_at, amount)")
+    assert [r[0] for r in con.execute(view_sql.PREDICTIONS_SQL, ["2026-10-07"]).fetchall()] == ["p1"]
+    assert [r[0] for r in con.execute(view_sql.FILINGS_SQL).fetchall()] == ["f1"]
+    assert [r[0] for r in con.execute(view_sql.ANNOUNCEMENTS_SQL).fetchall()] == ["a1"]
+    # the event row first seen by the clock: ITC's earlier date, TCS's event not yet known
+    assert con.execute(view_sql.COMPANY_EVENTS_SQL, ["2026-10-08", "2026-10-30"]).fetchall() == [
+        (__import__("datetime").date(2026, 10, 12), "earnings", "ITC", "Q2 results", None)]
