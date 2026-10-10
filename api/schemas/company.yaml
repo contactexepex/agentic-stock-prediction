@@ -57,8 +57,8 @@ CompanyPage:
     - $ref: '#/components/schemas/HorizonChoice'
     - type: object
       required: [status, reference_strategy, go_live, strategies, companies, ticker, company, lifecycle, agreement,
-                 head_to_head, predictions, published_ranges, open_trades, trade_checks, settled, reasons, news, results,
-                 events, bars, on_company]
+                 head_to_head, predictions, published_ranges, forecast_history, open_trades, trade_checks, settled,
+                 reasons, news, results, events, bars, on_company]
       properties:
         status: {$ref: '#/components/schemas/StatusBlock'}
         reference_strategy: {type: string, description: The registry's reference rule strategy (rule.model_news.v1)}
@@ -89,6 +89,7 @@ CompanyPage:
             ranges.py's published range of the as-of date per horizon, by horizon (empty when none is stored). Shown
             whatever a strategy's live_from, so the range card and chart have it before go-live too
           items: {$ref: '#/components/schemas/PublishedRange'}
+        forecast_history: {$ref: '#/components/schemas/ForecastHistory'}
         open_trades:
           type: array
           items: {$ref: '#/components/schemas/OpenTrade'}
@@ -242,6 +243,127 @@ CompanyBar:
     close: {type: number}
     volume: {type: ['integer', 'null']}
     adjusted: {type: boolean}
+ForecastHistory:
+  type: object
+  description: >-
+    Every stored run of the company's published ranges and model scores of the last 10 as-of dates (two weeks), by
+    horizon then time, each with its change from the previous run of the same horizon (null for the first). Owner,
+    2026-10-10: how each forecast was calculated and what changed between runs; B15 is to draw it as a chart with text
+  x-source: warehouse/company_history.forecast_history
+  required: [ranges, scores]
+  properties:
+    ranges:
+      type: array
+      items: {$ref: '#/components/schemas/HistoryRange'}
+    scores:
+      type: array
+      items: {$ref: '#/components/schemas/HistoryScore'}
+HistoryRange:
+  type: object
+  description: >-
+    One stored ranges.py run (kind ranges): target_price = base_close x exp(center); `change` against the previous
+    run: target and 80% width moves in percent and the inputs that changed (regime, calibration_id, inputs)
+  required: [id, ticker, made_at, as_of_date, session_date, exit_date, horizon_days, base_close, target_price, lo50,
+             hi50, lo80, hi80, inputs, notes, change]
+  properties:
+    id: {type: string}
+    ticker: {$ref: '#/components/schemas/Ticker'}
+    made_at: {$ref: '#/components/schemas/IsoTime'}
+    as_of_date: {$ref: '#/components/schemas/IsoDate'}
+    session_date: {$ref: '#/components/schemas/IsoDate'}
+    exit_date: {$ref: '#/components/schemas/IsoDate'}
+    horizon_days: {$ref: '#/components/schemas/Horizon'}
+    base_close: {type: number}
+    target_price: {type: number}
+    center: {$ref: '#/components/schemas/NullableNumber'}
+    sigma_h: {$ref: '#/components/schemas/NullableNumber'}
+    lo50: {type: number}
+    hi50: {type: number}
+    lo80: {type: number}
+    hi80: {type: number}
+    regime: {type: ['string', 'null']}
+    calibration_id: {type: ['string', 'null']}
+    inputs:
+      type: array
+      items: {type: string}
+    notes:
+      type: array
+      items: {type: string}
+    change:
+      type: ['object', 'null']
+      required: [from_id, from_made_at, target_pct, width80_pct, changed]
+      properties:
+        from_id: {type: string}
+        from_made_at: {$ref: '#/components/schemas/IsoTime'}
+        target_pct: {$ref: '#/components/schemas/NullableNumber'}
+        width80_pct: {$ref: '#/components/schemas/NullableNumber'}
+        changed:
+          type: array
+          items: {type: string, enum: [regime, calibration_id, inputs]}
+HistoryScore:
+  type: object
+  description: >-
+    One stored signal-model run (kind model_scores): P(up), its model, the points per feature group, the strongest
+    drivers each way and the news items counted (the score's explanation); `change` against the previous run: P(up)
+    in probability points, the groups whose points moved, the news ids added and dropped, and the model fields that
+    changed (model_version, model_id, trained_until)
+  required: [id, ticker, computed_at, as_of_date, entry_date, exit_date, horizon_days, prob_up, model_version, groups,
+             drivers_up, drivers_down, news_ids, change]
+  properties:
+    id: {type: string}
+    ticker: {$ref: '#/components/schemas/Ticker'}
+    computed_at: {$ref: '#/components/schemas/IsoTime'}
+    as_of_date: {$ref: '#/components/schemas/IsoDate'}
+    entry_date: {$ref: '#/components/schemas/IsoDate'}
+    exit_date: {$ref: '#/components/schemas/IsoDate'}
+    horizon_days: {$ref: '#/components/schemas/Horizon'}
+    prob_up: {$ref: '#/components/schemas/NullableNumber'}
+    prob_model: {$ref: '#/components/schemas/NullableNumber'}
+    base_rate: {$ref: '#/components/schemas/NullableNumber'}
+    news_score: {$ref: '#/components/schemas/NullableNumber'}
+    model_version: {type: ['string', 'null']}
+    model_id: {type: ['string', 'null']}
+    trained_until: {type: ['string', 'null']}
+    groups:
+      type: object
+      additionalProperties: {type: number}
+    drivers_up:
+      type: array
+      items: {$ref: '#/components/schemas/ScoreDriver'}
+    drivers_down:
+      type: array
+      items: {$ref: '#/components/schemas/ScoreDriver'}
+    news_items: {type: ['integer', 'null']}
+    news_ids:
+      type: array
+      items: {type: string}
+    change:
+      type: ['object', 'null']
+      required: [from_id, from_computed_at, prob_up, groups, news_added, news_dropped, changed]
+      properties:
+        from_id: {type: string}
+        from_computed_at: {$ref: '#/components/schemas/IsoTime'}
+        prob_up: {$ref: '#/components/schemas/NullableNumber'}
+        groups:
+          type: object
+          additionalProperties: {type: number}
+        news_added:
+          type: array
+          items: {type: string}
+        news_dropped:
+          type: array
+          items: {type: string}
+        changed:
+          type: array
+          items: {type: string, enum: [model_version, model_id, trained_until]}
+ScoreDriver:
+  type: object
+  description: One of a score's strongest drivers (model/explain.py)
+  required: [feature, points]
+  properties:
+    feature: {type: string}
+    points: {type: number}
+    text: {type: ['string', 'null']}
 PublishedRange:
   type: object
   description: >-

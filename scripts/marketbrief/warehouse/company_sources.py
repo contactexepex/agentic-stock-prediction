@@ -86,6 +86,7 @@ class CompanySources:
     scoreboard: list[dict] = field(default_factory=list)
     bars: dict[str, list[dict]] = field(default_factory=dict)
     ranges: dict[str, list[dict]] = field(default_factory=dict)
+    history: dict[str, dict] = field(default_factory=dict)  # company_history.forecast_history
 
 
 def bar_rows(con, as_of: str, cutoff: datetime) -> dict[str, list[dict]]:

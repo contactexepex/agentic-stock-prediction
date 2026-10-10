@@ -171,7 +171,9 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   `company_payloads.py` (per-company slicing in the mockups' fields) and `company_sources.py` (the stored records read
   once per build as of the cut-off, collected companies only) build rm.stock (the whole 03-company page: the shared
   blocks, lifecycle events, agreement, picks, predictions, open trades, latest trade checks, settled trades, AI
-  reasons, news of 30 days / newest 50, results, events of the next 60 days, the last 250 bars; owner, 2026-10-08),
+  reasons, news of 30 days / newest 50, results, events of the next 60 days, the last 250 bars; owner, 2026-10-08;
+  ranges.py's `published_ranges` whatever a strategy's live_from and the `forecast_history` of every stored range and
+  score run of the last 10 as-of dates with each run's change, `company_history.py`; owner, 2026-10-10),
   rm.bars, rm.stock_strategies (04 page), rm.trades (`_`: every open trade, the latest check, the last 5 sessions'
   settlements; per ticker: the last 60 sessions) and rm.lifecycle (`<ticker>:<date>`, the last 30 sessions: the
   predictions and picks made for that session followed to their checks, settlements and AI reasons), served by

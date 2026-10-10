@@ -197,6 +197,7 @@ def stock_payload(sources: CompanySources, ticker: str, shared: dict, blocks: di
         "head_to_head": pick_rows(sources, ticker, PICK_FIELDS),
         "predictions": prediction_rows(sources, ticker, PREDICTION_FIELDS),
         "published_ranges": range_rows(sources, ticker),
+        "forecast_history": sources.history.get(ticker, {"ranges": [], "scores": []}),
         **trade_lists(sources, ticker, blocks["open_trades"]),
         "news": company_news(blocks["news"]),
         "results": digest_rows(sources, ticker),
