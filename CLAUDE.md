@@ -249,8 +249,9 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   `portfolio.py import-inbox`); each write dispatches `onboard.yml`; pending until imported. Every call is logged in `inbox.command_log`
   (operational, not imported); refusals are posted to #market-brief for the owner. Gateway mode (`MB_GATEWAY=1`,
   the Vercel project at `omenix-gateway.vercel.app`, `web/middleware.ts`) serves only `/slack/*` (signed, at most 5 minutes old),
-  `/mcp` (GitHub OAuth, the owner's login and numeric id only) and `/oauth/*` plus `/.well-known/oauth-*` (POST only on
-  `/slack/commands` and `/slack/interactions`). Slack:
+  `/mcp` (GitHub OAuth, the owner's login and numeric id only), `/oauth/*` plus `/.well-known/oauth-*` (POST only on
+  `/slack/commands` and `/slack/interactions`) and GET `/brief/{india|us}/{date}-{32 hex}` (C2's public read-only daily
+  brief, `web/app/brief/`, 404 on a bad token; owner, 2026-10-10). Slack:
   `/company`, `/trade`, `/ask india|us QUESTION` (the `explain` tool, answered by B8's assistant through the tool
   layer's explain hook; "coming soon" until it is wired), in #market-brief only; Confirm posts a visible request message whose
   `slack_channel`/`slack_ts` go into the inbox row for B6's onboarding reply. Web tests: `npm test` in `web/` (node test
