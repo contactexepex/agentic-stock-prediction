@@ -50,7 +50,13 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   regime), `calibrate`, `context`, and after the forecaster `ranges`, `charts` (single-purpose
   PNGs) and `report` (report skeleton + Slack summary draft with every number; agents fill only
   the `AGENT` markers, see `templates/report.md`). After the report gate passes, `html_report` builds
-  the reader's HTML report from the filled md plus the data, then `dashboard` builds
+  the reader's HTML report from the filled md plus the data (C2, `marketbrief/presentation/reader/`: a phone-first page on
+  B7's tokens with light and dark mode; the 20-second top: market mood, benchmark move, how many companies lean up or
+  down, the biggest expected moves, the paper label; one card per active company with B12's published N+1/N+3/N+5
+  ranges as a fan on the last 20 closes, B10's model P(up) as "chance of going up", the lean, a plain-language why from
+  the score's points per feature group, flags (results soon, BLOCKED, contradicted news) and the change since the
+  previous run from B12's forecast_history; paper trades and signal tiers in lean words, SIMULATED, once a strategy is
+  live; everything as of the run's clock), then `dashboard` builds
   `reports/<market>/dashboard.html` (decision-support dashboard, stored data only as of the run's clock:
   watchlist, sector heatmap, candlesticks with the published ranges via the vendored TradingView
   Lightweight Charts in `marketbrief/presentation/dashboard/vendor/` (version and SHA-256 in its NOTICE),

@@ -392,6 +392,9 @@ def notify(root: Path, cfg: Path, env_no_hook: dict, *args: str) -> subprocess.C
                           env={**env_no_hook, "MB_ROOT": str(root), "MB_CONFIG": str(cfg), "MB_MARKET": MARKET})
 
 
+READER_CONFIG = ("review.yaml", "strategies.yaml")
+
+
 def check_html_and_slack(root: Path, cfg: Path, charts: dict, out: dict, rpath: Path) -> None:
     """The Slack draft, the HTML report (only from a filled report) and notify_slack.py's refusals and dry run."""
     slack = (root / out["slack_draft"]).read_text()
@@ -401,11 +404,24 @@ def check_html_and_slack(root: Path, cfg: Path, charts: dict, out: dict, rpath: 
     bad = run("html_report.py", root, cfg)
     assert bad.returncode == 1 and "AGENT markers" in bad.stdout
     rpath.write_text(re.sub(r"<!-- AGENT:[^>]*-->", "narrative", rpath.read_text()))
+    for name in READER_CONFIG:   # the reader's page reads the website's readers (B4/B12), which read these
+        if not (cfg / name).exists():
+            (cfg / name).write_text((REPO / "config" / name).read_text())
     hr = run("html_report.py", root, cfg)
     assert hr.returncode == 0, hr.stderr
     hout = json.loads(hr.stdout)
     page = (root / hout["html"]).read_text()
     assert hout["html"] == f"reports/{MARKET}/{charts['session_date']}.html" and "AGENT" not in page
+    data = json.loads(re.search(r'id="report-data">(.*?)</script>', page, re.S).group(1).replace("<\\/", "</"))
+    reader = data["reader"]   # the reader block: as of the run's clock, active companies, N+1/N+3/N+5
+    assert reader["horizons"] == [1, 3, 5] and reader["paper"]["live"] is False, reader["paper"]
+    assert [c["ticker"] for c in reader["companies"]] == [c["ticker"] for c in data["companies"]]
+    aapl = next(c for c in reader["companies"] if c["ticker"] == "AAPL")
+    assert [f["name"] for f in aapl["forecasts"]] == ["N+1", "N+3", "N+5"] and len(aapl["bars"]) == 20
+    first = aapl["forecasts"][0]
+    assert first["lo80"] < first["lo50"] < first["hi50"] < first["hi80"] and first["exit_date"] > first["entry_date"]
+    assert reader["mood"]["word"] == "Calm" and reader["benchmark"]["close_date"] == aapl["bars"][-1]["d"]
+    assert reader["paper_label"] == "Paper only — no proven edge yet"
     assert f'href="{charts["session_date"]}.html"' in (root / hout["index"]).read_text()
     assert [Path(p).name for p in hout["images"]] == ["ranges.png", "sectors.png", "track_record.png"]
 

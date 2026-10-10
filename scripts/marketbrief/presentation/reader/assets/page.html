@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>__TITLE__</title>
+<!-- report-meta: __META__ -->
+<style>__TOKENS__
+__CSS__</style></head>
+<body>
+__ICONS__
+<div class="wrap" id="app">
+  <header class="top" id="top"></header>
+  <section class="card" id="glance" aria-label="The day at a glance"></section>
+  <section class="card" id="changes" aria-label="What changed since the previous run"></section>
+  <section class="card" id="paper" aria-label="Paper trading"></section>
+  <section class="card" id="legend" aria-label="How to read this page"></section>
+  <nav class="controls" id="controls" aria-label="Choose horizon and companies">
+    <div class="seg" role="group" aria-label="Horizon" id="f-horizon"></div>
+    <label class="vh-label"><span class="micro">Sector</span><br><select id="f-sector" aria-label="Sector"></select></label>
+    <label><span class="micro">Show</span><br><select id="f-lean" aria-label="Show">
+      <option value="">All companies</option><option value="up">Lean up</option><option value="down">Lean down</option>
+      <option value="none">No clear lean</option><option value="flag">With a warning</option></select></label>
+    <label><span class="micro">Sort by</span><br><select id="f-sort" aria-label="Sort by">
+      <option value="lean">Strongest lean</option><option value="move">Biggest expected move</option>
+      <option value="name">Name</option></select></label>
+    <span class="count" id="f-count" aria-live="polite"></span>
+    <p class="hzline" id="f-hzline"></p>
+  </nav>
+  <section class="cards" id="cards" aria-label="Companies"></section>
+  <section class="card" id="track" aria-label="Track record"></section>
+  <section class="card" id="notes" aria-label="Analyst notes and data quality"></section>
+  <footer id="footer"></footer>
+</div>
+<div id="tip" hidden></div>
+<script type="application/json" id="report-data">__DATA__</script>
+<script>__JS__</script>
+</body></html>
