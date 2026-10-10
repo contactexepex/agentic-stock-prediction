@@ -19,8 +19,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 import common  # noqa: E402
 from marketbrief.core import database  # noqa: E402
 from marketbrief.core.market_config import load_market  # noqa: E402
+from marketbrief.constants.rm_company import PUBLISHED_RANGE_FIELDS  # noqa: E402
 from marketbrief.lab import registry  # noqa: E402
-from marketbrief.warehouse import rm_common, rm_compare, rm_home, rm_strategies, rm_watchlist  # noqa: E402
+from marketbrief.warehouse import (  # noqa: E402
+    company_sources,
+    rm_common,
+    rm_compare,
+    rm_home,
+    rm_strategies,
+    rm_watchlist,
+)
 from marketbrief.warehouse.rm_registry import BuildContext  # noqa: E402
 
 CUTOFF = datetime.fromisoformat("2026-10-07T12:00:00+00:00")
@@ -174,3 +182,25 @@ def test_home_to_date_rows_and_eod(ctx, monkeypatch):
     eod = rm_home.newest_eod(ctx)
     assert eod["id"] == "eod-us-2026-10-06" and eod["prompt_version"] == "eod-v1"
     assert set(eod) == set(rm_home.EOD_FIELDS)
+
+
+def published(ticker: str, k: int) -> dict:
+    return {"id": f"rng-{ticker}-{k}", "ticker": ticker, "made_at": "2026-10-07T10:00:00Z",
+            "as_of_date": "2026-10-06", "session_date": SESSION, "exit_date": "2026-10-08", "horizon_days": k,
+            "base_close": 100.0, "target_price": 100.5, "lo50": 99.0, "hi50": 102.0, "lo80": 97.0, "hi80": 104.0,
+            "regime": "TRENDING", "center": 0.005, "width": 0.02}
+
+
+def test_watchlist_published_ranges_show_before_go_live(ctx, monkeypatch):
+    # B12's reader gives ranges.py's rows of the as-of date; the page keeps the active companies whatever is_live
+    asked = []
+    rows = [published("JPM", 3), published("DAL", 1), published("AAPL", 3), published("AAPL", 1)]
+    monkeypatch.setattr(company_sources, "published_ranges", lambda _ctx, as_of: asked.append(as_of) or rows)
+    monkeypatch.setattr(BuildContext, "as_of", property(lambda _self: "2026-10-06"))
+    monkeypatch.setattr(registry, "is_live", lambda *_a, **_k: False)
+    out = rm_watchlist.published_ranges(ctx)
+    assert asked == ["2026-10-06"]
+    assert [(r["ticker"], r["horizon_days"]) for r in out] == [("AAPL", 1), ("AAPL", 3), ("JPM", 3)]   # DAL inactive
+    assert set(out[0]) == {"ticker", *PUBLISHED_RANGE_FIELDS}   # center and width are not page fields
+    monkeypatch.setattr(BuildContext, "as_of", property(lambda _self: None))
+    assert rm_watchlist.published_ranges(ctx) == []
