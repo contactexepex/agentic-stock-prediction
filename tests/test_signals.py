@@ -124,14 +124,16 @@ def test_config_holidays_close_the_market():
 def test_scheduled_macro_events():
     india, us = load_market("india"), load_market("us")
     evs = ev.market_events(india, date(2026, 10, 1), date(2027, 2, 28))
-    assert {(e["date"], e["type"]) for e in evs} >= {(date(2026, 10, 7), "rbi_policy"), (date(2026, 12, 4), "rbi_policy"),
-                                                     (date(2027, 2, 5), "rbi_policy"), (date(2027, 2, 1), "budget")}
+    assert {(e["date"], e["type"]) for e in evs} >= {
+        (date(2026, 10, 7), "rbi_policy"), (date(2026, 12, 4), "rbi_policy"),
+        (date(2027, 2, 5), "rbi_policy"), (date(2027, 2, 1), "budget")}
     us_evs = ev.market_events(us, date(2026, 10, 14), date(2026, 10, 14))
     cpi = [e for e in us_evs if e["type"] == "cpi"]
     assert cpi and cpi[0]["major"] and cpi[0]["release"] == "08:30 ET"
     jobs = ev.market_events(us, date(2026, 11, 6), date(2026, 11, 6))
     assert jobs[0]["type"] == "jobs_report" and jobs[0]["release"] == "08:30 ET"
-    india_jobs = [e for e in ev.market_events(india, date(2026, 11, 6), date(2026, 11, 6)) if e["type"] == "jobs_report"]
+    india_jobs = [e for e in ev.market_events(india, date(2026, 11, 6), date(2026, 11, 6))
+                  if e["type"] == "jobs_report"]
     assert india_jobs and india_jobs[0]["release"] is None       # released after the NSE close
     fomc27 = [e["date"] for e in ev.market_events(us, date(2027, 1, 1), date(2027, 12, 31)) if e["type"] == "fomc"]
     assert len(fomc27) == 8
@@ -304,7 +306,7 @@ def test_ranges_chart_uses_5d_when_1d_was_skipped_and_labels_late(monkeypatch):
     # mid-session run: no 1-day range was published, the 5-day ranges are late (never forecasts)
     view = {"currency": "USD", "companies": [_view_company("AAPL", [_rng(5, late=True)]), _view_company("MSFT", [])]}
     captured = {}
-    monkeypatch.setattr(charts, "save_png", lambda fig, path: captured.setdefault("fig", fig))
+    monkeypatch.setattr(charts, "save_png", lambda fig, _path: captured.setdefault("fig", fig))
     assert charts.ranges_chart(view, "unused.png")
     fig = captured["fig"]
     texts = [t.get_text() for ax in fig.axes for t in ax.texts] + [t.get_text() for t in fig.texts]
