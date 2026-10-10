@@ -34,12 +34,12 @@ function ScoreHow({ s }: { s: HistoryScore }) {
   return (
     <ul className="fh-how">
       <li>
-        P(up) {pct(s.prob_up, 1)}{base == null ? "" : ` = base rate ${pct(base, 1)}${parts.map(([g, v]) => ` ${v < 0 ? "−" : "+"} ${Math.abs(v).toFixed(2)} pts ${g}`).join("")}${sum == null ? "" : ` (${sum.toFixed(1)}% before rounding)`}`}.
+        P(up) {pct(s.prob_up, 1)}{base == null ? "" : ` = base rate ${pct(base, 1)}${parts.map(([g, v]) => ` ${v < 0 ? "−" : "+"} ${Math.abs(v).toFixed(2)} pts ${g}`).join("")}${sum == null ? "" : ` (${sum.toFixed(1)}% from the stored, rounded points)`}`}.
         {s.prob_model != null ? ` Without news ${pct(s.prob_model, 1)}.` : ""}
       </li>
       <li>
         News: {s.news_items ?? 0} {s.news_items === 1 ? "item" : "items"} counted{s.news_score != null ? `, score ${signed(s.news_score, 2, "")}` : ""}.
-        {drivers.length ? ` Strongest drivers: ${drivers.join("; ")}.` : " No feature moved the score."}
+        {drivers.length ? ` Strongest drivers: ${drivers.join("; ")}.` : " No driver of 0.05 pts or more."}
       </li>
       <li>Model {s.model_version ?? "not stored"}{s.model_id ? ` (${s.model_id})` : ""}{s.trained_until ? `, trained until ${fmtDate(s.trained_until, false)} ${s.trained_until.slice(0, 4)}` : ""}; window {fmtDate(s.entry_date)} open to {fmtDate(s.exit_date)} close.</li>
     </ul>

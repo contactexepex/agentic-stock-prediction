@@ -303,7 +303,7 @@ cases.push({
 });
 
 // Forecast history (owner, 2026-10-10; B12's rm.stock `forecast_history`). A real stored sample (HDFCBANK, as-of
-// dates 2026-09-25..2026-10-09, lib/company-pages/tests/fixtures) and a dense synthetic one: 10 as-of dates with two
+// dates 2026-10-06..2026-10-08 stored in the window 2026-09-24..2026-10-08, lib/company-pages/tests/fixtures) and a dense synthetic one: 10 as-of dates with two
 // runs a day (the evening run and the pre-open revision) at every horizon, so the list folds its earlier runs.
 const hdfcHistory = JSON.parse(readFileSync(new URL("../../../lib/company-pages/tests/fixtures/forecast-history-hdfcbank.json", import.meta.url), "utf8"));
 

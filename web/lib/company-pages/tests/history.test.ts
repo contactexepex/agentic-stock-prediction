@@ -1,6 +1,6 @@
 // The company page's forecast history (B15 on B12's rm.stock `forecast_history`), on a real stored sample:
-// HDFCBANK's runs of the as-of dates 2026-09-25..2026-10-09 built by warehouse/company_history.forecast_history at
-// the cut-off 2026-10-10T06:00Z (fixtures/forecast-history-hdfcbank.json).
+// HDFCBANK's runs built by warehouse/company_history.forecast_history at the cut-off 2026-10-10T06:00Z (the page
+// build's window: as-of 2026-09-24..2026-10-08; the stored runs fall on 2026-10-06..2026-10-08) (fixtures/forecast-history-hdfcbank.json).
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
