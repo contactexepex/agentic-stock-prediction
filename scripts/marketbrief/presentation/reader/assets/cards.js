@@ -53,7 +53,7 @@ function fanChart(c, h){
     fs.forEach(f => { const d = Math.abs(xs(last + off(f)) - px); if (d < bd) { bd = d; best = {f: f}; } });
     if (!best) return;
     if (best.p) showTip(ev, [[fmtDay(best.p.d, true)], ['close', fmtMoney(best.p.c)]]);
-    else { const f = best.f; showTip(ev, [['N+' + f.h + ' · sell at the close of ' + f.exit_label], ['expected', fmtMoney(f.target)],
+    else { const f = best.f; showTip(ev, [['N+' + f.h + ' · measured at the close of ' + f.exit_label], ['expected', fmtMoney(f.target)],
       ['to ' + fmtMoney(f.hi50) + ' (50%)', fmtMoney(f.lo50)], ['to ' + fmtMoney(f.hi80) + ' (80%)', fmtMoney(f.lo80)]]); }
   });
   hit.addEventListener('pointerleave', hideTip);
@@ -84,7 +84,7 @@ function horizonTable(c, h){
   const cols = HS.map(x => fc(c, x));
   const cell = (cls, text, on) => el('div', {class: cls + (on ? ' sel' : ''), role: 'cell'}, text);
   g.append(cell('h l', ''), ...HS.map((x, i) => cell('h', 'N+' + x, x === h)));
-  [['Sell at close', f => f && f.exit_label ? f.exit_label.replace(/^\w+ /, '') : '–'],
+  [['Measured at close', f => f && f.exit_label ? f.exit_label.replace(/^\w+ /, '') : '–'],
    ['Expected', f => f ? fmtNum(f.target) : '–'],
    ['50% range', f => f ? rangeText(f.lo50, f.hi50) : '–'],
    ['80% range', f => f ? rangeText(f.lo80, f.hi80) : '–'],
@@ -177,7 +177,7 @@ function renderCards(){
   if (!list.length) cs.append(el('p', {class: 'empty'}, 'No company matches. Choose another sector or “All companies”.'));
   $('#f-count').textContent = list.length + ' of ' + COS.length + ' companies';
   const ex = exitOf(H);
-  $('#f-hzline').textContent = ex ? 'N+' + H + ': bought at the open of ' + fmtDay(ex.entry_date, true) + ', sold at the close of ' + ex.exit_label + '.' : '';
+  $('#f-hzline').textContent = ex ? 'N+' + H + ': from the opening price of ' + fmtDay(ex.entry_date, true) + ' to the close of ' + ex.exit_label + '.' : '';
 }
 function focusCard(t){
   fs.value = ''; fl.value = ''; renderCards();

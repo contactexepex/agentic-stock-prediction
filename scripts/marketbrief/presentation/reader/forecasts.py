@@ -46,32 +46,45 @@ def ranges_by_key(ctx: BuildContext, as_of: str) -> dict[tuple[str, int], dict]:
     return {(row["ticker"], int(row["horizon_days"])): row for row in company_sources.published_ranges(ctx, as_of)}
 
 
-def latest_changes(ctx: BuildContext, as_of: str) -> dict[tuple[str, int], dict]:
-    """(ticker, horizon) -> {range, score}: the change of the newest stored range and score run of the as-of date
-    from the run before it (company_history), over the previous as-of date and this one."""
+def previous_day_runs(ctx: BuildContext, as_of: str) -> dict[tuple[str, int], dict]:
+    """(ticker, horizon) -> {ranges, scores}: the last stored range run and score run of the previous as-of date
+    (B12's company_history rows, as of the cut-off): what the page's forecast is compared with."""
     previous = ctx.con.execute(PREVIOUS_AS_OF_SQL, [ctx.cutoff, as_of]).fetchone()[0]
-    history = company_history.forecast_history(ctx, str(previous)[:10] if previous else as_of, as_of)
+    if previous is None:
+        return {}
+    day = str(previous)[:10]
     out: dict[tuple[str, int], dict] = {}
-    for ticker, kinds in history.items():
+    for ticker, kinds in company_history.forecast_history(ctx, day, day).items():
         for kind in ("ranges", "scores"):
-            for row in kinds[kind]:   # by horizon then time: the last one per horizon is the newest
-                if row["as_of_date"] == as_of:
-                    out.setdefault((ticker, int(row["horizon_days"])), {})[kind] = row["change"]
+            for row in kinds[kind]:   # by horizon then time: the last one per horizon wins
+                out.setdefault((ticker, int(row["horizon_days"])), {})[kind] = row
     return out
 
 
-def change_record(change: dict, sources: dict) -> dict | None:
-    """The card's 'since the previous run' facts: target move (percent), P(up) move (fraction), news added."""
-    rng, score = change.get("ranges"), change.get("scores")
-    if not rng and not score:
+def news_ids(score: dict | None) -> list[str]:
+    """The news ids a score counted (its explanation's news block)."""
+    contributions = (score or {}).get("contributions") or {}
+    return list((contributions.get("news") or {}).get("ids") or [])
+
+
+def change_record(rng: dict | None, score: dict | None, previous: dict | None, sources: dict) -> dict | None:
+    """The card's 'since the previous day's forecast' facts: the shown expected price against the previous as-of
+    date's last range run (percent), the shown P(up) against its last score run (fraction), and the news ids the shown
+    score counts that the previous one did not (those with a headline). None without a previous run."""
+    old_rng, old_score = (previous or {}).get("ranges"), (previous or {}).get("scores")
+    if not old_rng and not old_score:
         return None
-    return {"since": (rng or {}).get("from_made_at") or (score or {}).get("from_computed_at"),
-            "target_pct": None if not rng else number(rng.get("target_pct"), 2),
-            "prob_pts": None if not score else number(score.get("prob_up"), 4),
-            "news_added": [nid for nid in (score or {}).get("news_added") or [] if nid in sources]}
+    target = None if not (rng and old_rng) else \
+        company_history.pct_move(rng.get("target_price"), old_rng["target_price"])
+    prob = None if not (score and old_score) or None in (score.get("prob_up"), old_score.get("prob_up")) \
+        else round(score["prob_up"] - old_score["prob_up"], 4)
+    old_ids = set((old_score or {}).get("news_ids") or [])
+    added = [nid for nid in news_ids(score) if nid not in old_ids and nid in sources] if old_score else []
+    return {"since": (old_rng or {}).get("made_at") or (old_score or {}).get("computed_at"),
+            "target_pct": None if target is None else round(target, 2), "prob_pts": prob, "news_added": added}
 
 
-def forecast(rng: dict | None, score: dict | None, change: dict | None, horizon: int, sources: dict) -> dict:
+def forecast(rng: dict | None, score: dict | None, previous: dict | None, horizon: int, sources: dict) -> dict:
     """One horizon of a card: expected price, 50%/80% range, P(up), lean, why, change."""
     prob = number(score.get("prob_up")) if score else None
     side, strength = why.lean(prob)
@@ -88,20 +101,20 @@ def forecast(rng: dict | None, score: dict | None, change: dict | None, horizon:
         "move_pct": None if not (base and target) else round((target / base - 1) * PCT, 2),
         "prob_up": prob, "base_rate": number(score.get("base_rate")) if score else None,
         "lean": side, "strength": strength, "why": why.why_line(score),
-        "change": change_record(change, sources) if change else None,
+        "change": change_record(rng, score, previous, sources),
     }
 
 
 def company_forecasts(ctx: BuildContext, as_of: str, tickers: list[str], sources: dict) -> dict[str, list[dict]]:
     """ticker -> its forecasts at READER_HORIZONS (only horizons with a range or a score)."""
-    ranges, scores, changes = ranges_by_key(ctx, as_of), scores_by_key(ctx, as_of), latest_changes(ctx, as_of)
+    ranges, scores, previous = ranges_by_key(ctx, as_of), scores_by_key(ctx, as_of), previous_day_runs(ctx, as_of)
     out: dict[str, list[dict]] = {}
     for ticker in tickers:
         rows = []
         for horizon in shown_horizons():
             key = (ticker, horizon)
             if key in ranges or key in scores:
-                rows.append(forecast(ranges.get(key), scores.get(key), changes.get(key), horizon, sources))
+                rows.append(forecast(ranges.get(key), scores.get(key), previous.get(key), horizon, sources))
         out[ticker] = rows
     return out
 

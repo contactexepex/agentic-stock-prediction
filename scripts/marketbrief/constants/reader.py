@@ -24,18 +24,21 @@ STRENGTH_CLEAR, STRENGTH_SLIGHT, STRENGTH_NONE = "clear", "slight", "none"
 
 MOOD_WORDS = {"CALM": "Calm", "TRENDING": "Trending", "EVENT_HEAVY": "Event-heavy", "UNSTABLE": "Unstable"}
 
-# the model's feature groups (model/explain.py) in plain words, by the side they push
-GROUP_PHRASES = {
-    "news": ("recent verified news is positive", "recent verified news is negative"),
-    "momentum": ("the recent price trend points up", "the recent price trend points down"),
-    "market": ("the overall market backdrop helps", "the overall market backdrop weighs"),
-    "oscillator": ("short-term price signals point up", "short-term price signals point down"),
-    "regime": ("the market mood tilts it up", "the market mood tilts it down"),
-    "relative strength": ("it has done better than its sector", "it has done worse than its sector"),
-    "volatility": ("its recent price swings tilt it up", "its recent price swings tilt it down"),
-    "volume": ("trading volume tilts it up", "trading volume tilts it down"),
+# the model's feature groups (model/explain.py) in plain words. A group's points are its push on the model's estimate
+# (coefficient x feature), not the state of the market (a falling price can push the estimate up), so the why line
+# names the group and its push only: "<label> push(es) the chance up/down"
+GROUP_LABELS = {   # group -> (label, plural)
+    "news": ("recent verified news", False),
+    "momentum": ("the model's price-trend signals", True),
+    "market": ("the model's whole-market signals", True),
+    "oscillator": ("the model's short-term price signals", True),
+    "regime": ("the market mood", False),
+    "relative strength": ("the model's relative-strength signals (vs the sector and the market)", True),
+    "volatility": ("the model's price-swing signals", True),
+    "volume": ("the model's trading-volume signals", True),
 }
-GROUP_FALLBACK = ("the {group} signals point up", "the {group} signals point down")
+GROUP_FALLBACK = "the model's {group} signals"
+GROUP_PUSH = "{label}{items} {verb} the chance {side}"
 GROUP_BASELINE = "baseline"
 
 WHY_NO_SCORE = "No model score for this horizon today."

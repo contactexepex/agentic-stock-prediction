@@ -380,7 +380,7 @@ def test_html_renders_in_a_browser_with_working_filters(tmp_path):
     assert out["errors"] == [] and out["overflow"] is False
     g = out["glance"]   # the 20-second top: mood, benchmark, leans, biggest moves, the paper line
     assert "Event-heavy" in g and "S&P 500" in g and "▼ −1.23%" in g and "1 lean up" in g and "0 lean down" in g
-    assert "sell at the close of Tue 6 Oct" in g and "AAPL Inc" in g and "+0.5% to $110.50" in g
+    assert "measured at the close of Tue 6 Oct" in g and "AAPL Inc" in g and "+0.5% to $110.50" in g
     assert "Paper only — no proven edge yet" in g and "Only 2 forecast ranges checked so far: too few to judge." in g
     assert "chance of going up +3.1 pts" in out["changes"] and "Fed cuts rates" in out["changes"]
     assert "Confirmed by 2+ outlets" in out["changes"] and "Evil news" in out["changes"] and "Contradicted" in out["changes"]
@@ -394,7 +394,8 @@ def test_html_renders_in_a_browser_with_working_filters(tmp_path):
     assert "Since the previous run (Fri 2 Oct, 12:00 UTC)" in text and "1 new news item counted" in text
     assert "No price range today" in text and "Some recent news was contradicted" in text
     assert "Bad link 3" in text                                          # unsafe links stay visible as plain text
-    assert out["sectors"] == ["", "Tech"] and out["tech"] == 2 and out["up"] == 1   # sectors of the shown companies and out["flagged"] == 2
+    assert out["sectors"] == ["", "Tech"] and out["tech"] == 2 and out["up"] == 1   # sectors of the shown companies
+    assert out["flagged"] == 2                                           # both cards carry a warning
     assert "Why line N+3." in out["n3"] and "53%" in out["n3"] and "N+3" in out["g3"]   # the horizon switch
     assert "Nothing has been checked yet" not in out["track"] and "80% ranges, N+1" in out["track"]
     assert out["hrefs"] and all(re.match(r"^(https?://|index\.html$|2026-10-05\.md$)", h) for h in out["hrefs"]), out["hrefs"]

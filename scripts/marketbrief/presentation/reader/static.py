@@ -16,11 +16,11 @@ def money(symbol: str, value) -> str:
     return "–" if value is None else f"{symbol}{value:,.2f}"
 
 
-def signed(value, unit: str = "%") -> str:
-    if value is None:
-        return "–"
-    sign = "+" if value > 0 else "−" if value < 0 else ""
-    return f"{sign}{abs(value):.2f}{unit}"
+def signed(value, digits: int = 2) -> str:
+    """A percent with its sign (a true minus), at `digits` decimals (the page's own rounding)."""
+    if value is None or round(abs(value), digits) == 0:
+        return "–" if value is None else f"{0:.{digits}f}%"
+    return f"{'+' if value > 0 else '−'}{abs(value):.{digits}f}%"
 
 
 def lean_word(row: dict | None) -> str:
@@ -47,7 +47,7 @@ def summary(data: dict, horizon: int) -> str:
     for ticker in glance.get("moves", []):
         row = next((f for f in by[ticker]["forecasts"] if f["h"] == horizon), None)
         if row:
-            parts.append(f"<li>Big expected move: {escape(names.get(ticker, ticker))} {signed(row['move_pct'])} to "
+            parts.append(f"<li>Big expected move: {escape(names.get(ticker, ticker))} {signed(row['move_pct'], 1)} to "
                          f"{money(symbol, row['target'])} by {escape(row['exit_label'] or '')}</li>")
     parts.append(f"<li><b>{escape(reader.get('paper_label') or '')}</b></li></ul>")
     return "".join(parts)
@@ -63,7 +63,7 @@ def company_table(company: dict, card: dict, horizon: int, symbol: str) -> str:
            f"<p>Last close {money(symbol, main['base_close'] if main else company.get('close'))}</p>"]
     if rows:
         out.append(f"<table><tr><th></th>{head}</tr>"
-                   + line("Sell at close", lambda r: escape(r["exit_label"] or "–"))
+                   + line("Measured at close", lambda r: escape(r["exit_label"] or "–"))
                    + line("Expected", lambda r: money(symbol, r["target"]))
                    + line("50% range", lambda r: rng(r["lo50"], r["hi50"]))
                    + line("80% range", lambda r: rng(r["lo80"], r["hi80"]))

@@ -19,12 +19,13 @@ def lean(prob_up: float | None) -> tuple[str, str]:
 
 
 def group_phrase(group: str, points: float, news_items: int | None) -> str:
-    """One feature group's push in plain words, with the news item count for the news group."""
-    up, down = text.GROUP_PHRASES.get(group, tuple(p.format(group=group) for p in text.GROUP_FALLBACK))
-    phrase = up if points > 0 else down
-    if group == "news" and news_items:
-        phrase += text.WHY_NEWS_ITEMS.format(n=news_items, s="" if news_items == 1 else "s")
-    return phrase
+    """One feature group's push on the model's estimate in plain words, with the item count for the news group:
+    'recent verified news (6 items) pushes the chance down'."""
+    label, plural = text.GROUP_LABELS.get(group, (text.GROUP_FALLBACK.format(group=group), True))
+    items = text.WHY_NEWS_ITEMS.format(n=news_items, s="" if news_items == 1 else "s") \
+        if group == "news" and news_items else ""
+    return text.GROUP_PUSH.format(label=label, items=items, verb="push" if plural else "pushes",
+                                  side="up" if points > 0 else "down")
 
 
 def reasons(contributions: dict | None) -> list[tuple[str, float]]:

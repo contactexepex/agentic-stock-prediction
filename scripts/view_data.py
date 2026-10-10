@@ -28,6 +28,9 @@ from marketbrief.presentation.horizon_names import horizon_name, primary_horizon
 from marketbrief.utils.money import format_money
 from marketbrief.utils.numbers import json_safe_float
 from marketbrief.pipeline.score_predictions import is_late
+from marketbrief.presentation.view_sql import (ANNOUNCEMENTS_SQL, BANDS_SQL, CONF_BANDS_SQL, FEATURES_SQL,  # noqa: F401
+                                               FILINGS_SQL, PREDICTIONS_SQL, RANGE_RECORD_EXACT, RANGES_SQL,
+                                               REGIME_SQL, SCORED_CALLS_SQL)
 
 CURRENCY = CURRENCY_SYMBOLS
 HISTORY_DAYS = 20        # trading days of closes shown before the forecast fan
@@ -86,28 +89,6 @@ def _list(v) -> list:
     return [x for x in list(v) if x is not None]
 
 
-# calls by stated-confidence band (exact decimal average: no dependence on row order) and the scored
-# calls in a fixed order for scoring.call_scores / reliability (docs/REFACTOR_PLAN.md, nondeterminism)
-# (per scoring basis key, never pooled: analytics/call_basis.py; {src} = the track record as of the day's made_at)
-BANDS_SQL = f"""SELECT CASE WHEN confidence < 0.6 THEN '50-59%' WHEN confidence < 0.7 THEN '60-69%'
-                          WHEN confidence < 0.8 THEN '70-79%' ELSE '80-90%' END AS band, {BASIS_KEY_SQL} AS label_basis,
-                     count(*) AS n, avg(TRY_CAST(confidence AS DECIMAL(38,10))) AS conf, avg(hit::INT) AS hit
-              FROM {{src}} GROUP BY ALL ORDER BY band, label_basis"""
-SCORED_CALLS_SQL = ("SELECT confidence, hit FROM {src} WHERE confidence IS NOT NULL AND hit IS NOT NULL "
-                    f"AND {BASIS_KEY_SQL} = ? ORDER BY id, scored_at")
-# the same for report.py: its confidence bands, and range_record with the averaged % columns as exact decimals
-CONF_BANDS_SQL = f"""SELECT CASE WHEN confidence < 0.6 THEN '0.50-0.59' WHEN confidence < 0.7 THEN '0.60-0.69'
-                               WHEN confidence < 0.8 THEN '0.70-0.79' ELSE '0.80-0.90' END AS band,
-                          {BASIS_KEY_SQL} AS label_basis, count(*) AS n,
-                          avg(TRY_CAST(confidence AS DECIMAL(38,10))) AS conf, avg(hit::INT) AS hit
-                   FROM track_record GROUP BY ALL ORDER BY band, label_basis"""
-EXACT_COLUMNS = ("width80_pct", "naive_width80_pct", "is80_pct", "naive_is80_pct", "center_err_pct",
-                 "naive_center_err_pct")
-RANGE_RECORD_EXACT = ("(SELECT * REPLACE ("
-                      + ", ".join(f"TRY_CAST({c} AS DECIMAL(38,10)) AS {c}" for c in EXACT_COLUMNS)
-                      + ") FROM range_record)")
-
-
 def record_text(n: int, hits: int, what: str) -> str:
     """Plain-language track record: a share once there is enough history, else a sample note."""
     if n == 0:
@@ -130,7 +111,7 @@ def asof_source(con, view: str, cutoff) -> str:
 def gather_view(cfg: dict, con, now: datetime | None = None) -> dict:
     q = lambda sql, p=None: con.execute(sql, p or []).df()  # noqa: E731
     cur = cfg.get("currency", "")
-    ranges = q("SELECT * FROM ranges_latest WHERE as_of_date = (SELECT max(as_of_date) FROM ranges_latest)")
+    ranges = q(RANGES_SQL)
     if ranges.empty:
         raise SystemExit(MSG_NO_PUBLISHED_RANGES)
     as_of = pd.Timestamp(ranges["as_of_date"].iloc[0]).date()
@@ -140,8 +121,8 @@ def gather_view(cfg: dict, con, now: datetime | None = None) -> dict:
     calls_seen = q(f"SELECT id, made_at, {BASIS_KEY_SQL} AS label_basis FROM {trs}")
     basis = call_basis.current(calls_seen) or LABEL_CLOSE_TO_CLOSE  # per-company and proper scores: this basis
 
-    regime = q("SELECT * FROM regime_latest ORDER BY as_of_date DESC LIMIT 1")
-    feats = q("SELECT * FROM features_latest WHERE as_of_date = ?", [as_of]).set_index("ticker")
+    regime = q(REGIME_SQL)
+    feats = q(FEATURES_SQL, [as_of]).set_index("ticker")
     tickers = list(cfg["tickers"])
     hist = q(f"""SELECT ticker, date, close FROM (
                    SELECT *, row_number() OVER (PARTITION BY ticker ORDER BY date DESC) AS k
@@ -150,17 +131,14 @@ def gather_view(cfg: dict, con, now: datetime | None = None) -> dict:
                sum(hit50::INT) AS h50 FROM {rrs} GROUP BY ticker, h, label ORDER BY ticker, h, {LABEL_ORDER_SQL}""")
     tr = q(f"SELECT ticker, count(*) AS n, sum(hit::INT) AS hits FROM {trs} WHERE {BASIS_KEY_SQL} = ? "
            "GROUP BY ALL ORDER BY ticker", [basis])
-    preds = q("SELECT DISTINCT ON (id) * FROM predictions WHERE as_of_date = ? ORDER BY id, made_at", [as_of]) \
+    preds = q(PREDICTIONS_SQL, [as_of]) \
         if _has_rows(con, "predictions") else pd.DataFrame()
     news = q("""SELECT n.id, n.title, n.url, n.source, coalesce(n.published_at, n.first_seen_at) AS ts, n.tickers,
                        e.materiality, e.relevance, e.summary
                 FROM (SELECT DISTINCT ON (id) * FROM news_asof(coalesce($at, now())) ORDER BY id, first_seen_at) n
                 LEFT JOIN news_enriched_asof(coalesce($at, now())) e USING (id) ORDER BY id""", {"at": now})
-    filings = q("SELECT DISTINCT ON (id) id, ticker, form, url, accepted_at, description FROM filings "
-                "ORDER BY id, first_seen_at, ticker, form, url, accepted_at, description") \
-        if _has_rows(con, "filings") else pd.DataFrame()
-    anns = q("SELECT id, ticker, subject, url, published_at, source FROM announcements_latest ORDER BY id") \
-        if _has_rows(con, "announcements") else pd.DataFrame()
+    filings = q(FILINGS_SQL) if _has_rows(con, "filings") else pd.DataFrame()
+    anns = q(ANNOUNCEMENTS_SQL) if _has_rows(con, "announcements") else pd.DataFrame()
     cevents = q("SELECT date, type, ticker, name, amount FROM company_events WHERE date BETWEEN ? AND ? "
                 "ORDER BY date, ticker, type, name",
                 [as_of, as_of + timedelta(days=21)])
