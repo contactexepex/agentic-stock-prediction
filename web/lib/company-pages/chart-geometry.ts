@@ -1,13 +1,14 @@
 // Geometry of the company page's price chart (design/mockups/03-company/template.html drawChart): candles and volume
-// of the stored sessions, then FUT wider slots for the N+1..N+5 exit sessions where the reference strategy's fan
+// of the stored sessions, then FUT wider slots for the N+1..N+5 exit sessions where the published ranges' fan
 // (50% and 80% ranges from the last close), its targets and the spread of every strategy's target at the selected
 // horizon are drawn. Pure: the component renders the returned numbers as SVG.
 import { niceTicks } from "../ui/scales.ts";
+import type { RangeRow } from "./company-logic.ts";
 import type { Bar, Prediction } from "./types.ts";
 
 export interface ChartInput {
   bars: Bar[]; width: number; horizons: number[]; horizon: number;
-  reference: Prediction[];   // the reference strategy's predictions with ranges, one per horizon
+  reference: RangeRow[];     // the published ranges (company-logic publishedRanges), one per horizon
   atHorizon: Prediction[];   // every strategy's prediction at the selected horizon with a target
   tagWidth: number;          // width of the last-close tag text, measured by the caller
 }
@@ -27,7 +28,7 @@ export interface ChartGeometry {
 const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 export const PHONE_WIDTH = 560, PHONE_SESSIONS = 30, FUTURE_SLOTS = 5;
 
-const hasRange = (r: Prediction): r is Prediction & { lo50: number; hi50: number; lo80: number; hi80: number; target_price: number } =>
+const hasRange = (r: RangeRow): r is RangeRow & { lo50: number; hi50: number; lo80: number; hi80: number; target_price: number } =>
   r.lo50 != null && r.hi50 != null && r.lo80 != null && r.hi80 != null && r.target_price != null;
 
 export function chartGeometry(input: ChartInput): ChartGeometry | null {
@@ -40,7 +41,7 @@ export function chartGeometry(input: ChartInput): ChartGeometry | null {
   const FS = phone ? 2.4 : 2.2, step = (W - L - R) / (n + FUTURE_SLOTS * FS + 0.5);
   const x = (i: number) => L + (i < n ? (i + 0.5) * step : (n - 0.5) * step + (i - n + 1) * step * FS);
   const bw = Math.max(2, Math.min(12, step * 0.62)), labelAll = step * FS >= 22;
-  const ref = input.horizons.map(k => input.reference.find(r => r.horizon_days === k)).filter((r): r is Prediction => !!r).filter(hasRange);
+  const ref = input.horizons.map(k => input.reference.find(r => r.horizon_days === k)).filter((r): r is RangeRow => !!r).filter(hasRange);
   const at = input.atHorizon.filter(r => r.target_price != null);
   let lo = Math.min(...bars.map(b => b.low)), hi = Math.max(...bars.map(b => b.high));
   for (const r of ref) { lo = Math.min(lo, r.lo80); hi = Math.max(hi, r.hi80); }

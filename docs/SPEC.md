@@ -516,8 +516,10 @@ a second Vercel project, the gateway (`MB_GATEWAY=1`), without Vercel Authentica
 its middleware serves only `/slack/*` (every request verified with Slack's
 signing secret and refused when older than 5 minutes), `/mcp` (GitHub OAuth; only the owner's
 GitHub account is accepted) and the OAuth routes the MCP sign-in needs (`/.well-known/oauth-*`,
-authorize, token and callback). It exposes no pages and no `/api/v1` routes; it holds only what the tool
-layer needs (the MotherDuck read token, the inbox token, the dispatch token, the Anthropic key for
+authorize, token and callback), plus GET `/brief/{india|us}/{date}-{32 hex}`: the daily brief linked
+from Slack, public and read-only behind an unguessable token (404 on a bad one, noindex; owner decision
+2026-10-10; C2's handler). It exposes no other pages and no `/api/v1` routes; it holds only what the tool
+layer and the brief need (the MotherDuck read token, the inbox token, the dispatch token, the Anthropic key for
 `/ask`). No bypass secret is ever put in a URL.
 
 **Write path from the web tier.** The API appends the request to an inbox (ARCHITECTURE.md section 9)
@@ -655,7 +657,7 @@ trades to rank"), and keeps the best strategy overall beside the per-company bes
 | Claude Code routines | all computation and agents (schedules below); builds in cloud sessions | none |
 | GitHub | source of truth (`data/`), CI, Actions workflow `onboard.yml` for writes from the web tier | a fine-grained token (Actions read and write, this repo only) for Vercel |
 | MotherDuck | `market_brief` (`base`, `rm`, `meta`, `app`) and `market_brief_inbox` | a read-only token for the dashboard; the owner's all-privileges token for the inbox (owner decision 2026-10-08) |
-| Vercel | the `web/` app as two projects: the dashboard (Vercel Authentication) and the gateway (`MB_GATEWAY=1`, no Vercel Authentication, only `/slack/*`, `/mcp` and its OAuth routes); the existing `reports/` site until retired | create the two projects; add environment variables |
+| Vercel | the `web/` app as two projects: the dashboard (Vercel Authentication) and the gateway (`MB_GATEWAY=1`, no Vercel Authentication, only `/slack/*`, `/mcp` and its OAuth routes and the public daily brief `/brief/...`); the existing `reports/` site until retired | create the two projects; add environment variables |
 | Slack | existing app gains `/company`, `/trade`, `/ask` and interactivity pointing at the gateway | add the commands and the request URL in the Slack app settings (exact steps provided) |
 | Claude app | custom connector to the gateway's `/mcp` with GitHub sign-in | add the connector once `/mcp` is live |
 | Anthropic API | dashboard chat and `/ask` | a dedicated workspace with a $20 monthly spend limit and a key in it |

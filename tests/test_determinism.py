@@ -191,7 +191,8 @@ def test_percent_half_up_same_in_markdown_and_html():
     node = shutil.which("node")
     if not node:
         pytest.skip("node not installed")
-    line = next(x for x in (Path(html_report.__file__).read_text().splitlines()) if x.startswith("const pct0 ="))
+    page_js = Path(html_report.__file__).parent / "marketbrief" / "presentation" / "reader" / "assets" / "base.js"
+    line = next(x for x in page_js.read_text().splitlines() if x.startswith("const pct0 ="))
     js = line.split("//")[0] + f"\nconsole.log(JSON.stringify({json.dumps(SHARES)}.map(pct0)));"
     out = subprocess.run([node, "-e", js], capture_output=True, text=True, check=True).stdout
     assert json.loads(out) == [scoring.percent(v) for v in SHARES]

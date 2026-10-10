@@ -16,3 +16,10 @@ def load_settings():
 def load_validate_config():
     """config/validate.yaml as parsed (the daily run's validation thresholds)."""
     return yaml.safe_load((paths.CONFIG / FILE_VALIDATE_CONFIG).read_text())
+
+
+
+def slack_link_url() -> str | None:
+    """The base address of Slack links (config/settings.yaml slack_link_url; a market's page is
+    <slack_link_url>/<market>); None when not configured."""
+    return (load_settings() or {}).get("slack_link_url") or None

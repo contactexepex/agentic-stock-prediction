@@ -34,10 +34,21 @@ async function tableChecks(page) {
   return problems;
 }
 
+/** B11's `published_ranges` (ranges.py's range per company and horizon, live or not) is not in the design-closed mockup,
+ *  so the cases derive it from the mockup's reference-strategy `ranges`, which carry the same band fields. */
+const withPublished = (p) => ({
+  ...p,
+  published_ranges: p.ranges.map((r) => ({ ticker: r.ticker, horizon_days: r.horizon_days, base_close: r.base_close, target_price: r.target_price, lo50: r.lo50, hi50: r.hi50, lo80: r.lo80, hi80: r.hi80 })),
+});
+const publishedApi = (rest, market) => (rest === "watchlist" ? { status: 200, body: envelope(market, "_", withPublished(mockupPayload("02-watchlist", market))) } : undefined);
+
+/** The Range column reads `published_ranges` only: with live `ranges` but no published ones it shows none. */
+const liveRangesOnlyApi = (rest, market) => (rest === "watchlist" ? { status: 200, body: envelope(market, "_", { ...mockupPayload("02-watchlist", market), published_ranges: [] }) } : undefined);
+
 /** A flagged check shows a warning label with its count on the company's row and in the KPI. */
 const flaggedApi = (rest, market) => {
   if (rest !== "watchlist") return undefined;
-  const p = mockupPayload("02-watchlist", market);
+  const p = withPublished(mockupPayload("02-watchlist", market));
   const checks = p.trade_checks.map((c, i) => (i === 0 ? { ...c, flagged: true, flags: ["outside_range"] } : c));
   return { status: 200, body: envelope(market, "_", { ...p, trade_checks: checks }) };
 };
@@ -49,11 +60,21 @@ export const cases = [
     mockup: "02-watchlist",
     widths: [1280],
     waitFor: "table.wl",
+    api: publishedApi,
     expectText: ["No proven strong signals today", "Companies followed", "Most agreed at N+1", "12 of 15 buy", "3 of 3 companies", "Not listed: InterGlobe Aviation (IndiGo)", "manage on the Companies page"],
     expectSelector: ["table.wl tbody tr.row", ".rng svg", ".hzb svg", ".mb-agbar"],
   },
-  { name: "watchlist-india-narrow", path: "/india/watchlist", mockup: "02-watchlist", widths: [1024, 768, 390], waitFor: "table.wl", expectText: ["Most agreed at N+1", "RELIANCE"] },
-  { name: "watchlist-india-table", path: "/india/watchlist", mockup: "02-watchlist", widths: [1440], waitFor: "table.wl", check: tableChecks },
-  { name: "watchlist-us", path: "/us/watchlist", market: "us", mockup: "02-watchlist", widths: [1280], waitFor: "table.wl", expectText: ["NVDA", "14 of 15 buy", "No check yet", "first intraday check pending"] },
+  { name: "watchlist-india-narrow", path: "/india/watchlist", mockup: "02-watchlist", widths: [1024, 768, 390], waitFor: "table.wl", api: publishedApi, expectText: ["Most agreed at N+1", "RELIANCE"] },
+  { name: "watchlist-india-table", path: "/india/watchlist", mockup: "02-watchlist", widths: [1440], waitFor: "table.wl", api: publishedApi, check: tableChecks },
+  { name: "watchlist-us", path: "/us/watchlist", market: "us", mockup: "02-watchlist", widths: [1280], waitFor: "table.wl", api: publishedApi, expectText: ["NVDA", "14 of 15 buy", "No check yet", "first intraday check pending"] },
   { name: "watchlist-flagged", path: "/india/watchlist", mockup: "02-watchlist", widths: [1280], waitFor: "table.wl", api: flaggedApi, expectText: ["Flagged today", "1 of 4"], expectSelector: ["table.wl .mb-label.warn"] },
+  {
+    name: "watchlist-published-only",
+    path: "/india/watchlist",
+    mockup: "02-watchlist",
+    widths: [1280],
+    waitFor: "table.wl",
+    api: liveRangesOnlyApi,
+    check: async (page) => ((await page.locator("table.wl .rng").count()) === 0 ? [] : ["the Range column drew live ranges although published_ranges is empty"]),
+  },
 ];

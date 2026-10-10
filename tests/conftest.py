@@ -198,6 +198,7 @@ SLOW = {
 def pytest_configure(config):
     for k in PROXY_VARS:
         os.environ.pop(k, None)
+    os.environ.pop("BRIEF_LINK_SECRET", None)   # the public brief's secret (C2): tests set it themselves where needed
     os.environ["MB_NETGUARD"] = "on"
     paths = [p for p in os.environ.get("PYTHONPATH", "").split(os.pathsep) if p]
     if str(NETGUARD) not in paths:

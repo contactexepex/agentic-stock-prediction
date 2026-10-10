@@ -1,106 +1,525 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>India (NSE) briefs</title><style>
-/* Layout: one reading column; summary, then one filter row scoping overview charts and company cards. */
-:root{
-  --page:#f4f4f1; --surface:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --muted:#6f6d68; --grid:#e1e0d9;
-  --axis:#c3c2b7; --border:rgba(11,11,11,.10); --accent:#2a78d6; --accent-ink:#1c5cab;
-  --band80:rgba(42,120,214,.16); --band50:rgba(42,120,214,.34); --late:rgba(137,135,129,.22);
-  --up:#2a78d6; --down:#e34948; --call2:#eb6834; --warn-bg:#fff4dc; --warn-ink:#7a5200;
-  --pill:#ecebe6; --font:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
-  color-scheme:light;
+<meta name="color-scheme" content="light dark">
+<title>India (NSE) briefs</title><style>/* market-brief cockpit: design tokens, scheme v2 "modern admin light" (2026-10-08).
+   The owner asked for the look of modern admin templates (Pixinvent Materialize with its semi-dark vertical
+   menu, Aurora) applied to a broker-style cockpit: a soft light-grey page, white cards lifted by a faint shadow
+   (no hairline borders), one periwinkle-indigo accent, a dark navy sidebar with labels, icon tiles on the KPI
+   cards, gradient area charts, generous spacing. Token names keep the Material role vocabulary
+   (--md-sys-color-*) so components.css and every page need no renaming; the previous scheme ("terminal
+   light") used the same names with other values.
+   Verdict rule (owner): NO is red; YES is green, darker green for a strong signal, lighter green for an okay
+   one. Up/down/hit/miss always carry a glyph and a word. Text tones are AA on white (figures in the comments);
+   the vivid template tones live on fills and tints with a dark ink on them.
+   Self-contained: no @import, no font files, system font stack. */
+:root {
+  color-scheme: light;
+
+  /* ---- Colour roles --------------------------------------------------------------------- */
+  --md-sys-color-primary: #5a5ee6;                 /* periwinkle indigo (5.0:1 on white) */
+  --md-sys-color-on-primary: #ffffff;
+  --md-sys-color-primary-container: #e9eaff;       /* accent tint: selected segment, icon tiles */
+  --md-sys-color-on-primary-container: #3a3db8;    /* 7.0:1 on the tint */
+  --md-sys-color-secondary: #65708a;
+  --md-sys-color-on-secondary: #ffffff;
+  --md-sys-color-secondary-container: #eef0f5;
+  --md-sys-color-on-secondary-container: #3f4756;
+  --md-sys-color-tertiary: #7c3aed;
+  --md-sys-color-on-tertiary: #ffffff;
+  --md-sys-color-tertiary-container: #f1ebff;      /* Paper tag */
+  --md-sys-color-on-tertiary-container: #5b21b6;
+  --md-sys-color-error: #dc2626;
+  --md-sys-color-on-error: #ffffff;
+  --md-sys-color-error-container: #fde8e8;
+  --md-sys-color-on-error-container: #991b1b;
+  --md-sys-color-surface: #ffffff;
+  --md-sys-color-on-surface: #4b465c;              /* ink, 9.0:1 on white */
+  --md-sys-color-surface-variant: #f3f4f8;
+  --md-sys-color-on-surface-variant: #65708a;      /* muted labels, 5.0:1 on white */
+  --md-sys-color-surface-dim: #e4e6ee;
+  --md-sys-color-surface-bright: #ffffff;
+  --md-sys-color-surface-container-lowest: #ffffff; /* cards */
+  --md-sys-color-surface-container-low: #f7f7f9;    /* the page */
+  --md-sys-color-surface-container: #f3f4f8;        /* tiles, table heads, inputs */
+  --md-sys-color-surface-container-high: #eceef3;   /* table rules, dividers */
+  --md-sys-color-surface-container-highest: #e4e6ee;
+  --md-sys-color-outline: #a3a9b8;
+  --md-sys-color-outline-variant: #e7e9ef;          /* control borders */
+  --md-sys-color-inverse-surface: #2f3349;          /* tooltips, the sidebar */
+  --md-sys-color-inverse-on-surface: #f4f5fa;
+  --md-sys-color-inverse-primary: #b4b6ff;
+  --md-sys-color-surface-tint: #5a5ee6;
+  --md-sys-color-background: #f7f7f9;
+  --md-sys-color-on-background: #4b465c;
+  --md-sys-color-scrim: #000000;
+  --md-sys-color-shadow: #2f3349;
+
+  /* ---- Sidebar (semi-dark vertical menu) -------------------------------------------------- */
+  --mb-sidebar-bg: #2f3349;
+  --mb-sidebar-ink: #d7d8e5;         /* 8.8:1 on the sidebar */
+  --mb-sidebar-muted: #9fa2b7;       /* 4.9:1 */
+  --mb-sidebar-active: linear-gradient(72deg, #5a5ee6 0%, #7a7df0 100%);
+  --mb-sidebar-active-shadow: 0 4px 12px rgba(90, 94, 230, .45);
+
+  /* ---- Semantic tokens (finance) --------------------------------------------------------
+     up/hit = green, down/miss = red; text tones 5.0:1 / 4.8:1 on white. The tints are fresher than
+     before (template "label" badges): ink on tint 6.4:1 / 7.1:1 / 4.6:1. */
+  --mb-color-up: #15803d;
+  --mb-color-on-up: #ffffff;
+  --mb-color-up-container: #e3f8e9;
+  --mb-color-on-up-container: #166534;
+  --mb-color-down: #dc2626;
+  --mb-color-on-down: #ffffff;
+  --mb-color-down-container: #fde8e8;
+  --mb-color-on-down-container: #991b1b;
+  --mb-color-neutral: #65708a;
+  --mb-color-on-neutral: #ffffff;
+  --mb-color-neutral-container: #eef0f5;
+  --mb-color-on-neutral-container: #3f4756;
+  --mb-color-warn: #e07b00;               /* "direction unclear", flags (icons and fills) */
+  --mb-color-on-warn: #ffffff;
+  --mb-color-warn-container: #fff3e0;
+  --mb-color-on-warn-container: #b45309;  /* 4.6:1 on the tint, 5.0:1 on white */
+  --mb-color-info: #0b8fa6;
+  --mb-color-info-container: #e0f7fb;
+  --mb-color-on-info-container: #0c5d6b;
+  --mb-color-hit: var(--mb-color-up);
+  --mb-color-hit-container: var(--mb-color-up-container);
+  --mb-color-on-hit-container: var(--mb-color-on-up-container);
+  --mb-color-miss: var(--mb-color-down);
+  --mb-color-miss-container: var(--mb-color-down-container);
+  --mb-color-on-miss-container: var(--mb-color-on-down-container);
+  /* Verdict (decision header) */
+  --mb-verdict-no-bg: #fde8e8;        --mb-verdict-no-box: #dc2626;    --mb-verdict-no-ink: #991b1b;
+  --mb-verdict-strong-bg: #bff0cf;    --mb-verdict-strong-box: #166534; --mb-verdict-strong-ink: #14532d;
+  --mb-verdict-ok-bg: #e3f8e9;        --mb-verdict-ok-box: #15803d;    --mb-verdict-ok-ink: #166534;
+  /* Provenance labels: Live (green tint), Back-test (hatched accent tint), Mock (dashed), Paper (violet tint).
+     Each has a texture or border style besides its colour. */
+  --mb-color-live: var(--mb-color-up);
+  --mb-color-live-container: var(--mb-color-up-container);
+  --mb-color-on-live-container: var(--mb-color-on-up-container);
+  --mb-color-backtest: var(--md-sys-color-primary);
+  --mb-color-backtest-container: repeating-linear-gradient(135deg, rgba(90,94,230,.14) 0 3px, transparent 3px 6px);
+  --mb-color-on-backtest-container: var(--md-sys-color-on-primary-container);
+  --mb-color-mock: var(--md-sys-color-outline);
+  --mb-color-on-mock-container: var(--md-sys-color-on-surface-variant);
+  --mb-color-paper: var(--md-sys-color-tertiary);
+  --mb-color-paper-container: var(--md-sys-color-tertiary-container);
+  --mb-color-on-paper-container: var(--md-sys-color-on-tertiary-container);
+
+  /* ---- Chart tokens (dataviz skill) ------------------------------------------------------- */
+  --mb-chart-surface: var(--md-sys-color-surface-container-lowest);
+  --mb-chart-1: #5a5ee6;   /* series 1 = the accent: ranges, model, rule strategies, everything "ours" */
+  --mb-chart-2: #e07b00;   /* series 2 (orange; 3.0:1 on white: shapes with direct labels) */
+  --mb-chart-3: #0b8fa6;   /* series 3 (teal, 3.8:1) */
+  --mb-chart-4: #d6338f;   /* series 4 (pink, 4.4:1) */
+  --mb-chart-1-fill: rgba(90,94,230,.28);     /* gradient top of an area chart, fades to 0 */
+  --mb-chart-2-fill: rgba(224,123,0,.22);
+  --mb-chart-3-fill: rgba(11,143,166,.22);
+  --mb-chart-band-50: rgba(90,94,230,.30);   /* inner band, series 1 */
+  --mb-chart-band-80: rgba(90,94,230,.12);   /* outer band */
+  --mb-chart-fan: rgba(90,94,230,.10);
+  --mb-chart-ink: var(--md-sys-color-on-surface);           /* the actual line */
+  --mb-chart-grid: var(--md-sys-color-surface-container-high);
+  --mb-chart-axis: var(--md-sys-color-outline-variant);
+  --mb-chart-label: var(--md-sys-color-on-surface-variant);
+  --mb-chart-future: var(--md-sys-color-surface-container-low);
+
+  /* ---- Typography: M3 type scale on the system sans ------------------------------------ */
+  --md-ref-typeface-plain: "Inter", "Public Sans", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  --md-ref-typeface-brand: var(--md-ref-typeface-plain);
+  --md-ref-typeface-mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --md-sys-typescale-display-large: 400 57px/64px var(--md-ref-typeface-brand);
+  --md-sys-typescale-display-medium: 400 45px/52px var(--md-ref-typeface-brand);
+  --md-sys-typescale-display-small: 400 36px/44px var(--md-ref-typeface-brand);
+  --md-sys-typescale-headline-large: 600 32px/40px var(--md-ref-typeface-brand);
+  --md-sys-typescale-headline-medium: 600 28px/36px var(--md-ref-typeface-brand);
+  --md-sys-typescale-headline-small: 600 24px/32px var(--md-ref-typeface-brand);
+  --md-sys-typescale-title-large: 600 22px/28px var(--md-ref-typeface-brand);
+  --md-sys-typescale-title-medium: 600 16px/24px var(--md-ref-typeface-plain);
+  --md-sys-typescale-title-small: 600 14px/20px var(--md-ref-typeface-plain);
+  --md-sys-typescale-body-large: 400 16px/24px var(--md-ref-typeface-plain);
+  --md-sys-typescale-body-medium: 400 14px/22px var(--md-ref-typeface-plain);
+  --md-sys-typescale-body-small: 400 12.5px/18px var(--md-ref-typeface-plain);
+  --md-sys-typescale-label-large: 500 14px/20px var(--md-ref-typeface-plain);
+  --md-sys-typescale-label-medium: 500 12.5px/16px var(--md-ref-typeface-plain);
+  --md-sys-typescale-label-small: 500 11px/16px var(--md-ref-typeface-plain);
+  --md-sys-typescale-label-large-tracking: 0.1px;
+  --md-sys-typescale-label-medium-tracking: 0.3px;
+  --md-sys-typescale-label-small-tracking: 0.4px;
+  --md-sys-typescale-title-medium-tracking: 0.1px;
+  --md-sys-typescale-body-medium-tracking: 0.15px;
+  --md-sys-typescale-body-small-tracking: 0.3px;
+
+  /* ---- Shape ---------------------------------------------------------------------------- */
+  --md-sys-shape-corner-none: 0;
+  --md-sys-shape-corner-extra-small: 6px;
+  --md-sys-shape-corner-small: 8px;
+  --md-sys-shape-corner-medium: 12px;
+  --md-sys-shape-corner-large: 16px;
+  --md-sys-shape-corner-extra-large: 28px;
+  --md-sys-shape-corner-full: 9999px;
+  --mb-card-radius: 12px;        /* cards */
+  --mb-panel-radius: 10px;       /* tiles and columns inside a card */
+  --mb-card-border: 1px solid transparent;   /* cards are lifted by a shadow, not a hairline */
+  --mb-card-shadow: 0 2px 8px rgba(47, 51, 73, .08), 0 0 1px rgba(47, 51, 73, .14);
+  --mb-card-shadow-hover: 0 6px 18px rgba(47, 51, 73, .12), 0 0 1px rgba(47, 51, 73, .14);
+
+  /* ---- Elevation (soft, template-like) --------------------------------------------------- */
+  --md-sys-elevation-0: none;
+  --md-sys-elevation-1: var(--mb-card-shadow);
+  --md-sys-elevation-2: 0 4px 14px rgba(47, 51, 73, .12), 0 0 1px rgba(47, 51, 73, .16);
+  --md-sys-elevation-3: 0 8px 24px rgba(47, 51, 73, .16), 0 0 1px rgba(47, 51, 73, .18);
+  --md-sys-elevation-4: 0 12px 32px rgba(47, 51, 73, .18);
+  --md-sys-elevation-5: 0 16px 40px rgba(47, 51, 73, .22);
+
+  /* ---- State layers --------------------------------------------------------------------- */
+  --md-sys-state-hover-opacity: .08;
+  --md-sys-state-focus-opacity: .10;
+  --md-sys-state-pressed-opacity: .10;
+  --md-sys-state-dragged-opacity: .16;
+  --md-sys-state-disabled-opacity: .38;
+  --md-sys-state-disabled-container-opacity: .12;
+
+  /* ---- Spacing (4px grid) and layout ---------------------------------------------------- */
+  --mb-space-1: 4px; --mb-space-2: 8px; --mb-space-3: 12px; --mb-space-4: 16px; --mb-space-5: 20px;
+  --mb-space-6: 24px; --mb-space-8: 32px; --mb-space-10: 40px; --mb-space-12: 48px;
+  --mb-gutter: 16px;            /* phone side gutter (never less) */
+  --mb-gutter-desktop: 24px;
+  --mb-content-max: 1240px;
+  --mb-sidebar-width: 256px;    /* vertical menu with labels (>= 1200px) */
+  --mb-rail-width: 76px;        /* collapsed menu, icons only (600-1199px) */
+  --mb-navbar-height: 72px;     /* navigation bar (phone) */
+  --mb-topbar-height: 64px;
+
+  /* ---- Motion --------------------------------------------------------------------------- */
+  --md-sys-motion-duration-short: 120ms;
+  --md-sys-motion-duration-medium: 250ms;
+  --md-sys-motion-easing-standard: cubic-bezier(.2, 0, 0, 1);
+
+  /* ---- Focus ring ----------------------------------------------------------------------- */
+  --mb-focus-ring: 0 0 0 2px var(--md-sys-color-surface), 0 0 0 4px var(--md-sys-color-primary);
 }
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --page:#0d0d0d; --surface:#1a1a19; --ink:#ffffff; --ink2:#c3c2b7; --muted:#a3a198; --grid:#2c2c2a;
-  --axis:#383835; --border:rgba(255,255,255,.10); --accent:#3987e5; --accent-ink:#86b6ef;
-  --band80:rgba(57,135,229,.20); --band50:rgba(57,135,229,.42); --late:rgba(137,135,129,.28);
-  --up:#3987e5; --down:#e66767; --call2:#d95926; --warn-bg:#3a2e12; --warn-ink:#f3cf83; --pill:#2a2a28;
-  color-scheme:dark;}}
-:root[data-theme="dark"]{
-  --page:#0d0d0d; --surface:#1a1a19; --ink:#ffffff; --ink2:#c3c2b7; --muted:#a3a198; --grid:#2c2c2a;
-  --axis:#383835; --border:rgba(255,255,255,.10); --accent:#3987e5; --accent-ink:#86b6ef;
-  --band80:rgba(57,135,229,.20); --band50:rgba(57,135,229,.42); --late:rgba(137,135,129,.28);
-  --up:#3987e5; --down:#e66767; --call2:#d95926; --warn-bg:#3a2e12; --warn-ink:#f3cf83; --pill:#2a2a28;
-  color-scheme:dark;}
+
+/* Type role utility classes (apply to any element) */
+.md-display-large { font: var(--md-sys-typescale-display-large); letter-spacing: -0.25px; }
+.md-display-medium { font: var(--md-sys-typescale-display-medium); }
+.md-display-small { font: var(--md-sys-typescale-display-small); }
+.md-headline-large { font: var(--md-sys-typescale-headline-large); }
+.md-headline-medium { font: var(--md-sys-typescale-headline-medium); }
+.md-headline-small { font: var(--md-sys-typescale-headline-small); }
+.md-title-large { font: var(--md-sys-typescale-title-large); }
+.md-title-medium { font: var(--md-sys-typescale-title-medium); letter-spacing: var(--md-sys-typescale-title-medium-tracking); }
+.md-title-small { font: var(--md-sys-typescale-title-small); letter-spacing: 0.1px; }
+.md-body-large { font: var(--md-sys-typescale-body-large); letter-spacing: 0.3px; }
+.md-body-medium { font: var(--md-sys-typescale-body-medium); letter-spacing: var(--md-sys-typescale-body-medium-tracking); }
+.md-body-small { font: var(--md-sys-typescale-body-small); letter-spacing: var(--md-sys-typescale-body-small-tracking); }
+.md-label-large { font: var(--md-sys-typescale-label-large); letter-spacing: var(--md-sys-typescale-label-large-tracking); }
+.md-label-medium { font: var(--md-sys-typescale-label-medium); letter-spacing: var(--md-sys-typescale-label-medium-tracking); }
+.md-label-small { font: var(--md-sys-typescale-label-small); letter-spacing: var(--md-sys-typescale-label-small-tracking); }
+.md-numeric { font-variant-numeric: tabular-nums; }
+.md-micro { font: 500 11px/16px var(--md-ref-typeface-plain); letter-spacing: .06em; text-transform: uppercase; color: var(--md-sys-color-on-surface-variant); }
+
+/* market-brief cockpit: DARK colour roles of the design tokens (generated by design/system/dark_tokens.py; edit
+   the DARK table there and rerun). Same token names as tokens.css, colour roles only. Opt-in: inline this file after
+   tokens.css; the web app does not import it. Applies when the reader's system asks for dark (unless the page sets
+   data-theme="light") or when the page sets data-theme="dark". Every text pair is WCAG AA (4.5:1), checked by
+   `python design/system/dark_tokens.py --check`. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --md-sys-color-primary: #a8aafa;
+  --md-sys-color-on-primary: #1d1f45;
+  --md-sys-color-primary-container: #3a3d73;
+  --md-sys-color-on-primary-container: #d4d5ff;
+  --md-sys-color-secondary: #a3a9bd;
+  --md-sys-color-on-secondary: #25293c;
+  --md-sys-color-secondary-container: #3b4057;
+  --md-sys-color-on-secondary-container: #d7d9e6;
+  --md-sys-color-tertiary: #b9a3fb;
+  --md-sys-color-on-tertiary: #2a1d52;
+  --md-sys-color-tertiary-container: #3d3170;
+  --md-sys-color-on-tertiary-container: #ddd2ff;
+  --md-sys-color-error: #fb8585;
+  --md-sys-color-on-error: #3b0d0d;
+  --md-sys-color-error-container: #4c2429;
+  --md-sys-color-on-error-container: #fecaca;
+  --md-sys-color-surface: #2f3349;
+  --md-sys-color-on-surface: #dfe0ec;
+  --md-sys-color-surface-variant: #363b53;
+  --md-sys-color-on-surface-variant: #bac0d2;
+  --md-sys-color-surface-dim: #25293c;
+  --md-sys-color-surface-bright: #3b4057;
+  --md-sys-color-surface-container-lowest: #2f3349;
+  --md-sys-color-surface-container-low: #25293c;
+  --md-sys-color-surface-container: #363b53;
+  --md-sys-color-surface-container-high: #3d4259;
+  --md-sys-color-surface-container-highest: #464c66;
+  --md-sys-color-outline: #7a809a;
+  --md-sys-color-outline-variant: #464c66;
+  --md-sys-color-inverse-surface: #e7e8f0;
+  --md-sys-color-inverse-on-surface: #2f3349;
+  --md-sys-color-inverse-primary: #5a5ee6;
+  --md-sys-color-surface-tint: #a8aafa;
+  --md-sys-color-background: #25293c;
+  --md-sys-color-on-background: #dfe0ec;
+  --md-sys-color-scrim: #000000;
+  --md-sys-color-shadow: #000000;
+  --mb-sidebar-bg: #1f2233;
+  --mb-sidebar-ink: #d7d8e5;
+  --mb-sidebar-muted: #a3a7bd;
+  --mb-color-up: #4ade80;
+  --mb-color-on-up: #0b2a17;
+  --mb-color-up-container: #1e3d2c;
+  --mb-color-on-up-container: #a7f3c0;
+  --mb-color-down: #fb8585;
+  --mb-color-on-down: #3b0d0d;
+  --mb-color-down-container: #4c2429;
+  --mb-color-on-down-container: #fecaca;
+  --mb-color-neutral: #a3a9bd;
+  --mb-color-on-neutral: #25293c;
+  --mb-color-neutral-container: #3b4057;
+  --mb-color-on-neutral-container: #d7d9e6;
+  --mb-color-warn: #f5a524;
+  --mb-color-on-warn: #2e1c00;
+  --mb-color-warn-container: #4a3517;
+  --mb-color-on-warn-container: #fcd88a;
+  --mb-color-info: #38bdd3;
+  --mb-color-info-container: #173f49;
+  --mb-color-on-info-container: #a5ecf6;
+  --mb-verdict-no-bg: #4c2429;
+  --mb-verdict-no-box: #fb8585;
+  --mb-verdict-no-ink: #fecaca;
+  --mb-verdict-strong-bg: #1b5232;
+  --mb-verdict-strong-box: #4ade80;
+  --mb-verdict-strong-ink: #d1fadf;
+  --mb-verdict-ok-bg: #1e3d2c;
+  --mb-verdict-ok-box: #22c55e;
+  --mb-verdict-ok-ink: #a7f3c0;
+  --mb-color-backtest-container: repeating-linear-gradient(135deg, rgba(154,156,248,.18) 0 3px, transparent 3px 6px);
+  --mb-chart-1: #9a9cf8;
+  --mb-chart-2: #f5a524;
+  --mb-chart-3: #38bdd3;
+  --mb-chart-4: #f06aae;
+  --mb-chart-1-fill: rgba(154,156,248,.32);
+  --mb-chart-2-fill: rgba(245,165,36,.26);
+  --mb-chart-3-fill: rgba(56,189,211,.26);
+  --mb-chart-band-50: rgba(154,156,248,.40);
+  --mb-chart-band-80: rgba(154,156,248,.18);
+  --mb-chart-fan: rgba(154,156,248,.14);
+  --mb-card-shadow: 0 2px 8px rgba(0, 0, 0, .35), 0 0 1px rgba(0, 0, 0, .5);
+  --mb-card-shadow-hover: 0 6px 18px rgba(0, 0, 0, .45), 0 0 1px rgba(0, 0, 0, .5);
+  --md-sys-elevation-2: 0 4px 14px rgba(0, 0, 0, .4), 0 0 1px rgba(0, 0, 0, .5);
+  --md-sys-elevation-3: 0 8px 24px rgba(0, 0, 0, .45), 0 0 1px rgba(0, 0, 0, .55);
+  --md-sys-elevation-4: 0 12px 32px rgba(0, 0, 0, .5);
+  --md-sys-elevation-5: 0 16px 40px rgba(0, 0, 0, .55);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --md-sys-color-primary: #a8aafa;
+    --md-sys-color-on-primary: #1d1f45;
+    --md-sys-color-primary-container: #3a3d73;
+    --md-sys-color-on-primary-container: #d4d5ff;
+    --md-sys-color-secondary: #a3a9bd;
+    --md-sys-color-on-secondary: #25293c;
+    --md-sys-color-secondary-container: #3b4057;
+    --md-sys-color-on-secondary-container: #d7d9e6;
+    --md-sys-color-tertiary: #b9a3fb;
+    --md-sys-color-on-tertiary: #2a1d52;
+    --md-sys-color-tertiary-container: #3d3170;
+    --md-sys-color-on-tertiary-container: #ddd2ff;
+    --md-sys-color-error: #fb8585;
+    --md-sys-color-on-error: #3b0d0d;
+    --md-sys-color-error-container: #4c2429;
+    --md-sys-color-on-error-container: #fecaca;
+    --md-sys-color-surface: #2f3349;
+    --md-sys-color-on-surface: #dfe0ec;
+    --md-sys-color-surface-variant: #363b53;
+    --md-sys-color-on-surface-variant: #bac0d2;
+    --md-sys-color-surface-dim: #25293c;
+    --md-sys-color-surface-bright: #3b4057;
+    --md-sys-color-surface-container-lowest: #2f3349;
+    --md-sys-color-surface-container-low: #25293c;
+    --md-sys-color-surface-container: #363b53;
+    --md-sys-color-surface-container-high: #3d4259;
+    --md-sys-color-surface-container-highest: #464c66;
+    --md-sys-color-outline: #7a809a;
+    --md-sys-color-outline-variant: #464c66;
+    --md-sys-color-inverse-surface: #e7e8f0;
+    --md-sys-color-inverse-on-surface: #2f3349;
+    --md-sys-color-inverse-primary: #5a5ee6;
+    --md-sys-color-surface-tint: #a8aafa;
+    --md-sys-color-background: #25293c;
+    --md-sys-color-on-background: #dfe0ec;
+    --md-sys-color-scrim: #000000;
+    --md-sys-color-shadow: #000000;
+    --mb-sidebar-bg: #1f2233;
+    --mb-sidebar-ink: #d7d8e5;
+    --mb-sidebar-muted: #a3a7bd;
+    --mb-color-up: #4ade80;
+    --mb-color-on-up: #0b2a17;
+    --mb-color-up-container: #1e3d2c;
+    --mb-color-on-up-container: #a7f3c0;
+    --mb-color-down: #fb8585;
+    --mb-color-on-down: #3b0d0d;
+    --mb-color-down-container: #4c2429;
+    --mb-color-on-down-container: #fecaca;
+    --mb-color-neutral: #a3a9bd;
+    --mb-color-on-neutral: #25293c;
+    --mb-color-neutral-container: #3b4057;
+    --mb-color-on-neutral-container: #d7d9e6;
+    --mb-color-warn: #f5a524;
+    --mb-color-on-warn: #2e1c00;
+    --mb-color-warn-container: #4a3517;
+    --mb-color-on-warn-container: #fcd88a;
+    --mb-color-info: #38bdd3;
+    --mb-color-info-container: #173f49;
+    --mb-color-on-info-container: #a5ecf6;
+    --mb-verdict-no-bg: #4c2429;
+    --mb-verdict-no-box: #fb8585;
+    --mb-verdict-no-ink: #fecaca;
+    --mb-verdict-strong-bg: #1b5232;
+    --mb-verdict-strong-box: #4ade80;
+    --mb-verdict-strong-ink: #d1fadf;
+    --mb-verdict-ok-bg: #1e3d2c;
+    --mb-verdict-ok-box: #22c55e;
+    --mb-verdict-ok-ink: #a7f3c0;
+    --mb-color-backtest-container: repeating-linear-gradient(135deg, rgba(154,156,248,.18) 0 3px, transparent 3px 6px);
+    --mb-chart-1: #9a9cf8;
+    --mb-chart-2: #f5a524;
+    --mb-chart-3: #38bdd3;
+    --mb-chart-4: #f06aae;
+    --mb-chart-1-fill: rgba(154,156,248,.32);
+    --mb-chart-2-fill: rgba(245,165,36,.26);
+    --mb-chart-3-fill: rgba(56,189,211,.26);
+    --mb-chart-band-50: rgba(154,156,248,.40);
+    --mb-chart-band-80: rgba(154,156,248,.18);
+    --mb-chart-fan: rgba(154,156,248,.14);
+    --mb-card-shadow: 0 2px 8px rgba(0, 0, 0, .35), 0 0 1px rgba(0, 0, 0, .5);
+    --mb-card-shadow-hover: 0 6px 18px rgba(0, 0, 0, .45), 0 0 1px rgba(0, 0, 0, .5);
+    --md-sys-elevation-2: 0 4px 14px rgba(0, 0, 0, .4), 0 0 1px rgba(0, 0, 0, .5);
+    --md-sys-elevation-3: 0 8px 24px rgba(0, 0, 0, .45), 0 0 1px rgba(0, 0, 0, .55);
+    --md-sys-elevation-4: 0 12px 32px rgba(0, 0, 0, .5);
+    --md-sys-elevation-5: 0 16px 40px rgba(0, 0, 0, .55);
+  }
+}
+
+/* The reader's daily report (C2). Built on the cockpit design system's tokens (design/system/tokens.css and its
+   dark set tokens-dark.css, B7, inlined before this file); only token names are used below. */
+:root{--rd-gap:16px}
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
-body{margin:0;background:var(--page);color:var(--ink);font:15px/1.5 var(--font);overflow-wrap:anywhere}
-.wrap{max-width:980px;margin:0 auto;padding-inline:16px;padding-block:20px 48px;display:flex;flex-direction:column;gap:20px}
-a{color:var(--accent-ink)} a:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-h1,h2,h3{margin:0;text-wrap:balance;line-height:1.25}
-h1{font-size:1.6rem;font-weight:650} h2{font-size:1.1rem;font-weight:650} h3{font-size:1.02rem;font-weight:650}
-p{margin:0}
-.eyebrow{font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
-.sub{color:var(--ink2);font-size:.9rem}
-.panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
-.regime{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
-.pill{display:inline-block;padding:2px 10px;border-radius:999px;background:var(--pill);font-size:.8rem;font-weight:600;white-space:nowrap}
-.pill.up{background:color-mix(in srgb,var(--up) 18%,transparent)} .pill.down{background:color-mix(in srgb,var(--down) 18%,transparent)}
-.pill.late{background:var(--late)}
-.headline p{font-size:1.05rem}
-.top3{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:4px}
-.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
-.kpi{border-top:1px solid var(--grid);padding-top:8px}
-.kpi .v{font-size:1.5rem;font-weight:650} .kpi .l{font-size:.8rem;color:var(--ink2)}
-details{border-top:1px solid var(--grid);padding-top:8px}
-details>summary{cursor:pointer;font-weight:600;color:var(--ink2);list-style-position:outside}
+body{margin:0;background:var(--md-sys-color-surface-container-low);color:var(--md-sys-color-on-surface);
+  font:var(--md-sys-typescale-body-medium);letter-spacing:var(--md-sys-typescale-body-medium-tracking);overflow-wrap:anywhere}
+a{color:var(--md-sys-color-primary)}
+:focus-visible{outline:2px solid var(--md-sys-color-primary);outline-offset:2px}
+h1,h2,h3,p{margin:0} h1,h2,h3{text-wrap:balance}
+h1{font:var(--md-sys-typescale-headline-small)} h2{font:var(--md-sys-typescale-title-medium)} h3{font:var(--md-sys-typescale-title-medium)}
+.ms{width:1em;height:1em;display:inline-block;vertical-align:-.15em;fill:currentColor;flex:none}
+.wrap{max-width:1040px;margin:0 auto;padding:16px 16px 48px;display:flex;flex-direction:column;gap:var(--rd-gap)}
+.micro{font:var(--md-sys-typescale-label-small);letter-spacing:.06em;text-transform:uppercase;color:var(--md-sys-color-on-surface-variant)}
+.muted{color:var(--md-sys-color-on-surface-variant)} .small{font:var(--md-sys-typescale-body-small)}
+.num{font-variant-numeric:tabular-nums}
+.card{background:var(--md-sys-color-surface-container-lowest);border-radius:var(--mb-card-radius);box-shadow:var(--mb-card-shadow);
+  padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.card-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.top{display:flex;flex-direction:column;gap:6px}
+.top .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.tag{display:inline-flex;align-items:center;gap:4px;padding:2px 10px;border-radius:999px;font:var(--md-sys-typescale-label-medium);white-space:nowrap}
+.tag.paper{background:var(--md-sys-color-tertiary-container);color:var(--md-sys-color-on-tertiary-container)}
+.tag.sim{background:var(--md-sys-color-tertiary-container);color:var(--md-sys-color-on-tertiary-container);letter-spacing:.06em}
+.tag.up{background:var(--mb-color-up-container);color:var(--mb-color-on-up-container)}
+.tag.down{background:var(--mb-color-down-container);color:var(--mb-color-on-down-container)}
+.tag.none{background:var(--mb-color-neutral-container);color:var(--mb-color-on-neutral-container)}
+.tag.warn{background:var(--mb-color-warn-container);color:var(--mb-color-on-warn-container)}
+.tag.info{background:var(--mb-color-info-container);color:var(--mb-color-on-info-container)}
+.up-t{color:var(--mb-color-up)} .down-t{color:var(--mb-color-down)}
+/* glance */
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tile{background:var(--md-sys-color-surface-container);border-radius:var(--mb-panel-radius);padding:10px 12px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.tile .big{font:var(--md-sys-typescale-title-large);font-variant-numeric:tabular-nums}
+.leanbar{display:flex;height:14px;border-radius:7px;overflow:hidden;background:var(--md-sys-color-surface-container)}
+.leanbar span{display:block;height:100%}
+.leanbar .u{background:var(--mb-color-up)} .leanbar .n{background:var(--md-sys-color-outline)} .leanbar .d{background:var(--mb-color-down)}
+.leankey{display:flex;gap:12px;flex-wrap:wrap;font:var(--md-sys-typescale-label-large)}
+.moves{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.moves li{display:flex;justify-content:space-between;gap:8px;align-items:baseline;border-top:1px solid var(--md-sys-color-surface-container-high);padding-top:6px}
+.moves button{all:unset;cursor:pointer;font-weight:600;color:var(--md-sys-color-primary)}
+.headline{font:var(--md-sys-typescale-body-large)}
+.top3{margin:0;padding-left:1.2em;display:flex;flex-direction:column;gap:4px}
+/* controls */
+.controls{position:sticky;top:0;z-index:5;background:var(--md-sys-color-surface-container-low);padding:8px 0;display:flex;flex-wrap:wrap;gap:8px;align-items:center;border-bottom:1px solid var(--md-sys-color-outline-variant)}
+.seg{display:inline-flex;background:var(--md-sys-color-surface-container);border-radius:999px;padding:3px;gap:2px}
+.seg button{border:0;background:none;color:var(--md-sys-color-on-surface-variant);font:var(--md-sys-typescale-label-large);padding:6px 12px;border-radius:999px;cursor:pointer;min-height:32px}
+.seg button[aria-pressed="true"]{background:var(--md-sys-color-surface-container-lowest);color:var(--md-sys-color-on-primary-container);box-shadow:var(--mb-card-shadow)}
+.controls select{font:var(--md-sys-typescale-label-large);padding:6px 8px;border-radius:8px;border:1px solid var(--md-sys-color-outline-variant);background:var(--md-sys-color-surface-container-lowest);color:var(--md-sys-color-on-surface);min-height:34px;max-width:100%}
+.controls .count{margin-left:auto;font:var(--md-sys-typescale-body-small);color:var(--md-sys-color-on-surface-variant)}
+.hzline{font:var(--md-sys-typescale-body-small);color:var(--md-sys-color-on-surface-variant);width:100%}
+@media (max-width:560px){.controls{position:static;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+  .controls .seg{grid-column:1 / -1;justify-content:space-between} .controls .seg button{flex:1}
+  .controls select{width:100%} .controls .count{grid-column:1 / -1;margin-left:0}}
+.key{display:flex;flex-wrap:wrap;gap:10px 16px;font:var(--md-sys-typescale-body-small);color:var(--md-sys-color-on-surface-variant)}
+.key span{display:inline-flex;align-items:center;gap:6px}
+.sw{display:inline-block;width:16px;height:10px;border-radius:3px}
+/* company cards */
+.cards{display:grid;grid-template-columns:1fr;gap:var(--rd-gap)}
+@media (min-width:880px){.cards{grid-template-columns:1fr 1fr}}
+.co-head{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+.co-head .tk{font:var(--md-sys-typescale-body-small);color:var(--md-sys-color-on-surface-variant)}
+.co-price{font:var(--md-sys-typescale-body-small);color:var(--md-sys-color-on-surface-variant)}
+.co-price b{color:var(--md-sys-color-on-surface);font-variant-numeric:tabular-nums}
+.co svg.fan{display:block;width:100%;height:auto;max-width:560px}
+.odds{display:flex;flex-direction:column;gap:4px}
+.odds .row{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.odds .row b{font:var(--md-sys-typescale-title-medium);font-variant-numeric:tabular-nums}
+.meter{position:relative;height:10px;border-radius:5px;background:linear-gradient(90deg,var(--mb-color-down-container),var(--md-sys-color-surface-container) 45%,var(--md-sys-color-surface-container) 55%,var(--mb-color-up-container))}
+.meter .mid{position:absolute;left:50%;top:-3px;bottom:-3px;width:2px;margin-left:-1px;background:var(--md-sys-color-outline)}
+.meter .dot{position:absolute;top:50%;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;border:2px solid var(--md-sys-color-surface-container-lowest)}
+.meter-scale{display:flex;justify-content:space-between;font:var(--md-sys-typescale-label-small);color:var(--md-sys-color-on-surface-variant)}
+.hz{display:grid;grid-template-columns:auto repeat(3,minmax(0,1fr));gap:0;font:var(--md-sys-typescale-body-small);font-variant-numeric:tabular-nums;border-radius:var(--mb-panel-radius);overflow:hidden;background:var(--md-sys-color-surface-container)}
+.hz>div{padding:5px 6px;border-top:1px solid var(--md-sys-color-surface-container-high);min-width:0}
+.hz>.h{border-top:0;font-weight:600;color:var(--md-sys-color-on-surface)}
+.hz>.l{color:var(--md-sys-color-on-surface-variant)}
+.hz>.sel{background:var(--md-sys-color-primary-container);color:var(--md-sys-color-on-primary-container)}
+.why{font:var(--md-sys-typescale-body-medium)}
+.flags{display:flex;flex-wrap:wrap;gap:6px}
+.flags .tag{white-space:normal;max-width:100%;border-radius:12px}
+.chg,.paperline{font:var(--md-sys-typescale-body-small);color:var(--md-sys-color-on-surface-variant)}
+details{border-top:1px solid var(--md-sys-color-surface-container-high);padding-top:8px}
+details>summary{cursor:pointer;font:var(--md-sys-typescale-label-large);color:var(--md-sys-color-on-surface-variant)}
 details[open]>summary{margin-bottom:8px}
-.prose{display:flex;flex-direction:column;gap:8px;max-width:68ch}
-.prose ul{margin:0;padding-left:1.2em;display:flex;flex-direction:column;gap:4px}
-.warn{background:var(--warn-bg);color:var(--warn-ink);border-radius:8px;padding:8px 12px;font-size:.9rem}
-dl.gloss{display:grid;grid-template-columns:max-content 1fr;gap:6px 14px;margin:0;font-size:.92rem}
-dl.gloss dt{font-weight:600} dl.gloss dd{margin:0;color:var(--ink2)}
+.more{display:flex;flex-direction:column;gap:8px}
+.more h4{margin:4px 0 0;font:var(--md-sys-typescale-label-small);letter-spacing:.06em;text-transform:uppercase;color:var(--md-sys-color-on-surface-variant)}
+.more ul,.list{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:6px}
+.list.plain{list-style:none;padding:0}
+.ref{white-space:nowrap} .ref-missing{color:var(--md-sys-color-on-surface-variant);font-family:var(--md-ref-typeface-mono);font-size:.85em}
+strong.bull{color:var(--mb-color-up)} strong.bear{color:var(--mb-color-down)}
+dl.gloss{display:grid;grid-template-columns:max-content 1fr;gap:6px 14px;margin:0}
+dl.gloss dt{font-weight:600} dl.gloss dd{margin:0;color:var(--md-sys-color-on-surface-variant)}
 @media (max-width:560px){dl.gloss{grid-template-columns:1fr} dl.gloss dd{margin-bottom:6px}}
-.filters{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--page);padding-block:8px;display:flex;flex-wrap:wrap;gap:10px;align-items:end;border-bottom:1px solid var(--grid)}
-.filters label{display:flex;flex-direction:column;gap:2px;font-size:.75rem;color:var(--muted);font-weight:600;letter-spacing:.03em;text-transform:uppercase;min-width:0}
-.filters select,.filters input{font:inherit;font-size:.95rem;padding:6px 8px;border:1px solid var(--axis);border-radius:8px;background:var(--surface);color:var(--ink);min-width:0;max-width:100%}
-.filters button{font:inherit;font-size:.9rem;padding:6px 12px;border-radius:8px;border:1px solid var(--axis);background:transparent;color:var(--ink2);cursor:pointer}
-.filters .count{font-size:.85rem;color:var(--ink2);margin-left:auto;padding-bottom:6px}
-@media (max-width:700px){.filters{position:static} .filters label{flex:1 1 140px} .filters select,.filters input{width:100%}}
-.charts{display:grid;grid-template-columns:1fr;gap:16px}
-@media (min-width:860px){.charts{grid-template-columns:1fr 1fr} .charts .wide{grid-column:1 / -1}}
-.chart svg{display:block;width:100%;height:auto;overflow:visible}
-/* keep chart text near its design size: a lone card or chart never scales its labels up */
-.co svg{max-width:520px} .chart:not(.wide) svg{max-width:520px} .chart.wide svg{max-width:900px}
-.chart .cap{font-size:.85rem;color:var(--ink2)}
-.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:.8rem;color:var(--ink2)}
-.legend span{display:inline-flex;align-items:center;gap:6px}
-.sw{display:inline-block;width:14px;height:10px;border-radius:2px}
-.cards{display:grid;grid-template-columns:1fr;gap:16px}
-@media (min-width:860px){.cards{grid-template-columns:1fr 1fr} .cards.one{grid-template-columns:1fr}}
-.co header{display:flex;flex-direction:column;gap:4px}
-.co .row{display:flex;justify-content:space-between;gap:8px;align-items:baseline;flex-wrap:wrap}
-.co .tk{color:var(--muted);font-weight:500;font-size:.85rem;margin-left:6px}
-.co .price{font-variant-numeric:tabular-nums;color:var(--ink2);font-size:.9rem}
-.chg.up{color:var(--up)} .chg.down{color:var(--down)}
-.rng{display:flex;flex-direction:column;gap:2px;border-top:1px solid var(--grid);padding-top:8px}
-.rng .when{font-size:.8rem;color:var(--muted);font-weight:600;letter-spacing:.02em;text-transform:uppercase}
-.rng .main{font-size:1rem} .rng .main b{font-variant-numeric:tabular-nums}
-.rng .second{font-size:.88rem;color:var(--ink2)}
-.rng.is-late .main{color:var(--ink2)}
-.tag-late{font-size:.82rem;background:var(--late);border-radius:6px;padding:2px 8px;align-self:flex-start}
-.record{font-size:.88rem;color:var(--ink2)}
-.why h4{margin:6px 0 2px;font-size:.8rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
-.why ul{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:4px;font-size:.92rem}
-.why .meta{color:var(--muted);font-size:.8rem}
-.ref{font-size:.85em;white-space:nowrap}
-.ref-missing{color:var(--muted);font-family:ui-monospace,monospace;font-size:.8em}
-strong.bull{color:var(--up)} strong.bear{color:var(--down)}
-.tbl{overflow-x:auto} table{border-collapse:collapse;font-size:.85rem;font-variant-numeric:tabular-nums;width:100%}
-th,td{text-align:left;padding:4px 8px;border-bottom:1px solid var(--grid);white-space:nowrap}
-#tip{position:fixed;pointer-events:none;background:var(--surface);color:var(--ink);border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:.82rem;box-shadow:0 4px 14px rgba(0,0,0,.12);z-index:20;max-width:260px}
-#tip b{font-variant-numeric:tabular-nums}
-.empty{color:var(--ink2);font-size:.92rem}
-footer{color:var(--muted);font-size:.82rem;display:flex;flex-direction:column;gap:4px}
+.prose{display:flex;flex-direction:column;gap:8px;max-width:70ch}
+.prose ul{margin:0;padding-left:1.2em}
+.rec{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;align-items:center;font:var(--md-sys-typescale-body-small)}
+.rec .bar{grid-column:1 / -1;position:relative;height:8px;border-radius:4px;background:var(--md-sys-color-surface-container)}
+.rec .bar i{position:absolute;left:0;top:0;bottom:0;border-radius:4px;background:var(--md-sys-color-primary)}
+.rec .bar b{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--md-sys-color-on-surface)}
+table{border-collapse:collapse;width:100%;font:var(--md-sys-typescale-body-small);font-variant-numeric:tabular-nums}
+th,td{text-align:left;padding:5px 6px;border-bottom:1px solid var(--md-sys-color-surface-container-high)}
+th{color:var(--md-sys-color-on-surface-variant);font-weight:600}
+.tbl{overflow-x:auto}
+.empty{color:var(--md-sys-color-on-surface-variant)}
+#tip{position:fixed;pointer-events:none;background:var(--md-sys-color-inverse-surface);color:var(--md-sys-color-inverse-on-surface);border-radius:8px;padding:6px 10px;font:var(--md-sys-typescale-body-small);z-index:20;max-width:240px}
+footer{color:var(--md-sys-color-on-surface-variant);font:var(--md-sys-typescale-body-small);display:flex;flex-direction:column;gap:4px}
 .idx{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
-.idx a{display:flex;gap:12px;flex-wrap:wrap;align-items:baseline;text-decoration:none;color:var(--ink);font-weight:600}
-.idx .r,.idx .c{font-weight:500;color:var(--ink2);font-size:.9rem}
-.idx p{color:var(--ink2);font-size:.9rem}
+.idx a{display:flex;gap:12px;flex-wrap:wrap;align-items:baseline;text-decoration:none;color:var(--md-sys-color-on-surface);font-weight:600}
+.idx .r,.idx .c{font-weight:500;color:var(--md-sys-color-on-surface-variant)}
+.idx p{color:var(--md-sys-color-on-surface-variant)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+.noscript table{margin:6px 0 12px} .noscript th{overflow-wrap:normal} .noscript h3{margin-top:16px} .noscript ul{padding-left:1.2em}
 </style></head>
 <body><div class="wrap">
-<header style="display:flex;flex-direction:column;gap:6px"><div class="eyebrow">Market brief · india</div>
-<h1>India (NSE): daily reports</h1><p class="sub">Newest first. Research log, not investment advice.</p></header>
-<section class="panel"><ul class="idx"><li><a href="2026-10-09.html"><span class="d">2026-10-09</span><span class="r">CALM</span><span class="c">1 call</span></a><p>TCS reported Q2 results after the 2026-10-08 close (nse_announcements), the session&#x27;s main company event, after a broad sell-off that took the Nifty 50 down 1.64% with heavy foreign selling. The only call today is TCS down at N+5.</p></li><li><a href="2026-10-08.html"><span class="d">2026-10-08</span><span class="r">CALM</span><span class="c">0 calls</span></a><p>No calls today: the forecaster abstained on all 20 stocks because the signal model sits near its base rate and almost no news is verified. TCS reports results today, and the Nifty 50 starts after a -0.76% day with FIIs net sellers.</p></li><li><a href="2026-10-07.html"><span class="d">2026-10-07</span><span class="r">EVENT_HEAVY</span><span class="c">0 calls</span></a><p>The RBI raised the repo rate by 25 bp to 5.5% this morning, its first hike since 2023 (ETV Bharat, The Indian Express), and the Nifty 50 was -0.41% shortly after the open. This run started after the open, so it makes no calls today.</p></li></ul></section>
+<header class="top"><div class="micro">Market brief · india</div>
+<h1>India (NSE): daily reports</h1><p class="muted">Newest first. Research log, not investment advice.</p></header>
+<section class="card"><ul class="idx"><li><a href="2026-10-09.html"><span class="d">2026-10-09</span><span class="r">CALM</span><span class="c">1 call</span></a><p>TCS reported Q2 results after the 2026-10-08 close (nse_announcements), the session&#x27;s main company event, after a broad sell-off that took the Nifty 50 down 1.64% with heavy foreign selling. The only call today is TCS down at N+5.</p></li><li><a href="2026-10-08.html"><span class="d">2026-10-08</span><span class="r">CALM</span><span class="c">0 calls</span></a><p>No calls today: the forecaster abstained on all 20 stocks because the signal model sits near its base rate and almost no news is verified. TCS reports results today, and the Nifty 50 starts after a -0.76% day with FIIs net sellers.</p></li><li><a href="2026-10-07.html"><span class="d">2026-10-07</span><span class="r">EVENT_HEAVY</span><span class="c">0 calls</span></a><p>The RBI raised the repo rate by 25 bp to 5.5% this morning, its first hike since 2023 (ETV Bharat, The Indian Express), and the Nifty 50 was -0.41% shortly after the open. This run started after the open, so it makes no calls today.</p></li></ul></section>
 </div></body></html>

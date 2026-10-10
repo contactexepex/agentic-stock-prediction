@@ -294,3 +294,125 @@ def test_a_strategy_not_live_on_its_day_is_left_out(monkeypatch):
     for ticker in company_mockup()["india"]["pages"]:
         page = company_payloads.lifecycle_payload(after, ticker, SESSION)
         assert all(row.get("strategy_id") != reference for row in page["predictions"] + page["trade_checks"])
+
+
+def published_range(ticker: str, as_of: str, horizon: int, made_at: str, center: float) -> dict:
+    """A ranges.py row (the stored ranges kind's fields) of an as-of date and horizon."""
+    session, exit_day = {"2026-10-05": ("2026-10-06", "2026-10-07"), "2026-10-06": ("2026-10-07", "2026-10-08"),
+                         "2026-10-07": ("2026-10-08", "2026-10-09")}[as_of]
+    return {"id": f"{as_of}-{ticker}-{horizon}d", "made_at": made_at, "as_of_date": as_of, "session_date": session,
+            "target_date": exit_day, "ticker": ticker, "horizon_days": horizon, "base_close": 1000.0,
+            "center": center, "sigma_h": 0.02, "lo50": 980.0, "hi50": 1020.0, "lo80": 960.0, "hi80": 1040.0,
+            "naive_lo50": 981.0, "naive_hi50": 1019.0, "naive_lo80": 961.0, "naive_hi80": 1039.0,
+            "direction": None, "confidence": None, "regime": "CALM", "calibration_id": "test", "notes": [],
+            "inputs": [], "iv_sigma_h": None, "horizon_label": "n_plus_k", "entry_date": session,
+            "exit_date": exit_day}
+
+
+def test_published_ranges_show_when_no_strategy_is_live(root, monkeypatch):
+    """ranges.py publishes a range for every company whatever a strategy's live_from: the company page carries the
+    as-of date's ranges (B10's ranges_asof as of the cut-off) when no strategy is live and its predictions are left
+    out; an older as-of date, a range stored after the cut-off and a company not collected never show."""
+    from marketbrief.lab import registry
+
+    ticker = next(iter(company_mockup()["india"]["pages"]))
+    rows = [published_range(ticker, AS_OF, 2, "2026-10-07T02:30:00Z", 0.0),
+            published_range(ticker, AS_OF, 1, "2026-10-07T02:30:00Z", 0.01),
+            published_range(ticker, "2026-10-05", 1, "2026-10-06T02:30:00Z", 0.0),
+            published_range(ticker, "2026-10-07", 1, "2026-10-08T02:30:00Z", 0.0),  # after the cut-off
+            published_range("NOTCOLLECTED", AS_OF, 1, "2026-10-07T02:30:00Z", 0.0)]
+    for as_of in ("2026-10-05", "2026-10-06", "2026-10-07"):
+        path = root / "data" / "india" / "ranges" / "2026" / "10" / f"{as_of}.jsonl"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("".join(json.dumps(row) + "\n" for row in rows if row["as_of_date"] == as_of))
+    monkeypatch.setattr(registry, "is_live", lambda _strategy, _day, **_options: False)
+    sources = sources_of("india")
+    assert not sources.predictions and not sources.all_predictions
+    assert set(sources.ranges) == {ticker}
+    page = company_payloads.stock_payload(sources, ticker, {}, EMPTY_BLOCKS)
+    assert page["predictions"] == []
+    assert [(row["id"], row["horizon_days"]) for row in page["published_ranges"]] == [
+        (f"{AS_OF}-{ticker}-1d", 1), (f"{AS_OF}-{ticker}-2d", 2)]
+    first = page["published_ranges"][0]
+    assert first == {"id": f"{AS_OF}-{ticker}-1d", "made_at": "2026-10-07T02:30:00Z", "as_of_date": AS_OF,
+                     "session_date": SESSION, "exit_date": "2026-10-08", "horizon_days": 1, "base_close": 1000.0,
+                     "target_price": 1010.0502, "lo50": 980.0, "hi50": 1020.0, "lo80": 960.0, "hi80": 1040.0,
+                     "regime": "CALM"}
+
+
+SESSIONS = {"2026-10-05": ("2026-10-06", "2026-10-07"), "2026-10-06": ("2026-10-07", "2026-10-08"),
+            "2026-10-07": ("2026-10-08", "2026-10-09")}
+
+
+def model_score(ticker: str, as_of: str, computed_at: str, prob: float, news: tuple[list[str], float]) -> dict:
+    """A 1-day model_scores row (the stored kind's fields) with its explanation; `news` = (ids, points)."""
+    news_ids, news_points = news
+    explain = {"groups": {"baseline": -0.45, "momentum": 0.1, "news": news_points},
+               "up": [{"feature": "ret_5d", "points": 0.1, "text": "5-day return"}], "down": [],
+               "news": {"score": 0.01, "items": len(news_ids), "ids": news_ids}}
+    session, exit_day = SESSIONS[as_of]
+    return {"id": f"{as_of}-{ticker}-1d", "as_of_date": as_of, "ticker": ticker, "horizon_days": 1,
+            "label_convention": "open_to_close", "prob_up": prob, "prob_model": prob, "calibrated": True,
+            "base_rate": 0.5, "news_score": 0.01, "news_logit": 0.0, "contributions": explain,
+            "model_version": "logit-v1", "model_id": "india-1d-test", "trained_until": "2026-10-01",
+            "computed_at": computed_at, "horizon_label": "n_plus_k", "entry_date": session, "exit_date": exit_day}
+
+
+def legacy(row: dict, horizon: int = 1) -> dict:
+    """The row as a score written before B10 (no horizon label, entry or exit date)."""
+    old = {key: value for key, value in row.items() if key not in ("horizon_label", "entry_date", "exit_date")}
+    return {**old, "horizon_days": horizon, "id": row["id"].replace("-1d", f"-{horizon}d")}
+
+
+def write_rows(root: Path, kind: str, rows: list[dict]) -> None:
+    path = root / "data" / "india" / kind / "2026" / "10" / "2026-10-07.jsonl"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("".join(json.dumps(row) + "\n" for row in rows))
+
+
+def test_forecast_history_keeps_every_run_with_its_change(root):
+    """The company page's forecast history (owner, 2026-10-10): every stored run of the window's ranges and model
+    scores by horizon then time, each with its change from the previous run of that horizon; B10's label rule (an
+    old open-to-close 1-day score is N+1, an old 5-day one is not); a run stored after the cut-off, an as-of date
+    outside the window and a company not collected never show; the payload fits the schema."""
+    from marketbrief.warehouse import openapi_spec, schema_check
+    from marketbrief.warehouse.company_history import forecast_history
+
+    ticker = next(iter(company_mockup()["india"]["pages"]))
+    older = published_range(ticker, "2026-10-05", 1, "2026-10-06T02:30:00Z", 0.0)
+    newer = {**published_range(ticker, AS_OF, 1, "2026-10-07T02:30:00Z", 0.01), "lo80": 950.0, "hi80": 1050.0,
+             "regime": "TRENDING"}
+    write_rows(root, "ranges", [older, newer,
+                                published_range(ticker, AS_OF, 2, "2026-10-06T01:00:00Z", 0.0),  # earliest run
+                                published_range(ticker, "2026-10-07", 1, "2026-10-07T03:00:00Z", 0.0),  # after as_of
+                                # in the window, made after the cut-off
+                                {**published_range(ticker, AS_OF, 2, "2026-10-07T13:00:00Z", 0.0), "lo80": 1.0},
+                                published_range("NOTCOLLECTED", AS_OF, 1, "2026-10-07T02:30:00Z", 0.0)])
+    first = legacy(model_score(ticker, "2026-10-05", "2026-10-06T02:20:00Z", 0.55, (["a", "b"], 0.05)))
+    write_rows(root, "model_scores", [
+        first, legacy(first, 2),  # old 1-day: N+1; old 5-day convention: not N+k
+        model_score(ticker, AS_OF, "2026-10-07T02:20:00Z", 0.52, (["b", "c"], -0.05)),
+        model_score(ticker, AS_OF, "2026-10-07T02:25:00Z", 0.50, (["b", "c", "d"], -0.15)),
+        model_score(ticker, "2026-10-07", "2026-10-07T03:00:00Z", 0.45, (["e"], -0.3)),  # after as_of
+        model_score(ticker, AS_OF, "2026-10-07T13:00:00Z", 0.40, (["e"], -0.5))])  # after the cut-off
+    ctx = FixtureContext(load_market("india"), connect("india"), CUTOFF)
+    history = forecast_history(ctx, "2026-10-05", AS_OF)
+    assert set(history) == {ticker}
+    ranges, scores = history[ticker]["ranges"], history[ticker]["scores"]
+    assert [(row["id"], row["change"] is None) for row in ranges] == [  # by horizon, then time
+        (f"2026-10-05-{ticker}-1d", True), (f"{AS_OF}-{ticker}-1d", False), (f"{AS_OF}-{ticker}-2d", True)]
+    assert ranges[1]["change"] == {"from_id": f"2026-10-05-{ticker}-1d", "from_made_at": "2026-10-06T02:30:00Z",
+                                   "target_pct": 1.005, "width80_pct": 25.0, "changed": ["regime"]}
+    assert [(row["id"], row["computed_at"]) for row in scores] == [
+        (f"2026-10-05-{ticker}-1d", "2026-10-06T02:20:00Z"), (f"{AS_OF}-{ticker}-1d", "2026-10-07T02:20:00Z"),
+        (f"{AS_OF}-{ticker}-1d", "2026-10-07T02:25:00Z")]
+    assert (scores[0]["entry_date"], scores[0]["exit_date"]) == ("2026-10-06", "2026-10-07")  # B10's window
+    assert scores[2]["change"] == {"from_id": f"{AS_OF}-{ticker}-1d", "from_computed_at": "2026-10-07T02:20:00Z",
+                                   "prob_up": -0.02, "groups": {"news": -0.1}, "news_added": ["d"],
+                                   "news_dropped": [], "changed": []}
+    assert scores[1]["change"]["news_added"] == ["c"] and scores[1]["change"]["news_dropped"] == ["a"]
+    later = forecast_history(ctx, AS_OF, AS_OF)[ticker]  # the window starts at the as-of date
+    assert {row["as_of_date"] for row in later["ranges"] + later["scores"]} == {AS_OF}
+    assert later["scores"][0]["change"] is None and later["ranges"][0]["change"] is None
+    spec = openapi_spec.bundle()
+    assert schema_check.errors(history[ticker], {"$ref": "#/components/schemas/ForecastHistory"}, spec) == []

@@ -152,10 +152,47 @@ def view():
     }
 
 
-def page(v=None):
+def fcast(h, lo80, hi80, prob, lean, strength, exit_date, exit_label, change=None):
+    """One reader forecast row as presentation/reader/forecasts.forecast builds it."""
+    return {"h": h, "name": f"N+{h}", "exit_date": exit_date, "exit_label": exit_label, "entry_date": "2026-10-05",
+            "base_close": 110.0, "target": 110.5, "lo50": lo80 + 2, "hi50": hi80 - 2, "lo80": lo80, "hi80": hi80,
+            "move_pct": 0.45, "prob_up": prob, "base_rate": 0.5, "lean": lean, "strength": strength,
+            "why": f"Why line N+{h}.", "change": change}
+
+
+def reader():
+    """The reader block (presentation/reader/gather.reader_data) for view(): AAPL leans up, MSFT has no score."""
+    change = {"since": "2026-10-02T12:00:00Z", "target_pct": 1.25, "prob_pts": 0.031, "news_added": ["abcdef0123456789"]}
+    aapl = {"ticker": "AAPL", "bars": [{"d": f"2026-09-{d:02d}", "c": 100.0 + d / 10} for d in range(21, 31)],
+            "forecasts": [fcast(1, 104.0, 116.0, 0.58, "up", "clear", "2026-10-06", "Tue 6 Oct", change),
+                          fcast(3, 101.0, 119.0, 0.53, "up", "slight", "2026-10-08", "Thu 8 Oct"),
+                          fcast(5, 98.25, 121.5, 0.51, "none", "none", "2026-10-12", "Mon 12 Oct")],
+            "flags": [{"code": "earnings", "text": "Results in 3 days: prices can jump"}]}
+    msft = {"ticker": "MSFT", "bars": [{"d": "2026-09-30", "c": 315.0}], "forecasts": [],
+            "flags": [{"code": "contradicted", "text": "Some recent news was contradicted by other sources"}]}
+    return {"horizons": [1, 3, 5], "default_horizon": 1, "lean": {"slight": 0.02, "clear": 0.05},
+            "cutoff": "2026-10-05T00:00:00+00:00", "as_of": "2026-10-02", "as_of_label": "Fri 2 Oct",
+            "paper_label": "Paper only — no proven edge yet",
+            "mood": {"code": "EVENT_HEAVY", "word": "Event-heavy", "plain": "Event-heavy: big events.", "stress": False},
+            "benchmark": {"symbol": "SPY", "name": "S&P 500", "close": 500.0, "close_date": "2026-10-02",
+                          "change_pct": -1.23, "change_5d_pct": 0.5},
+            "vol_index": None, "companies": [aapl, msft],
+            "glance": {"1": {"up": 1, "down": 0, "none": 0, "no_score": 1, "moves": ["AAPL"]},
+                       "3": {"up": 1, "down": 0, "none": 0, "no_score": 1, "moves": ["AAPL"]},
+                       "5": {"up": 0, "down": 0, "none": 1, "no_score": 1, "moves": ["AAPL"]}},
+            "changes": {"by_horizon": {"1": [{"ticker": "AAPL", "target_pct": 1.25, "prob_pts": 0.031}], "3": [], "5": []},
+                        "news": [{"ticker": "AAPL", "id": "abcdef0123456789", "title": "Fed cuts rates",
+                                  "url": "https://example.com/fed", "source": "Reuters",
+                                  "ts": "2026-10-02T12:00:00+00:00", "status": "corroborated"}],
+                        "news_total": 1, "since": "2026-10-02T12:00:00Z"},
+            "paper": {"live": False, "live_from": "2026-10-12", "label": "SIMULATED",
+                      "note": "Paper trading (simulated, no real money) starts on Mon 12 Oct."}}
+
+
+def page(v=None, rd=None):
     v = v or view()
     n, _ = hr.narrative_html(hr.parse_report(FILLED, ["Tech", "Banks"]), v["sources"])
-    return v, hr.build_page(v, n, {"md": "2026-10-05.md", "index": "index.html", "charts": []})
+    return v, hr.build_page(v, n, {"md": "2026-10-05.md", "index": "index.html", "charts": []}, rd or reader())
 
 
 def embedded(html: str) -> dict:
@@ -212,7 +249,8 @@ def test_inline_keeps_titles_intact_and_survives_nul_and_long_words():
     assert 'title="Bull: shares jump"' in out and out.startswith('<strong class="bull">Bull:</strong>')
     assert out.count("<strong") == 1
     assert hr._inline("odd \x000\x00 text [a](https://example.com/a)", {}, set()).startswith("odd 0 text <a href=")
-    assert "font:15px/1.5 var(--font);overflow-wrap:anywhere}" in Path(hr.__file__).read_text()   # body rule
+    from marketbrief.presentation.reader import page as reader_page
+    assert "overflow-wrap:anywhere}" in reader_page.css().split("body{", 1)[1].split("\n", 2)[1]   # body rule
 
 
 BAD_URLS = ["javascript:alert(1)", "data:text/html,<script>alert(1)</script>", "JaVaScRiPt:alert(1)",
@@ -249,21 +287,21 @@ def test_markdown_links_are_not_rewritten_or_double_escaped():
 
 def test_html_page_has_sections_filters_and_matching_numbers():
     v, html = page()
-    for needle in ('id="summary"', 'id="charts"', 'id="cards"', 'id="notes"', 'id="footer"',
-                   'id="f-sector"', 'id="f-company"', 'id="f-search"', 'id="f-reset"',
-                   "How to read this", "Data quality", "Top 3 things that matter today",
-                   "Late: made after this session opened. Not a forecast, never scored.",
-                   "80% chance between ", "not enough history yet", "No call",
-                   "prefers-color-scheme: dark", 'name="viewport"'):
+    for needle in ('id="glance"', 'id="changes"', 'id="paper"', 'id="legend"', 'id="cards"', 'id="track"',
+                   'id="notes"', 'id="footer"', 'id="f-sector"', 'id="f-lean"', 'id="f-sort"', 'id="f-horizon"',
+                   "The day in 20 seconds", "What changed since the previous day’s forecast", "How to read this page",
+                   "Chance of going up", "prefers-color-scheme: dark", ':root[data-theme="dark"]', 'name="viewport"',
+                   "--md-sys-color-primary", '<symbol id="ms-warning"', '<meta name="robots" content="noindex, nofollow">'):
         assert needle in html, needle
     assert "<!-- AGENT" not in html and "AGENT:" not in html
-    assert not re.search(r'<(?:script|link)[^>]+(?:src|href)="https?://', html)      # nothing loaded from the network
+    assert not re.search(r'<(?:script|link|img)[^>]+(?:src|href)="https?://', html)   # nothing loaded from the network
+    assert not re.search(r"@import\s+(?:url|\x27|\")", html) and "url(http" not in html
+    assert not re.search(r"\b(?:buy|sell) (?:now|signal)\b|\bstrong buy\b|\bstrong sell\b", html, re.I)   # no advice words
     d = embedded(html)
-    assert [s["sector"] for s in d["sectors"]] == ["Tech", "Banks"]                   # sector dropdown source
+    assert [s["sector"] for s in d["sectors"]] == ["Tech", "Banks"]
     for got, want in zip(d["companies"], v["companies"]):
         assert got["ranges"] == want["ranges"] and got["close"] == want["close"]
-    assert d["companies"][1]["ranges"][0]["late"] is True
-    assert d["narrative"]["top3"][1] == "Apple reports on Thursday."
+    assert d["reader"] == reader() and d["narrative"]["top3"][1] == "Apple reports on Thursday."
     assert "sources" not in d                                                        # only what the page shows
     meta = json.loads(hr.META_RE.search(html).group(1))
     assert meta == {"session": "2026-10-05", "regime": "EVENT_HEAVY", "calls": 1, "late": 1,
@@ -295,19 +333,26 @@ RENDER_JS = r"""
 const { chromium } = require('playwright');
 (async () => {
   const b = await chromium.launch(); const errors = [];
-  const p = await b.newPage({viewport: {width: 390, height: 800}});
+  const p = await b.newPage({viewport: {width: 360, height: 800}});
   p.on('pageerror', e => errors.push(e.message)); p.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
+  p.on('request', r => { if (!r.url().startsWith('file:')) errors.push('request ' + r.url()); });
   await p.goto('file://' + process.argv[2]);
-  const all = await p.textContent('#cards'); const charts = await p.textContent('#charts');
+  const glance = await p.textContent('#glance'), changes = await p.textContent('#changes'), paper = await p.textContent('#paper');
+  const legend = await p.textContent('#legend'), all = await p.textContent('#cards'), track = await p.textContent('#track');
   const overflow = await p.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
-  await p.selectOption('#f-sector', 'Banks'); const banks = await p.locator('#cards article').count();
-  await p.selectOption('#f-sector', 'Tech'); await p.selectOption('#f-company', 'MSFT');
-  const one = await p.locator('#cards article').count(); const open = await p.$eval('#cards details.why', d => d.open);
-  await p.click('#f-reset'); await p.fill('#f-search', 'aap'); const search = await p.locator('#cards article').count();
-  await p.click('#f-reset');
+  const order = await p.$$eval('#cards article h3', hs => hs.map(h => h.textContent));
+  const sectors = await p.$$eval('#f-sector option', os => os.map(o => o.value));
+  await p.selectOption('#f-sector', 'Tech'); const tech = await p.locator('#cards article').count();
+  await p.selectOption('#f-sector', ''); await p.selectOption('#f-lean', 'up'); const up = await p.locator('#cards article').count();
+  await p.selectOption('#f-lean', 'flag'); const flagged = await p.locator('#cards article').count();
+  await p.selectOption('#f-lean', ''); await p.click('#f-horizon button:nth-child(2)');
+  const n3 = await p.textContent('#cards'); const g3 = await p.textContent('#glance');
   const hrefs = await p.$$eval('a', as => as.map(a => a.getAttribute('href')));
-  const dates = await p.$$eval('#cards svg text', ts => ts.map(t => t.textContent).filter(x => /[A-Z][a-z]{2}$/.test(x)));
-  console.log(JSON.stringify({errors, all, charts, overflow, banks, one, open, search, hrefs, dates})); await b.close();
+  const dates = await p.$$eval('#cards svg.fan text', ts => ts.map(t => t.textContent).filter(x => /[A-Z][a-z]{2}$/.test(x)));
+  const light = await p.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  await p.emulateMedia({colorScheme: 'dark'}); const dark = await p.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  console.log(JSON.stringify({errors, glance, changes, paper, legend, all, track, overflow, order, sectors, tech, up, flagged, n3, g3, hrefs, dates, light, dark}));
+  await b.close();
 })();
 """
 
@@ -317,13 +362,13 @@ def test_html_renders_in_a_browser_with_working_filters(tmp_path):
     if root is None:
         pytest.skip("node + playwright not installed")
     # unsafe links put straight into the page data: the JS must refuse them on its own (defence in depth)
-    v = view()
+    v, rd = view(), reader()
     v["companies"][1]["news"] = [{"id": f"bad{i}", "title": f"Bad link {i}", "url": u, "source": "Feed",
                                   "ts": None, "cited": False} for i, u in enumerate(BAD_URLS)]
-    v["companies"][0]["calls"][0]["evidence"].append({"id": "evil", "title": "Evil evidence",
-                                                      "url": "JaVaScRiPt:alert(1)", "source": "Feed"})
+    rd["changes"]["news"].append({"ticker": "MSFT", "id": "evil", "title": "Evil news", "url": "JaVaScRiPt:alert(1)",
+                                  "source": "Feed", "ts": None, "status": "contradicted"})
     v["sources"]["ffffffffffffffff"] = {"title": "Bad source", "url": " javascript:alert(1)", "source": "BadFeed"}
-    _, html = page(v)
+    _, html = page(v, rd)
     f = tmp_path / "r.html"
     f.write_text(html)
     js = tmp_path / "render.js"
@@ -333,23 +378,29 @@ def test_html_renders_in_a_browser_with_working_filters(tmp_path):
     assert r.returncode == 0, r.stderr
     out = json.loads(r.stdout.strip().splitlines()[-1])
     assert out["errors"] == [] and out["overflow"] is False
+    g = out["glance"]   # the 20-second top: mood, benchmark, leans, biggest moves, the paper line
+    assert "Event-heavy" in g and "S&P 500" in g and "▼ −1.23%" in g and "1 lean up" in g and "0 lean down" in g
+    assert "measured at the close of Tue 6 Oct" in g and "AAPL Inc" in g and "+0.5% to $110.50" in g
+    assert "Paper only — no proven edge yet" in g and "Only 2 forecast ranges checked so far: too few to judge." in g
+    assert "chance of going up +3.1 pts" in out["changes"] and "Fed cuts rates" in out["changes"]
+    assert "Confirmed by 2+ outlets" in out["changes"] and "Evil news" in out["changes"] and "Contradicted" in out["changes"]
+    assert "starts on Mon 12 Oct" in out["paper"] and "SIMULATED" in out["paper"]
+    assert "80% range about 8 times in 10" in out["legend"] and "coin flip" in out["legend"]
     text = out["all"]
-    assert "80% chance between $98.25 and $121.50" in text            # numbers as given, never re-derived
-    assert "N+1 (2 trading days) · by Tue 6 Oct" in text and "N+5 (6 trading days) · by Mon 12 Oct" in text
-    assert "5 trading days · by Fri 9 Oct" in text                       # the old window keeps its wording
-    assert "Where each price may be in 2 trading days (N+1) (by Tue 6 Oct)" in out["charts"]   # primary_horizon
-    assert "N+5 (6 trading days) call: up" in text and "N+1 80% ranges: Not enough history yet" in text
-    assert "Up call, 65% confidence" in text and "No call" in text
-    assert "Late: made after this session opened. Not a forecast, never scored." in text
-    assert "Range for the record: $300.00 to $330.00 (80%)" in text
-    assert "80% chance between $300.00" not in text                      # a late range is never a forecast
-    assert "Not enough history yet: 2 of 2" in text and "Fed cuts rates" in text and "Bull:" in text
-    assert out["banks"] == 0 and out["one"] == 1 and out["open"] is True and out["search"] == 1
-    # every link on the page is http(s) or a relative link to the report's own files
+    assert out["order"] == ["AAPL Inc", "MSFT Inc"]                       # strongest lean first
+    assert "Last close $110.00" in text and "Lean up" in text and "Chance of going up by Tue 6 Oct58%" in text
+    assert "104.00–​116.00" in text and "98.25–​121.50" in text  # numbers as given, never re-derived
+    assert "Why line N+1." in text and "Results in 3 days: prices can jump" in text
+    assert "Since the previous day’s forecast (Fri 2 Oct, 12:00 UTC)" in text and "1 new news item counted" in text
+    assert "No price range today" in text and "Some recent news was contradicted" in text
+    assert "Bad link 3" in text                                          # unsafe links stay visible as plain text
+    assert out["sectors"] == ["", "Tech"] and out["tech"] == 2 and out["up"] == 1   # sectors of the shown companies
+    assert out["flagged"] == 2                                           # both cards carry a warning
+    assert "Why line N+3." in out["n3"] and "53%" in out["n3"] and "N+3" in out["g3"]   # the horizon switch
+    assert "Nothing has been checked yet" not in out["track"] and "80% ranges, N+1" in out["track"]
     assert out["hrefs"] and all(re.match(r"^(https?://|index\.html$|2026-10-05\.md$)", h) for h in out["hrefs"]), out["hrefs"]
-    assert "Bad link 3" in text and "Evil evidence" in text               # unsafe links stay visible as plain text
-    # one date style on the chart axes: "21 Sep", "5 Oct", "9 Oct"
     assert out["dates"] and all(re.match(r"^\d{1,2} [A-Z][a-z]{2}$", d) for d in out["dates"]), out["dates"]
+    assert out["light"] != out["dark"]                                   # dark mode follows the system
 
 
 # ---------- Slack ----------

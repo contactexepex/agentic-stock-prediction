@@ -19,7 +19,6 @@ BASELINE_COMMIT = "24749bdc4835bff242b2683f83e85f2a7e3a2ab0"   # the code before
 
 # module (repo-relative) -> its line count when listed (2026-10-06, commit 24749bd)
 MODULE_ALLOWLIST: dict[str, int] = {
-    "scripts/html_report.py": 772,
 }
 # "module::Class" -> its line count when listed; no class is over the limit today
 CLASS_ALLOWLIST: dict[str, int] = {}

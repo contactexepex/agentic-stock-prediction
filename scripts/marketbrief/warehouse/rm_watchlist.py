@@ -5,17 +5,19 @@ Watchlist payload of the dashboard slice (WS1) under contract 2.0.
 Payload: the page shell, B4's Company records (active and inactive; the page shows the active ones and names the
 inactive under the table, decision 13), B4's Agreement per horizon and open trades, B12's latest trade checks by the
 cut-off, the reference rule strategy's ranges (its newest predictions made by the cut-off while it was live on their
-session; Wave 5 go-live) and the strategies.
+session; Wave 5 go-live), ranges.py's published ranges of the as-of date (whatever a strategy's live_from; the Range
+column) and the strategies.
 Everything is as of the cut-off; no build time is in the payload."""
 
 from __future__ import annotations
 
 import pandas as pd
 
+from marketbrief.constants.rm_company import PUBLISHED_RANGE_FIELDS
 from marketbrief.constants.warehouse import MARKET_PAGE_KEY, REFERENCE_STRATEGY, RM_WATCHLIST
 from marketbrief.utils.numbers import json_safe_float
-from marketbrief.warehouse import rm_common
-from marketbrief.warehouse.market_page_parts import companies, market_mockup, shell, trade_checks
+from marketbrief.warehouse import company_sources, rm_common
+from marketbrief.warehouse.market_page_parts import companies, market_mockup, pick, shell, trade_checks
 from marketbrief.warehouse.news_items import iso
 from marketbrief.warehouse.rm_registry import BuildContext, ContractCase, PageBuilder
 
@@ -58,6 +60,17 @@ def ranges(ctx: BuildContext) -> list[dict]:
     return [range_record(row) for row in rows if row["ticker"] in ctx.active]
 
 
+def published_ranges(ctx: BuildContext) -> list[dict]:
+    """ranges.py's published range per active company and horizon of the as-of date, stored by the cut-off (B12's
+    company_sources.published_ranges, the company page's rows), shown whatever a strategy's live_from; by ticker,
+    then horizon. Empty without an as-of date."""
+    if not ctx.as_of:
+        return []
+    rows = [{"ticker": row["ticker"], **pick(row, PUBLISHED_RANGE_FIELDS)}
+            for row in company_sources.published_ranges(ctx, ctx.as_of) if row["ticker"] in ctx.active]
+    return sorted(rows, key=lambda row: (row["ticker"], row["horizon_days"]))
+
+
 def watchlist_pages(ctx: BuildContext) -> dict[str, dict]:
     """rm.watchlist: the market's one Watchlist page."""
     payload = {
@@ -67,6 +80,7 @@ def watchlist_pages(ctx: BuildContext) -> dict[str, dict]:
         "open_trades": rm_common.open_trades(ctx),
         "trade_checks": trade_checks(ctx, CHECK_FIELDS),
         "ranges": ranges(ctx),
+        "published_ranges": published_ranges(ctx),
         "strategies": rm_common.strategies(ctx, STRATEGY_FIELDS),
     }
     return {MARKET_PAGE_KEY: payload}
@@ -80,5 +94,6 @@ CONTRACT_CASES = (
         mockup="design/mockups/02-watchlist/data.json",
         mockup_payload=market_mockup,
         map_paths=("$.strategies", "$.agreement"),
+        extra_keys=("published_ranges",),
     ),
 )

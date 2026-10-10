@@ -21,11 +21,12 @@ export const READ_MODEL_COLUMNS =
   "market, page_key, as_of, cutoff, built_at, schema_version, source_commit, payload_sha256, payload";
 /** The major version of api/openapi.yaml this app serves; a stored row of another major version is refused (503). */
 export const CONTRACT_MAJOR = "2";
-/** The static reports site (config/settings.yaml pages_url): its pages work without the warehouse. */
-export const REPORTS_URL = "https://agentic-stock-prediction-reports.vercel.app";
-/** Problem.fallback_links of a market: its static dashboard and its report index. */
+/** The live app (config/warehouse.yaml app_url). The static reports site was deleted on 2026-10-10, so no link goes
+ * there any more. */
+export const APP_URL = "https://omenix.vercel.app";
+/** Problem.fallback_links of a market: its page in the live app, to try again from. */
 export function fallbackLinks(market: string): string[] {
-  return [`${REPORTS_URL}/${market}/dashboard.html`, `${REPORTS_URL}/${market}/index.html`];
+  return [`${APP_URL}/${market}`];
 }
 
 /** How a route serves a stored row (scripts/marketbrief/warehouse/contract.py `serve`). */

@@ -50,7 +50,13 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   regime), `calibrate`, `context`, and after the forecaster `ranges`, `charts` (single-purpose
   PNGs) and `report` (report skeleton + Slack summary draft with every number; agents fill only
   the `AGENT` markers, see `templates/report.md`). After the report gate passes, `html_report` builds
-  the reader's HTML report from the filled md plus the data, then `dashboard` builds
+  the reader's HTML report from the filled md plus the data (C2, `marketbrief/presentation/reader/`: a phone-first page on
+  B7's tokens with light and dark mode; the 20-second top: market mood, benchmark move, how many companies lean up or
+  down, the biggest expected moves, the paper label; one card per active company with B12's published N+1/N+3/N+5
+  ranges as a fan on the last 20 closes, B10's model P(up) as "chance of going up", the lean, a plain-language why from
+  the score's points per feature group, flags (results soon, BLOCKED, contradicted news) and the change since the
+  previous run from B12's forecast_history; paper trades and signal tiers in lean words, SIMULATED, once a strategy is
+  live; everything as of the run's clock), then `dashboard` builds
   `reports/<market>/dashboard.html` (decision-support dashboard, stored data only as of the run's clock:
   watchlist, sector heatmap, candlesticks with the published ranges via the vendored TradingView
   Lightweight Charts in `marketbrief/presentation/dashboard/vendor/` (version and SHA-256 in its NOTICE),
@@ -167,11 +173,21 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   `POST .../companies/preview` (summary, add_company's resolved identifiers; nothing written) and
   `.../companies/commands` (written through B5's tool layer only when `confirmed_summary` equals the server's own
   preview; delete typed; `web/lib/data/company-commands.ts`).
+- Public brief (C2, docs/ws/c2.md; owner decision 2026-10-10): the reader's daily page, read-only and without
+  login, at the gateway's `GET /brief/<market>/<session>-<token>` (`web/app/brief/[market]/[slug]/route.ts`,
+  `web/lib/brief/brief.ts`; B5's gateway allowlist). token = HMAC-SHA256(`BRIEF_LINK_SECRET`, market and session)
+  cut to 128 bits (`presentation/reader/links.py`), never stored: `warehouse/rm_brief.py` writes rm.brief
+  (page_key = session; the committed `reports/<market>/<session>.html` and the token's SHA-256, newest 30 reader
+  pages), the route checks the slug before reading and compares the SHA-256 in constant time; anything else is a
+  404. Without the secret no link and no rm.brief row. The HTML file stays attached in Slack as the offline backup.
 - Company pages (B12, docs/ws/b12.md; contract 2.0): `scripts/marketbrief/warehouse/rm_company.py` (builders),
   `company_payloads.py` (per-company slicing in the mockups' fields) and `company_sources.py` (the stored records read
   once per build as of the cut-off, collected companies only) build rm.stock (the whole 03-company page: the shared
   blocks, lifecycle events, agreement, picks, predictions, open trades, latest trade checks, settled trades, AI
-  reasons, news of 30 days / newest 50, results, events of the next 60 days, the last 250 bars; owner, 2026-10-08),
+  reasons, news of 30 days / newest 50, results, events of the next 60 days, the last 250 bars; owner, 2026-10-08;
+  ranges.py's `published_ranges` whatever a strategy's live_from and the `forecast_history` of every stored range and
+  score run of the last 10 as-of dates (B10's N+k labels) with each run's change, `company_history.py`; owner,
+  2026-10-10),
   rm.bars, rm.stock_strategies (04 page), rm.trades (`_`: every open trade, the latest check, the last 5 sessions'
   settlements; per ticker: the last 60 sessions) and rm.lifecycle (`<ticker>:<date>`, the last 30 sessions: the
   predictions and picks made for that session followed to their checks, settlements and AI reasons), served by
@@ -233,8 +249,9 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   `portfolio.py import-inbox`); each write dispatches `onboard.yml`; pending until imported. Every call is logged in `inbox.command_log`
   (operational, not imported); refusals are posted to #market-brief for the owner. Gateway mode (`MB_GATEWAY=1`,
   the Vercel project at `omenix-gateway.vercel.app`, `web/middleware.ts`) serves only `/slack/*` (signed, at most 5 minutes old),
-  `/mcp` (GitHub OAuth, the owner's login and numeric id only) and `/oauth/*` plus `/.well-known/oauth-*` (POST only on
-  `/slack/commands` and `/slack/interactions`). Slack:
+  `/mcp` (GitHub OAuth, the owner's login and numeric id only), `/oauth/*` plus `/.well-known/oauth-*` (POST only on
+  `/slack/commands` and `/slack/interactions`) and GET `/brief/{india|us}/{date}-{32 hex}` (C2's public read-only daily
+  brief, `web/app/brief/`, 404 on a bad token; owner, 2026-10-10). Slack:
   `/company`, `/trade`, `/ask india|us QUESTION` (the `explain` tool, answered by B8's assistant through the tool
   layer's explain hook; "coming soon" until it is wired), in #market-brief only; Confirm posts a visible request message whose
   `slack_channel`/`slack_ts` go into the inbox row for B6's onboarding reply. Web tests: `npm test` in `web/` (node test
@@ -389,13 +406,14 @@ connect to brokerage tools, and nothing here is investment advice. Design: `docs
   `reports/<market>/<session_date>.html` the self-contained reader's report linked from Slack
   (filters by sector and company; no network needed) and `reports/<market>/index.html` (all days);
   chart images in `reports/<market>/charts/<session_date>/` (`ranges`, `sectors`, `track_record`);
-  `config/settings.yaml` holds the repo URL, optional `pages_url`, the Slack channel id and the AI
-  model's `model_training_cutoff` (ai_replay's fair vs contaminated split). `pages_url` is the owner's
-  private Vercel site serving `reports/` (Vercel Authentication on all deployments), so Slack links open
-  the rendered pages. It deploys only by hand from the Vercel dashboard (`reports/vercel.json`:
-  `git.deploymentEnabled` false, owner decision 2026-10-08), so a day's links open only after the owner deploys.
-  `reports/index.html` is its hand-written landing page and `reports/vercel.json` its deployment setting (the
-  only files under `reports/` that build work may change; no script writes them)
+  `config/settings.yaml` holds the repo URL, the Slack channel id and the AI model's `model_training_cutoff`
+  (ai_replay's fair vs contaminated split) and `slack_link_url`: Slack links open `<slack_link_url>/<market>`, the
+  market's page in the app (`core.settings.slack_link_url`); with `BRIEF_LINK_SECRET` set, the daily brief's link is
+  C2's public brief page `<brief_link_url>/brief/<market>/<session>-<token>` (`gather.brief_url`,
+  `reader.links.brief_path`); the daily HTML report is attached in the day's thread
+  and the weekly report links to its repo file. The static reports site (`pages_url`) is retired from Slack links
+  (it deploys only by hand; owner, 2026-10-10); `reports/index.html` and `reports/vercel.json` are left for the later
+  static cleanup (the only files under `reports/` that build work may change; no script writes them)
 - `reports/<market>/review-YYYY-Www.md` the weekly review (record in `data/<market>/reviews/`)
 - `judgments/log.jsonl` every judge verdict on build work (append-only); daily-run verdicts are in
   `data/<market>/judgments/`

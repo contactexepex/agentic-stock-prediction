@@ -1,6 +1,6 @@
 "use client";
 // The company page's price chart (design/mockups/03-company drawChart): daily candles (hollow = closed above the open,
-// filled = below) with volume, the session being predicted (D) and the N+1..N+5 exit slots where the reference
+// filled = below) with volume, the session being predicted (D) and the N+1..N+5 exit slots where the published
 // strategy's 50% and 80% ranges draw a fan from the last close, its targets as dots on a dashed line, the selected
 // horizon's target as a tag on the price axis, the spread of every strategy's target at that horizon, and the paper
 // trades as triangles (entries below, exits above, hollow = still open). Hover or the arrow keys read each day;
@@ -10,14 +10,14 @@ import { Card, CardHead, PaperTag } from "../../../../../../components/ui/primit
 import { DASH, fmtDate, fmtDateYear, money, price, signed } from "../../../../../../lib/ui/format.ts";
 import { LOCALE } from "../../../../../../lib/ui/constants.ts";
 import { barAt, chartGeometry } from "../../../../../../lib/company-pages/chart-geometry.ts";
-import { horizonsOf, tradeMarks } from "../../../../../../lib/company-pages/company-logic.ts";
+import { horizonsOf, publishedRanges, tradeMarks } from "../../../../../../lib/company-pages/company-logic.ts";
 import type { CompanyPayload } from "../../../../../../lib/company-pages/types.ts";
 import type { PageCtx } from "./context.ts";
 import { plural } from "./labels.ts";
 
 const horizonList = (rows: Array<{ horizon_days: number }>) => horizonsOf(rows).map((k) => `N+${k}`).join(", ");
 
-function useWidth<T extends HTMLElement>(): [React.RefObject<T | null>, number] {
+export function useWidth<T extends HTMLElement>(): [React.RefObject<T | null>, number] {
   const ref = useRef<T>(null);
   const [width, setWidth] = useState(0);
   useEffect(() => {
@@ -45,7 +45,7 @@ export function PriceChart({ p, ctx, horizon }: { p: CompanyPayload; ctx: PageCt
   const cur = ctx.currency;
   const [hostRef, width] = useWidth<HTMLDivElement>();
   const [hover, setHover] = useState<number | null>(null);
-  const reference = useMemo(() => p.predictions.filter((r) => r.strategy_id === p.reference_strategy), [p.predictions, p.reference_strategy]);
+  const reference = useMemo(() => publishedRanges(p), [p]);
   const atHorizon = useMemo(() => p.predictions.filter((r) => r.horizon_days === horizon && r.target_price != null), [p.predictions, horizon]);
   const lastClose = p.bars.length ? p.bars[p.bars.length - 1].close : null;
   const tagText = price(cur, lastClose);
@@ -61,7 +61,7 @@ export function PriceChart({ p, ctx, horizon }: { p: CompanyPayload; ctx: PageCt
   const head = (
     <CardHead
       title="Price with today’s targets and ranges"
-      help="Daily candles of the stored sessions (hollow = closed above the open, filled = below). To the right of the last close: the reference strategy’s published targets for N+1..N+5 (dots on a dashed line), its 50% and 80% ranges as the shaded fan, and at the selected horizon the spread of every strategy’s target (the thin bar). Triangles mark the paper trades: entries below, exits above, hollow = still open. Hover or use the arrow keys for each day’s prices."
+      help="Daily candles of the stored sessions (hollow = closed above the open, filled = below). To the right of the last close: the published targets for N+1..N+5 (ranges.py; dots on a dashed line), their 50% and 80% ranges as the shaded fan, and at the selected horizon the spread of every strategy’s target (the thin bar). Triangles mark the paper trades: entries below, exits above, hollow = still open. Hover or use the arrow keys for each day’s prices."
       end={n ? (<span className="ctl">{n} sessions to {fmtDate(p.bars[n - 1].date)}<span className="muted">·</span><PaperTag label={p.status.paper_label} /></span>) : undefined}
     />
   );
@@ -193,7 +193,7 @@ export function PriceChart({ p, ctx, horizon }: { p: CompanyPayload; ctx: PageCt
           <>
             <span><i className="b8" />80% range</span>
             <span><i className="b5" />50% range</span>
-            <span><i className="tg" />reference target per horizon (the tag on the axis = the selected one)</span>
+            <span><i className="tg" />published target per horizon (the tag on the axis = the selected one)</span>
             {g.spread ? <span><i className="sp" />all strategies’ targets at the selected horizon</span> : null}
           </>
         ) : null}

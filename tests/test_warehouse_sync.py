@@ -46,6 +46,7 @@ MARKET_AND_TICKER_TABLES = ("compare", "trades")  # the market's page `_` and on
 MARKET_AND_STRATEGY_TABLES = ("strategies",)  # the market's page `_` and one page per registry strategy (B13)
 STRATEGY_IDS = [spec["id"] for spec in registry.strategies()]
 TICKER_DAY_TABLES = ("lifecycle",)  # one page per ticker and session, `<ticker>:<date>` (B12)
+NO_PAGE_TABLES = ("brief",)  # the public brief (C2): no page without BRIEF_LINK_SECRET (unset in these tests)
 SESSION_DAYS = rm_company.sessions_back(
     load_market("us"), market_status.status(load_market("us"), datetime.fromisoformat(CUTOFF))["session_date"],
     LIFECYCLE_SESSIONS)
@@ -63,6 +64,8 @@ def expected_keys(tickers: list[str]) -> dict[str, list[str]]:
             out[table] = ["_", *STRATEGY_IDS]
         elif table in TICKER_DAY_TABLES:
             out[table] = [f"{ticker}:{day}" for ticker in tickers for day in SESSION_DAYS]
+        elif table in NO_PAGE_TABLES:
+            out[table] = []
         else:
             out[table] = ["_"]
     return out

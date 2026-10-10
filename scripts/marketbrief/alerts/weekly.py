@@ -7,8 +7,11 @@ from marketbrief.alerts.constants import FAMILY_LABELS, LABEL_PAPER_ONLY, MSG_FO
 
 
 def build_weekly(market: str, review: dict, names: dict | None = None, currency: str | None = None,
-                 report_url: str | None = None) -> str:
-    """The weekly post of one stored research review."""
+                 links: dict | None = None) -> str:
+    """The weekly post of one stored research review. `links`: `repo` (the repo's blob base, e.g.
+    https://github.com/o/r/blob/main) for the report file, `app` (config/settings.yaml slack_link_url) for the
+    market page."""
+    links = links or {}
     names = names or {}
     currency = currency or fmt.MARKET_CURRENCY.get(market, "")
     lines = [f"*{fmt.market_label(market)} — weekly research report {review['iso_week']}*"
@@ -32,7 +35,9 @@ def build_weekly(market: str, review: dict, names: dict | None = None, currency:
     if not review.get("proposals"):
         lines.append("• No proposals this week.")
     if review.get("report_path"):
-        link = f"{report_url.rstrip('/')}/{review['report_path'].removeprefix('reports/')}" if report_url else None
-        lines.append(f"Full report: {link or review['report_path']}")
+        repo, path = links.get("repo"), review["report_path"]
+        lines.append(f"Full report: {repo.rstrip('/') + '/' + path if repo else path}")
+    if links.get("app"):
+        lines.append(f"Market page: {links['app'].rstrip('/')}/{market}")
     lines.append(MSG_FOOTER)
     return "\n".join(lines) + "\n"
