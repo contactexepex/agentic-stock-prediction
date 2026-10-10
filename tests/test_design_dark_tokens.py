@@ -14,7 +14,8 @@ def test_dark_css_is_current_and_aa():
 
 
 def test_dark_tokens_only_override_existing_names():
-    light = set(re.findall(r"(--[a-z0-9-]+)\s*:", (ROOT / "design" / "system" / "tokens.css").read_text(encoding="utf-8")))
+    tokens_css = (ROOT / "design" / "system" / "tokens.css").read_text(encoding="utf-8")
+    light = set(re.findall(r"(--[a-z0-9-]+)\s*:", tokens_css))
     unknown = [name for name in dark_tokens.DARK if name.startswith("--") and name not in light]
     assert unknown == []
 
