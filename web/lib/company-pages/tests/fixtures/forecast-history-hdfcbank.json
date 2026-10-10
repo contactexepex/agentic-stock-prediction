@@ -1,0 +1,1269 @@
+{
+ "ranges": [
+  {
+   "id": "2026-10-07-HDFCBANK-1d",
+   "ticker": "HDFCBANK",
+   "made_at": "2026-10-08T02:26:06Z",
+   "as_of_date": "2026-10-07",
+   "session_date": "2026-10-08",
+   "exit_date": "2026-10-09",
+   "horizon_days": 1,
+   "base_close": 702.75,
+   "target_price": 699.2933,
+   "center": -0.004931,
+   "sigma_h": 0.019712,
+   "lo50": 690.0546,
+   "hi50": 706.763,
+   "lo80": 682.0082,
+   "hi80": 715.6091,
+   "regime": "CALM",
+   "calibration_id": "2026-10-07-1d (pool, n=8680+0)",
+   "inputs": [
+    "beta_split"
+   ],
+   "notes": [
+    "index -0.08% expected from SPX, x beta 1.24 x0.5, own cue -0.98% net x0.5"
+   ],
+   "change": null
+  },
+  {
+   "id": "2026-10-08-HDFCBANK-1d",
+   "ticker": "HDFCBANK",
+   "made_at": "2026-10-09T02:26:28Z",
+   "as_of_date": "2026-10-08",
+   "session_date": "2026-10-09",
+   "exit_date": "2026-10-12",
+   "horizon_days": 1,
+   "base_close": 692.25,
+   "target_price": 690.2143,
+   "center": -0.002945,
+   "sigma_h": 0.019811,
+   "lo50": 680.9642,
+   "hi50": 697.529,
+   "lo80": 672.7883,
+   "hi80": 706.3731,
+   "regime": "CALM",
+   "calibration_id": "2026-10-08-1d (pool, n=8700+0)",
+   "inputs": [
+    "beta_split"
+   ],
+   "notes": [
+    "index -0.17% expected from SPX, x beta 1.23 x0.5, own cue -0.59% net x0.5"
+   ],
+   "change": {
+    "from_id": "2026-10-07-HDFCBANK-1d",
+    "from_made_at": "2026-10-08T02:26:06Z",
+    "target_pct": -1.2983,
+    "width80_pct": -0.0479,
+    "changed": [
+     "calibration_id"
+    ]
+   }
+  },
+  {
+   "id": "2026-10-07-HDFCBANK-2d",
+   "ticker": "HDFCBANK",
+   "made_at": "2026-10-08T02:26:06Z",
+   "as_of_date": "2026-10-07",
+   "session_date": "2026-10-08",
+   "exit_date": "2026-10-12",
+   "horizon_days": 2,
+   "base_close": 702.75,
+   "target_price": 699.2933,
+   "center": -0.004931,
+   "sigma_h": 0.024143,
+   "lo50": 688.0551,
+   "hi50": 708.2889,
+   "lo80": 677.7743,
+   "hi80": 719.1145,
+   "regime": "CALM",
+   "calibration_id": "2026-10-07-2d (pool, n=8660+0)",
+   "inputs": [],
+   "notes": [
+    "cue -0.98% x0.5"
+   ],
+   "change": null
+  },
+  {
+   "id": "2026-10-08-HDFCBANK-2d",
+   "ticker": "HDFCBANK",
+   "made_at": "2026-10-09T02:26:28Z",
+   "as_of_date": "2026-10-08",
+   "session_date": "2026-10-09",
+   "exit_date": "2026-10-13",
+   "horizon_days": 2,
+   "base_close": 692.25,
+   "target_price": 690.2143,
+   "center": -0.002945,
+   "sigma_h": 0.024263,
+   "lo50": 678.963,
+   "hi50": 699.118,
+   "lo80": 668.6941,
+   "hi80": 709.8313,
+   "regime": "CALM",
+   "calibration_id": "2026-10-08-2d (pool, n=8680+0)",
+   "inputs": [],
+   "notes": [
+    "cue -0.59% x0.5"
+   ],
+   "change": {
+    "from_id": "2026-10-07-HDFCBANK-2d",
+    "from_made_at": "2026-10-08T02:26:06Z",
+    "target_pct": -1.2983,
+    "width80_pct": -0.491,
+    "changed": [
+     "calibration_id"
+    ]
+   }
+  },
+  {
+   "id": "2026-10-07-HDFCBANK-3d",
+   "ticker": "HDFCBANK",
+   "made_at": "2026-10-08T02:26:06Z",
+   "as_of_date": "2026-10-07",
+   "session_date": "2026-10-08",
+   "exit_date": "2026-10-13",
+   "horizon_days": 3,
+   "base_close": 702.75,
+   "target_price": 699.2933,
+   "center": -0.004931,
+   "sigma_h": 0.027877,
+   "lo50": 685.9345,
+   "hi50": 709.6627,
+   "lo80": 674.3445,
+   "hi80": 722.1132,
+   "regime": "CALM",
+   "calibration_id": "2026-10-07-3d (pool, n=8640+0)",
+   "inputs": [],
+   "notes": [
+    "cue -0.98% x0.5"
+   ],
+   "change": null
+  },
+  {
+   "id": "2026-10-08-HDFCBANK-3d",
+   "ticker": "HDFCBANK",
+   "made_at": "2026-10-09T02:26:28Z",
+   "as_of_date": "2026-10-08",
+   "session_date": "2026-10-09",
+   "exit_date": "2026-10-14",
+   "horizon_days": 3,
+   "base_close": 692.25,
+   "target_price": 690.2143,
+   "center": -0.002945,
+   "sigma_h": 0.028016,
+   "lo50": 676.8775,
+   "hi50": 700.4008,
+   "lo80": 665.4139,
+   "hi80": 712.8045,
+   "regime": "CALM",
+   "calibration_id": "2026-10-08-3d (pool, n=8660+0)",
+   "inputs": [],
+   "notes": [
+    "cue -0.59% x0.5"
+   ],
+   "change": {
+    "from_id": "2026-10-07-HDFCBANK-3d",
+    "from_made_at": "2026-10-08T02:26:06Z",
+    "target_pct": -1.2983,
+    "width80_pct": -0.7915,
+    "changed": [
+     "calibration_id"
+    ]
+   }
+  },
+  {
+   "id": "2026-10-07-HDFCBANK-4d",
+   "ticker": "HDFCBANK",
+   "made_at": "2026-10-08T02:26:06Z",
+   "as_of_date": "2026-10-07",
+   "session_date": "2026-10-08",
+   "exit_date": "2026-10-14",
+   "horizon_days": 4,
+   "base_close": 702.75,
+   "target_price": 699.2933,
+   "center": -0.004931,
+   "sigma_h": 0.031168,
+   "lo50": 683.7882,
+   "hi50": 710.6116,
+   "lo80": 670.4231,
+   "hi80": 724.4159,
+   "regime": "CALM",
+   "calibration_id": "2026-10-07-4d (pool, n=8620+0)",
+   "inputs": [],
+   "notes": [
+    "cue -0.98% x0.5"
+   ],
+   "change": null
+  },
+  {
+   "id": "2026-10-08-HDFCBANK-4d",
+   "ticker": "HDFCBANK",
+   "made_at": "2026-10-09T02:26:28Z",
+   "as_of_date": "2026-10-08",
+   "session_date": "2026-10-09",
+   "exit_date": "2026-10-15",
+   "horizon_days": 4,
+   "base_close": 692.25,
+   "target_price": 690.2143,
+   "center": -0.002945,
+   "sigma_h": 0.031323,
+   "lo50": 674.733,
+   "hi50": 701.3819,
+   "lo80": 661.4458,
+   "hi80": 715.0951,
+   "regime": "CALM",
+   "calibration_id": "2026-10-08-4d (pool, n=8640+0)",
+   "inputs": [],
+   "notes": [
+    "cue -0.59% x0.5"
+   ],
+   "change": {
+    "from_id": "2026-10-07-HDFCBANK-4d",
+    "from_made_at": "2026-10-08T02:26:06Z",
+    "target_pct": -1.2983,
+    "width80_pct": -0.6362,
+    "changed": [
+     "calibration_id"
+    ]
+   }
+  },
+  {
+   "id": "2026-10-07-HDFCBANK-5d",
+   "ticker": "HDFCBANK",
+   "made_at": "2026-10-08T02:26:06Z",
+   "as_of_date": "2026-10-07",
+   "session_date": "2026-10-08",
+   "exit_date": "2026-10-15",
+   "horizon_days": 5,
+   "base_close": 702.75,
+   "target_price": 699.2933,
+   "center": -0.004931,
+   "sigma_h": 0.034143,
+   "lo50": 682.3521,
+   "hi50": 711.89,
+   "lo80": 668.2199,
+   "hi80": 727.3867,
+   "regime": "CALM",
+   "calibration_id": "2026-10-07-5d (pool, n=8600+0)",
+   "inputs": [],
+   "notes": [
+    "cue -0.98% x0.5"
+   ],
+   "change": null
+  },
+  {
+   "id": "2026-10-08-HDFCBANK-5d",
+   "ticker": "HDFCBANK",
+   "made_at": "2026-10-09T02:26:28Z",
+   "as_of_date": "2026-10-08",
+   "session_date": "2026-10-09",
+   "exit_date": "2026-10-16",
+   "horizon_days": 5,
+   "base_close": 692.25,
+   "target_price": 690.2143,
+   "center": -0.002945,
+   "sigma_h": 0.034313,
+   "lo50": 673.2775,
+   "hi50": 702.6852,
+   "lo80": 659.1564,
+   "hi80": 718.0127,
+   "regime": "CALM",
+   "calibration_id": "2026-10-08-5d (pool, n=8620+0)",
+   "inputs": [],
+   "notes": [
+    "cue -0.59% x0.5"
+   ],
+   "change": {
+    "from_id": "2026-10-07-HDFCBANK-5d",
+    "from_made_at": "2026-10-08T02:26:06Z",
+    "target_pct": -1.2983,
+    "width80_pct": -0.5248,
+    "changed": [
+     "calibration_id"
+    ]
+   }
+  }
+ ],
+ "scores": [
+  {
+   "id": "2026-10-06-HDFCBANK-1d",
+   "ticker": "HDFCBANK",
+   "computed_at": "2026-10-07T05:08:03Z",
+   "as_of_date": "2026-10-06",
+   "entry_date": "2026-10-07",
+   "exit_date": "2026-10-08",
+   "horizon_days": 1,
+   "prob_up": 0.4697,
+   "prob_model": 0.4711,
+   "base_rate": 0.4756,
+   "news_score": -0.054,
+   "model_version": "logit-v1",
+   "model_id": "india-1d-open_to_close-logit-v1-2026-10-01",
+   "trained_until": "2026-10-01",
+   "groups": {
+    "baseline": -0.45,
+    "market": 0.0,
+    "momentum": 0.0,
+    "news": -0.13,
+    "oscillator": 0.0,
+    "regime": 0.0,
+    "relative strength": 0.0,
+    "volatility": 0.0,
+    "volume": 0.0
+   },
+   "drivers_up": [],
+   "drivers_down": [
+    {
+     "feature": "news",
+     "points": -0.13,
+     "text": "verified news score -0.05 (1 item(s)): -0.1 pts"
+    }
+   ],
+   "news_items": 1,
+   "news_ids": [
+    "ba14ee8a9b2558de"
+   ],
+   "change": null
+  },
+  {
+   "id": "2026-10-06-HDFCBANK-1d",
+   "ticker": "HDFCBANK",
+   "computed_at": "2026-10-07T05:11:06Z",
+   "as_of_date": "2026-10-06",
+   "entry_date": "2026-10-07",
+   "exit_date": "2026-10-08",
+   "horizon_days": 1,
+   "prob_up": 0.4714,
+   "prob_model": 0.4711,
+   "base_rate": 0.4756,
+   "news_score": 0.0135,
+   "model_version": "logit-v1",
+   "model_id": "india-1d-open_to_close-logit-v1-2026-10-01",
+   "trained_until": "2026-10-01",
+   "groups": {
+    "baseline": -0.45,
+    "market": 0.0,
+    "momentum": 0.0,
+    "news": 0.03,
+    "oscillator": 0.0,
+    "regime": 0.0,
+    "relative strength": 0.0,
+    "volatility": 0.0,
+    "volume": 0.0
+   },
+   "drivers_up": [],
+   "drivers_down": [],
+   "news_items": 3,
+   "news_ids": [
+    "ba14ee8a9b2558de",
+    "dd31e044314de2b7",
+    "187981f2c0de3577"
+   ],
+   "change": {
+    "from_id": "2026-10-06-HDFCBANK-1d",
+    "from_computed_at": "2026-10-07T05:08:03Z",
+    "prob_up": 0.0017,
+    "groups": {
+     "news": 0.16
+    },
+    "news_added": [
+     "dd31e044314de2b7",
+     "187981f2c0de3577"
+    ],
+    "news_dropped": [],
+    "changed": []
+   }
+  },
+  {
+   "id": "2026-10-07-HDFCBANK-1d",
+   "ticker": "HDFCBANK",
+   "computed_at": "2026-10-08T02:17:48Z",
+   "as_of_date": "2026-10-07",
+   "entry_date": "2026-10-08",
+   "exit_date": "2026-10-09",
+   "horizon_days": 1,
+   "prob_up": 0.4706,
+   "prob_model": 0.4711,
+   "base_rate": 0.4756,
+   "news_score": -0.0203,
+   "model_version": "logit-v1",
+   "model_id": "india-1d-open_to_close-logit-v1-2026-10-01",
+   "trained_until": "2026-10-01",
+   "groups": {
+    "baseline": -0.45,
+    "market": 0.0,
+    "momentum": 0.0,
+    "news": -0.05,
+    "oscillator": 0.0,
+    "regime": 0.0,
+    "relative strength": 0.0,
+    "volatility": 0.0,
+    "volume": 0.0
+   },
+   "drivers_up": [],
+   "drivers_down": [
+    {
+     "feature": "news",
+     "points": -0.05,
+     "text": "verified news score -0.02 (2 item(s)): -0.1 pts"
+    }
+   ],
+   "news_items": 2,
+   "news_ids": [
+    "ba14ee8a9b2558de",
+    "187981f2c0de3577"
+   ],
+   "change": {
+    "from_id": "2026-10-06-HDFCBANK-1d",
+    "from_computed_at": "2026-10-07T05:11:06Z",
+    "prob_up": -0.0008,
+    "groups": {
+     "news": -0.08
+    },
+    "news_added": [],
+    "news_dropped": [
+     "dd31e044314de2b7"
+    ],
+    "changed": []
+   }
+  },
+  {
+   "id": "2026-10-08-HDFCBANK-1d",
+   "ticker": "HDFCBANK",
+   "computed_at": "2026-10-09T02:16:31Z",
+   "as_of_date": "2026-10-08",
+   "entry_date": "2026-10-09",
+   "exit_date": "2026-10-12",
+   "horizon_days": 1,
+   "prob_up": 0.4719,
+   "prob_model": 0.4711,
+   "base_rate": 0.4756,
+   "news_score": 0.0337,
+   "model_version": "logit-v1",
+   "model_id": "india-1d-open_to_close-logit-v1-2026-10-01",
+   "trained_until": "2026-10-01",
+   "groups": {
+    "baseline": -0.45,
+    "market": 0.0,
+    "momentum": 0.0,
+    "news": 0.08,
+    "oscillator": 0.0,
+    "regime": 0.0,
+    "relative strength": 0.0,
+    "volatility": 0.0,
+    "volume": 0.0
+   },
+   "drivers_up": [
+    {
+     "feature": "news",
+     "points": 0.08,
+     "text": "verified news score +0.03 (4 item(s)): +0.1 pts"
+    }
+   ],
+   "drivers_down": [],
+   "news_items": 4,
+   "news_ids": [
+    "187981f2c0de3577",
+    "06fecfa16d032786",
+    "65154b6d5c3a267a",
+    "063a1eb883bb560e"
+   ],
+   "change": {
+    "from_id": "2026-10-07-HDFCBANK-1d",
+    "from_computed_at": "2026-10-08T02:17:48Z",
+    "prob_up": 0.0013,
+    "groups": {
+     "news": 0.13
+    },
+    "news_added": [
+     "06fecfa16d032786",
+     "65154b6d5c3a267a",
+     "063a1eb883bb560e"
+    ],
+    "news_dropped": [
+     "ba14ee8a9b2558de"
+    ],
+    "changed": []
+   }
+  },
+  {
+   "id": "2026-10-08-HDFCBANK-1d",
+   "ticker": "HDFCBANK",
+   "computed_at": "2026-10-09T02:21:45Z",
+   "as_of_date": "2026-10-08",
+   "entry_date": "2026-10-09",
+   "exit_date": "2026-10-12",
+   "horizon_days": 1,
+   "prob_up": 0.4696,
+   "prob_model": 0.4711,
+   "base_rate": 0.4756,
+   "news_score": -0.0585,
+   "model_version": "logit-v1",
+   "model_id": "india-1d-open_to_close-logit-v1-2026-10-01",
+   "trained_until": "2026-10-01",
+   "groups": {
+    "baseline": -0.45,
+    "market": 0.0,
+    "momentum": 0.0,
+    "news": -0.15,
+    "oscillator": 0.0,
+    "regime": 0.0,
+    "relative strength": 0.0,
+    "volatility": 0.0,
+    "volume": 0.0
+   },
+   "drivers_up": [],
+   "drivers_down": [
+    {
+     "feature": "news",
+     "points": -0.15,
+     "text": "verified news score -0.06 (7 item(s)): -0.1 pts"
+    }
+   ],
+   "news_items": 7,
+   "news_ids": [
+    "187981f2c0de3577",
+    "06fecfa16d032786",
+    "65154b6d5c3a267a",
+    "063a1eb883bb560e",
+    "4c9751d69e516062",
+    "438721d4c526d281",
+    "c79cc049eb587e57"
+   ],
+   "change": {
+    "from_id": "2026-10-08-HDFCBANK-1d",
+    "from_computed_at": "2026-10-09T02:16:31Z",
+    "prob_up": -0.0023,
+    "groups": {
+     "news": -0.23
+    },
+    "news_added": [
+     "4c9751d69e516062",
+     "438721d4c526d281",
+     "c79cc049eb587e57"
+    ],
+    "news_dropped": [],
+    "changed": []
+   }
+  },
+  {
+   "id": "2026-10-07-HDFCBANK-2d",
+   "ticker": "HDFCBANK",
+   "computed_at": "2026-10-08T02:17:48Z",
+   "as_of_date": "2026-10-07",
+   "entry_date": "2026-10-08",
+   "exit_date": "2026-10-12",
+   "horizon_days": 2,
+   "prob_up": 0.4694,
+   "prob_model": 0.4699,
+   "base_rate": 0.4763,
+   "news_score": -0.0203,
+   "model_version": "logit-v1",
+   "model_id": "india-2d-n_plus_k-logit-v1-2026-10-01",
+   "trained_until": "2026-10-01",
+   "groups": {
+    "baseline": -0.56,
+    "market": 0.02,
+    "momentum": 0.12,
+    "news": -0.05,
+    "oscillator": 0.05,
+    "regime": -0.19,
+    "relative strength": -0.1,
+    "volatility": 0.01,
+    "volume": 0.0
+   },
+   "drivers_up": [
+    {
+     "feature": "beta_1y",
+     "points": 0.07,
+     "text": "beta 1.24: +0.1 pts"
+    },
+    {
+     "feature": "ret_5d",
+     "points": 0.05,
+     "text": "5-day return -2.8%: +0.1 pts"
+    },
+    {
+     "feature": "ret_1d",
+     "points": 0.05,
+     "text": "1-day return -1.2%: +0.1 pts"
+    }
+   ],
+   "drivers_down": [
+    {
+     "feature": "rel_sector_5d",
+     "points": -0.17,
+     "text": "5-day return vs sector peers -7.8%: -0.2 pts"
+    },
+    {
+     "feature": "regime_calm",
+     "points": -0.12,
+     "text": "regime CALM: -0.1 pts"
+    },
+    {
+     "feature": "news",
+     "points": -0.05,
+     "text": "verified news score -0.02 (2 item(s)): -0.1 pts"
+    }
+   ],
+   "news_items": 2,
+   "news_ids": [
+    "ba14ee8a9b2558de",
+    "187981f2c0de3577"
+   ],
+   "change": null
+  },
+  {
+   "id": "2026-10-08-HDFCBANK-2d",
+   "ticker": "HDFCBANK",
+   "computed_at": "2026-10-09T02:16:31Z",
+   "as_of_date": "2026-10-08",
+   "entry_date": "2026-10-09",
+   "exit_date": "2026-10-13",
+   "horizon_days": 2,
+   "prob_up": 0.4716,
+   "prob_model": 0.4707,
+   "base_rate": 0.4763,
+   "news_score": 0.0337,
+   "model_version": "logit-v1",
+   "model_id": "india-2d-n_plus_k-logit-v1-2026-10-01",
+   "trained_until": "2026-10-01",
+   "groups": {
+    "baseline": -0.56,
+    "market": 0.03,
+    "momentum": 0.1,
+    "news": 0.08,
+    "oscillator": 0.07,
+    "regime": -0.19,
+    "relative strength": -0.03,
+    "volatility": 0.01,
+    "volume": 0.01
+   },
+   "drivers_up": [
+    {
+     "feature": "news",
+     "points": 0.08,
+     "text": "verified news score +0.03 (4 item(s)): +0.1 pts"
+    },
+    {
+     "feature": "rsi_14",
+     "points": 0.07,
+     "text": "RSI 38.9, near oversold: +0.1 pts"
+    },
+    {
+     "feature": "beta_1y",
+     "points": 0.06,
+     "text": "beta 1.23: +0.1 pts"
+    }
+   ],
+   "drivers_down": [
+    {
+     "feature": "regime_calm",
+     "points": -0.12,
+     "text": "regime CALM: -0.1 pts"
+    },
+    {
+     "feature": "rel_sector_5d",
+     "points": -0.1,
+     "text": "5-day return vs sector peers -4.4%: -0.1 pts"
+    }
+   ],
+   "news_items": 4,
+   "news_ids": [
+    "187981f2c0de3577",
+    "06fecfa16d032786",
+    "65154b6d5c3a267a",
+    "063a1eb883bb560e"
+   ],
+   "change": {
+    "from_id": "2026-10-07-HDFCBANK-2d",
+    "from_computed_at": "2026-10-08T02:17:48Z",
+    "prob_up": 0.0022,
+    "groups": {
+     "market": 0.01,
+     "momentum": -0.02,
+     "news": 0.13,
+     "oscillator": 0.02,
+     "relative strength": 0.07,
+     "volume": 0.01
+    },
+    "news_added": [
+     "06fecfa16d032786",
+     "65154b6d5c3a267a",
+     "063a1eb883bb560e"
+    ],
+    "news_dropped": [
+     "ba14ee8a9b2558de"
+    ],
+    "changed": []
+   }
+  },
+  {
+   "id": "2026-10-08-HDFCBANK-2d",
+   "ticker": "HDFCBANK",
+   "computed_at": "2026-10-09T02:21:45Z",
+   "as_of_date": "2026-10-08",
+   "entry_date": "2026-10-09",
+   "exit_date": "2026-10-13",
+   "horizon_days": 2,
+   "prob_up": 0.4693,
+   "prob_model": 0.4707,
+   "base_rate": 0.4763,
+   "news_score": -0.0585,
+   "model_version": "logit-v1",
+   "model_id": "india-2d-n_plus_k-logit-v1-2026-10-01",
+   "trained_until": "2026-10-01",
+   "groups": {
+    "baseline": -0.56,
+    "market": 0.03,
+    "momentum": 0.1,
+    "news": -0.15,
+    "oscillator": 0.07,
+    "regime": -0.19,
+    "relative strength": -0.03,
+    "volatility": 0.01,
+    "volume": 0.01
+   },
+   "drivers_up": [
+    {
+     "feature": "rsi_14",
+     "points": 0.07,
+     "text": "RSI 38.9, near oversold: +0.1 pts"
+    },
+    {
+     "feature": "beta_1y",
+     "points": 0.06,
+     "text": "beta 1.23: +0.1 pts"
+    },
+    {
+     "feature": "ret_1d",
+     "points": 0.06,
+     "text": "1-day return -1.5%: +0.1 pts"
+    }
+   ],
+   "drivers_down": [
+    {
+     "feature": "news",
+     "points": -0.15,
+     "text": "verified news score -0.06 (7 item(s)): -0.1 pts"
+    },
+    {
+     "feature": "regime_calm",
+     "points": -0.12,
+     "text": "regime CALM: -0.1 pts"
+    },
+    {
+     "feature": "rel_sector_5d",
+     "points": -0.1,
+     "text": "5-day return vs sector peers -4.4%: -0.1 pts"
+    }
+   ],
+   "news_items": 7,
+   "news_ids": [
+    "187981f2c0de3577",
+    "06fecfa16d032786",
+    "65154b6d5c3a267a",
+    "063a1eb883bb560e",
+    "4c9751d69e516062",
+    "438721d4c526d281",
+    "c79cc049eb587e57"
+   ],
+   "change": {
+    "from_id": "2026-10-08-HDFCBANK-2d",
+    "from_computed_at": "2026-10-09T02:16:31Z",
+    "prob_up": -0.0023,
+    "groups": {
+     "news": -0.23
+    },
+    "news_added": [
+     "4c9751d69e516062",
+     "438721d4c526d281",
+     "c79cc049eb587e57"
+    ],
+    "news_dropped": [],
+    "changed": []
+   }
+  },
+  {
+   "id": "2026-10-07-HDFCBANK-3d",
+   "ticker": "HDFCBANK",
+   "computed_at": "2026-10-08T02:17:49Z",
+   "as_of_date": "2026-10-07",
+   "entry_date": "2026-10-08",
+   "exit_date": "2026-10-13",
+   "horizon_days": 3,
+   "prob_up": 0.4674,
+   "prob_model": 0.4679,
+   "base_rate": 0.4834,
+   "news_score": -0.0203,
+   "model_version": "logit-v1",
+   "model_id": "india-3d-n_plus_k-logit-v1-2026-10-01",
+   "trained_until": "2026-10-01",
+   "groups": {
+    "baseline": -1.55,
+    "market": 0.0,
+    "momentum": 0.0,
+    "news": -0.05,
+    "oscillator": 0.0,
+    "regime": 0.0,
+    "relative strength": 0.0,
+    "volatility": 0.0,
+    "volume": 0.0
+   },
+   "drivers_up": [],
+   "drivers_down": [
+    {
+     "feature": "news",
+     "points": -0.05,
+     "text": "verified news score -0.02 (2 item(s)): -0.1 pts"
+    }
+   ],
+   "news_items": 2,
+   "news_ids": [
+    "ba14ee8a9b2558de",
+    "187981f2c0de3577"
+   ],
+   "change": null
+  },
+  {
+   "id": "2026-10-08-HDFCBANK-3d",
+   "ticker": "HDFCBANK",
+   "computed_at": "2026-10-09T02:16:31Z",
+   "as_of_date": "2026-10-08",
+   "entry_date": "2026-10-09",
+   "exit_date": "2026-10-14",
+   "horizon_days": 3,
+   "prob_up": 0.4688,
+   "prob_model": 0.4679,
+   "base_rate": 0.4834,
+   "news_score": 0.0337,
+   "model_version": "logit-v1",
+   "model_id": "india-3d-n_plus_k-logit-v1-2026-10-01",
+   "trained_until": "2026-10-01",
+   "groups": {
+    "baseline": -1.55,
+    "market": 0.0,
+    "momentum": 0.0,
+    "news": 0.08,
+    "oscillator": 0.0,
+    "regime": 0.0,
+    "relative strength": 0.0,
+    "volatility": 0.0,
+    "volume": 0.0
+   },
+   "drivers_up": [
+    {
+     "feature": "news",
+     "points": 0.08,
+     "text": "verified news score +0.03 (4 item(s)): +0.1 pts"
+    }
+   ],
+   "drivers_down": [],
+   "news_items": 4,
+   "news_ids": [
+    "187981f2c0de3577",
+    "06fecfa16d032786",
+    "65154b6d5c3a267a",
+    "063a1eb883bb560e"
+   ],
+   "change": {
+    "from_id": "2026-10-07-HDFCBANK-3d",
+    "from_computed_at": "2026-10-08T02:17:49Z",
+    "prob_up": 0.0014,
+    "groups": {
+     "news": 0.13
+    },
+    "news_added": [
+     "06fecfa16d032786",
+     "65154b6d5c3a267a",
+     "063a1eb883bb560e"
+    ],
+    "news_dropped": [
+     "ba14ee8a9b2558de"
+    ],
+    "changed": []
+   }
+  },
+  {
+   "id": "2026-10-08-HDFCBANK-3d",
+   "ticker": "HDFCBANK",
+   "computed_at": "2026-10-09T02:21:45Z",
+   "as_of_date": "2026-10-08",
+   "entry_date": "2026-10-09",
+   "exit_date": "2026-10-14",
+   "horizon_days": 3,
+   "prob_up": 0.4665,
+   "prob_model": 0.4679,
+   "base_rate": 0.4834,
+   "news_score": -0.0585,
+   "model_version": "logit-v1",
+   "model_id": "india-3d-n_plus_k-logit-v1-2026-10-01",
+   "trained_until": "2026-10-01",
+   "groups": {
+    "baseline": -1.55,
+    "market": 0.0,
+    "momentum": 0.0,
+    "news": -0.15,
+    "oscillator": 0.0,
+    "regime": 0.0,
+    "relative strength": 0.0,
+    "volatility": 0.0,
+    "volume": 0.0
+   },
+   "drivers_up": [],
+   "drivers_down": [
+    {
+     "feature": "news",
+     "points": -0.15,
+     "text": "verified news score -0.06 (7 item(s)): -0.1 pts"
+    }
+   ],
+   "news_items": 7,
+   "news_ids": [
+    "187981f2c0de3577",
+    "06fecfa16d032786",
+    "65154b6d5c3a267a",
+    "063a1eb883bb560e",
+    "4c9751d69e516062",
+    "438721d4c526d281",
+    "c79cc049eb587e57"
+   ],
+   "change": {
+    "from_id": "2026-10-08-HDFCBANK-3d",
+    "from_computed_at": "2026-10-09T02:16:31Z",
+    "prob_up": -0.0023,
+    "groups": {
+     "news": -0.23
+    },
+    "news_added": [
+     "4c9751d69e516062",
+     "438721d4c526d281",
+     "c79cc049eb587e57"
+    ],
+    "news_dropped": [],
+    "changed": []
+   }
+  },
+  {
+   "id": "2026-10-07-HDFCBANK-4d",
+   "ticker": "HDFCBANK",
+   "computed_at": "2026-10-08T02:17:50Z",
+   "as_of_date": "2026-10-07",
+   "entry_date": "2026-10-08",
+   "exit_date": "2026-10-14",
+   "horizon_days": 4,
+   "prob_up": 0.4699,
+   "prob_model": 0.4704,
+   "base_rate": 0.4866,
+   "news_score": -0.0203,
+   "model_version": "logit-v1",
+   "model_id": "india-4d-n_plus_k-logit-v1-2026-10-01",
+   "trained_until": "2026-10-01",
+   "groups": {
+    "baseline": -1.62,
+    "market": 0.0,
+    "momentum": 0.0,
+    "news": -0.05,
+    "oscillator": 0.0,
+    "regime": 0.0,
+    "relative strength": 0.0,
+    "volatility": 0.0,
+    "volume": 0.0
+   },
+   "drivers_up": [],
+   "drivers_down": [
+    {
+     "feature": "news",
+     "points": -0.05,
+     "text": "verified news score -0.02 (2 item(s)): -0.1 pts"
+    }
+   ],
+   "news_items": 2,
+   "news_ids": [
+    "ba14ee8a9b2558de",
+    "187981f2c0de3577"
+   ],
+   "change": null
+  },
+  {
+   "id": "2026-10-08-HDFCBANK-4d",
+   "ticker": "HDFCBANK",
+   "computed_at": "2026-10-09T02:16:31Z",
+   "as_of_date": "2026-10-08",
+   "entry_date": "2026-10-09",
+   "exit_date": "2026-10-15",
+   "horizon_days": 4,
+   "prob_up": 0.4713,
+   "prob_model": 0.4704,
+   "base_rate": 0.4866,
+   "news_score": 0.0337,
+   "model_version": "logit-v1",
+   "model_id": "india-4d-n_plus_k-logit-v1-2026-10-01",
+   "trained_until": "2026-10-01",
+   "groups": {
+    "baseline": -1.62,
+    "market": 0.0,
+    "momentum": 0.0,
+    "news": 0.08,
+    "oscillator": 0.0,
+    "regime": 0.0,
+    "relative strength": 0.0,
+    "volatility": 0.0,
+    "volume": 0.0
+   },
+   "drivers_up": [
+    {
+     "feature": "news",
+     "points": 0.08,
+     "text": "verified news score +0.03 (4 item(s)): +0.1 pts"
+    }
+   ],
+   "drivers_down": [],
+   "news_items": 4,
+   "news_ids": [
+    "187981f2c0de3577",
+    "06fecfa16d032786",
+    "65154b6d5c3a267a",
+    "063a1eb883bb560e"
+   ],
+   "change": {
+    "from_id": "2026-10-07-HDFCBANK-4d",
+    "from_computed_at": "2026-10-08T02:17:50Z",
+    "prob_up": 0.0014,
+    "groups": {
+     "news": 0.13
+    },
+    "news_added": [
+     "06fecfa16d032786",
+     "65154b6d5c3a267a",
+     "063a1eb883bb560e"
+    ],
+    "news_dropped": [
+     "ba14ee8a9b2558de"
+    ],
+    "changed": []
+   }
+  },
+  {
+   "id": "2026-10-08-HDFCBANK-4d",
+   "ticker": "HDFCBANK",
+   "computed_at": "2026-10-09T02:21:45Z",
+   "as_of_date": "2026-10-08",
+   "entry_date": "2026-10-09",
+   "exit_date": "2026-10-15",
+   "horizon_days": 4,
+   "prob_up": 0.469,
+   "prob_model": 0.4704,
+   "base_rate": 0.4866,
+   "news_score": -0.0585,
+   "model_version": "logit-v1",
+   "model_id": "india-4d-n_plus_k-logit-v1-2026-10-01",
+   "trained_until": "2026-10-01",
+   "groups": {
+    "baseline": -1.62,
+    "market": 0.0,
+    "momentum": 0.0,
+    "news": -0.15,
+    "oscillator": 0.0,
+    "regime": 0.0,
+    "relative strength": 0.0,
+    "volatility": 0.0,
+    "volume": 0.0
+   },
+   "drivers_up": [],
+   "drivers_down": [
+    {
+     "feature": "news",
+     "points": -0.15,
+     "text": "verified news score -0.06 (7 item(s)): -0.1 pts"
+    }
+   ],
+   "news_items": 7,
+   "news_ids": [
+    "187981f2c0de3577",
+    "06fecfa16d032786",
+    "65154b6d5c3a267a",
+    "063a1eb883bb560e",
+    "4c9751d69e516062",
+    "438721d4c526d281",
+    "c79cc049eb587e57"
+   ],
+   "change": {
+    "from_id": "2026-10-08-HDFCBANK-4d",
+    "from_computed_at": "2026-10-09T02:16:31Z",
+    "prob_up": -0.0023,
+    "groups": {
+     "news": -0.23
+    },
+    "news_added": [
+     "4c9751d69e516062",
+     "438721d4c526d281",
+     "c79cc049eb587e57"
+    ],
+    "news_dropped": [],
+    "changed": []
+   }
+  },
+  {
+   "id": "2026-10-07-HDFCBANK-5d",
+   "ticker": "HDFCBANK",
+   "computed_at": "2026-10-08T02:17:50Z",
+   "as_of_date": "2026-10-07",
+   "entry_date": "2026-10-08",
+   "exit_date": "2026-10-15",
+   "horizon_days": 5,
+   "prob_up": 0.4654,
+   "prob_model": 0.4659,
+   "base_rate": 0.4866,
+   "news_score": -0.0203,
+   "model_version": "logit-v1",
+   "model_id": "india-5d-n_plus_k-logit-v1-2026-10-01",
+   "trained_until": "2026-10-01",
+   "groups": {
+    "baseline": -2.07,
+    "market": 0.0,
+    "momentum": 0.0,
+    "news": -0.05,
+    "oscillator": 0.0,
+    "regime": 0.0,
+    "relative strength": 0.0,
+    "volatility": 0.0,
+    "volume": 0.0
+   },
+   "drivers_up": [],
+   "drivers_down": [
+    {
+     "feature": "news",
+     "points": -0.05,
+     "text": "verified news score -0.02 (2 item(s)): -0.1 pts"
+    }
+   ],
+   "news_items": 2,
+   "news_ids": [
+    "ba14ee8a9b2558de",
+    "187981f2c0de3577"
+   ],
+   "change": null
+  },
+  {
+   "id": "2026-10-08-HDFCBANK-5d",
+   "ticker": "HDFCBANK",
+   "computed_at": "2026-10-09T02:16:31Z",
+   "as_of_date": "2026-10-08",
+   "entry_date": "2026-10-09",
+   "exit_date": "2026-10-16",
+   "horizon_days": 5,
+   "prob_up": 0.4667,
+   "prob_model": 0.4659,
+   "base_rate": 0.4866,
+   "news_score": 0.0337,
+   "model_version": "logit-v1",
+   "model_id": "india-5d-n_plus_k-logit-v1-2026-10-01",
+   "trained_until": "2026-10-01",
+   "groups": {
+    "baseline": -2.07,
+    "market": 0.0,
+    "momentum": 0.0,
+    "news": 0.08,
+    "oscillator": 0.0,
+    "regime": 0.0,
+    "relative strength": 0.0,
+    "volatility": 0.0,
+    "volume": 0.0
+   },
+   "drivers_up": [
+    {
+     "feature": "news",
+     "points": 0.08,
+     "text": "verified news score +0.03 (4 item(s)): +0.1 pts"
+    }
+   ],
+   "drivers_down": [],
+   "news_items": 4,
+   "news_ids": [
+    "187981f2c0de3577",
+    "06fecfa16d032786",
+    "65154b6d5c3a267a",
+    "063a1eb883bb560e"
+   ],
+   "change": {
+    "from_id": "2026-10-07-HDFCBANK-5d",
+    "from_computed_at": "2026-10-08T02:17:50Z",
+    "prob_up": 0.0013,
+    "groups": {
+     "news": 0.13
+    },
+    "news_added": [
+     "06fecfa16d032786",
+     "65154b6d5c3a267a",
+     "063a1eb883bb560e"
+    ],
+    "news_dropped": [
+     "ba14ee8a9b2558de"
+    ],
+    "changed": []
+   }
+  },
+  {
+   "id": "2026-10-08-HDFCBANK-5d",
+   "ticker": "HDFCBANK",
+   "computed_at": "2026-10-09T02:21:45Z",
+   "as_of_date": "2026-10-08",
+   "entry_date": "2026-10-09",
+   "exit_date": "2026-10-16",
+   "horizon_days": 5,
+   "prob_up": 0.4644,
+   "prob_model": 0.4659,
+   "base_rate": 0.4866,
+   "news_score": -0.0585,
+   "model_version": "logit-v1",
+   "model_id": "india-5d-n_plus_k-logit-v1-2026-10-01",
+   "trained_until": "2026-10-01",
+   "groups": {
+    "baseline": -2.07,
+    "market": 0.0,
+    "momentum": 0.0,
+    "news": -0.15,
+    "oscillator": 0.0,
+    "regime": 0.0,
+    "relative strength": 0.0,
+    "volatility": 0.0,
+    "volume": 0.0
+   },
+   "drivers_up": [],
+   "drivers_down": [
+    {
+     "feature": "news",
+     "points": -0.15,
+     "text": "verified news score -0.06 (7 item(s)): -0.1 pts"
+    }
+   ],
+   "news_items": 7,
+   "news_ids": [
+    "187981f2c0de3577",
+    "06fecfa16d032786",
+    "65154b6d5c3a267a",
+    "063a1eb883bb560e",
+    "4c9751d69e516062",
+    "438721d4c526d281",
+    "c79cc049eb587e57"
+   ],
+   "change": {
+    "from_id": "2026-10-08-HDFCBANK-5d",
+    "from_computed_at": "2026-10-09T02:16:31Z",
+    "prob_up": -0.0023,
+    "groups": {
+     "news": -0.23
+    },
+    "news_added": [
+     "4c9751d69e516062",
+     "438721d4c526d281",
+     "c79cc049eb587e57"
+    ],
+    "news_dropped": [],
+    "changed": []
+   }
+  }
+ ]
+}
