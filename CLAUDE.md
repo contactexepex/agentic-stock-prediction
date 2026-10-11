@@ -5,6 +5,10 @@ prices, overnight cues, news, events and SEC filings, compute PASDS indicators a
 regime, reason over them with subagents, make small, scored predictions, store everything in
 this repo and post one Slack digest per market. Research only: never place trades, never
 connect to brokerage tools, and nothing here is investment advice. Design: `docs/DESIGN.md`.
+Accounts and evaluation (final design v16): `docs/PLAN_v16.md` (approved, never edited), its clarification
+register `docs/PLAN_v16_errata.md` (DC-1 to DC-12, DC-11 withdrawn) and the 58 approved implementation stories
+`docs/PLAN_v16_stories.md` (GitHub issues #361-#418, index #419). Run its Appendix E script from the repository
+root as `MB_NOW=2026-10-09T23:59:00Z PYTHONPATH=scripts python docs/plan_volatility.py`.
 
 ## Layout
 - `config/markets/<market>.yaml` per market: exchange calendar, timezone, market-level symbols
