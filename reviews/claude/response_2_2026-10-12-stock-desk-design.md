@@ -18,7 +18,7 @@ results blackout blocks the reporting company, but not its peers (section 4 belo
 ## 1. Checks of review 1's numbers (all re-run by me on 12 Oct 2026)
 
 **Strong evidence: DuckDB queries on the stored data, and the arithmetic in a script.** I did not re-run review 1's
-AUC figures (0.4853 / 0.4826 and the weekly 0.4877 / 0.4829); they match the AUCs already in the design (section 2).
+AUC figures (0.4853 / 0.4826 and the weekly 0.4877 / 0.4829); the first pair matches the design's 0.485 / 0.483 (section 2) after rounding; the weekly pair is not in the design.
 
 | Review 1 claim | My check | Result |
 |---|---|---|
