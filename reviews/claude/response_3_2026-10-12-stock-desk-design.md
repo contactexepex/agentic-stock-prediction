@@ -23,7 +23,7 @@ disagree on one small point: the weight of one newly cited paper (2.5 below). It
 | About 161 India / 160 US events have entry and exit bars | events with E + 2 calendar days between 7 Oct 2024 and 2 Oct 2026 (a rough version of review 2's check) | 161 and 160: **confirmed** |
 | Cleaned timing: India 30 before open / 82 during / 129 after close / 1 untimed; US 140 / 5 / 95 / 1 | `earnings_events` on `event_history` before 10 Oct 2026 | **confirmed**. My response 2 counts were the raw rows, labelled as such; review 2 is right that the study must use these |
 | Stored earnings rows have no `accepted_at`; `first_seen_at` is October 2026 collection | `event_history` by source | `accepted_at` filled on 0 rows for every source; first seen 5-7 Oct 2026: **confirmed** |
-| SE = 5/√240 = 0.3227; 95% half-width 0.6326; one-sided 80% power at α 0.05 / 0.01: 0.8025 / 1.0225 | arithmetic: (1.645 + 0.842) × 0.3227 and (2.326 + 0.842) × 0.3227 | **confirmed** |
+| SE = 5/√240 = 0.3227; 95% half-width 0.6326; one-sided 80% power at α 0.05 / 0.01: 0.8025 / 1.0225 | arithmetic: (1.645 + 0.842) × 0.3227 (0.8027 recomputed; review 2 rounds to 0.8025) and (2.326 + 0.842) × 0.3227 | **confirmed** |
 
 ## 2. Point-by-point decisions
 
@@ -39,9 +39,10 @@ labels, corporate actions, eligibility and fills reduce it further. Version 4 ad
 
 **How to get past the price limit (reasoning only, my proposal):** the code to rebuild the long history already exists.
 `model_history.py` fetches Yahoo daily bars from 2011 into `work/model_history/` with `auto_adjust=False` (the stored
-basis), paced, and writes a manifest with one SHA-256 per file (`marketbrief/model/history_cache.py` line 145).
+basis, split-adjusted as of the fetch), paced, and writes a manifest with the SHA-256 of its single bars file
+(`marketbrief/model/history_cache.py` line 145).
 DC-12 (7) already says the cache is frozen as a dated copy with that manifest. Running it is an existing tool on an
-allowlisted HTTPS source, not a code change. That would cover the full Oct 2023 event inventory.
+HTTPS source the project already uses through its paced Yahoo client, not a code change. That would cover the full Oct 2023 event inventory.
 
 Its limits, stated:
 - Yahoo's history today is not point-in-time and has no delisted names;
@@ -92,8 +93,8 @@ mapping; meeting 1 reports both as labelled sensitivities. No design text change
 
 ### 2.5 Subrahmanyam (2026) — **partly accepted: the conclusion yes, the weight no**
 
-**Reasoning only.** Review 2 cites a 2026 paper in the *Journal of Investment and Management* from Science
-Publishing Group. That publisher has been widely criticised for weak peer review (it appeared on Beall's list of
+**Reasoning only.** Review 2 cites a 2026 paper from Science Publishing Group (its URL, `sciencepublishinggroup.com/.../j.jim...`, points to that
+publisher's investment journal). That publisher has been widely criticised for weak peer review (it appeared on Beall's list of
 possibly predatory publishers). I would give the paper little weight. Its direction, drift concentrated in very small
 companies, agrees with Martineau (2022), so it changes no prior and no decision. This note only keeps the evidence
 labels honest.

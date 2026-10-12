@@ -23,6 +23,8 @@ in [response 3](../reviews/claude/response_3_2026-10-12-stock-desk-design.md)):*
 3. S9 details: the leader's news must be public before the pre-open cut-off; peers whose own results fall inside the
    holding window are reported apart (11). New research family S10, price-pressure recovery (4).
 4. "No trade = 0" means incremental value against staying in cash (5.4).
+5. Review 2's bounds on shadow role attribution (6); S9's price coverage noted (4); section 13's open questions
+   replaced.
 
 **Version 3 (after [ChatGPT review 1](../reviews/chatgpt/review_1_2026-10-12-stock-desk-design.md); Claude's
 checks and reasons in [response 2](../reviews/claude/response_2_2026-10-12-stock-desk-design.md)):**
@@ -481,8 +483,8 @@ prediction its own record, not a funded position) stay as the **measurement** of
    - **Coverage first (amendment A):** before any inference, a table of events, entry and exit price bars, labels and
      availability times per market. The stored `bars` start on 7 Oct 2024: of the 242 India and 241 US releases,
      about 161 and 160 have the entry and exit bars. The study either rebuilds and freezes the long-history cache
-     (`model_history.py`, Yahoo, paced; a dated copy with its per-file SHA-256 manifest, DC-12 (7), as-traded basis
-     DC-12 (2)) or keeps to the covered period, and says which. Timing counts are reported for the cleaned sample
+     (`model_history.py`, Yahoo, paced; a dated copy with its manifest's SHA-256, DC-12 (7); Yahoo's bars are
+     split-adjusted as of the fetch, so DC-12 (2)'s as-traded rebuild applies) or keeps to the covered period, and says which. Timing counts are reported for the cleaned sample
      (`earnings_events`), not the raw rows. The release time is a filing-time proxy unless checked against dated
      primary evidence: a sample is checked, unknowns stay visible, and a later 10-Q/10-K's classification is never
      used as an entry-known feature.
