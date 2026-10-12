@@ -384,3 +384,43 @@ cases.push(
     expectText: ["No range or score run stored for this company at N+1 in the last 10 as-of dates."],
   },
 );
+
+// B17's evening run (B12's `run` field, schema ForecastRun): an evening preview on the range card and the chart, and
+// the evening / pre-open names in the forecast history, where the pre-open run says it revises the evening run.
+function withEvening(history) {
+  const ranges = [], scores = [];
+  for (const [list, out, key] of [[history.ranges, ranges, "made_at"], [history.scores, scores, "computed_at"]]) {
+    for (const row of list) {
+      if (row.horizon_days !== 1 || row.as_of_date !== "2026-10-08") { out.push({ ...row, run: null }); continue; }
+      if (out.some((r) => r.run === "evening" && r.id === row.id)) { out.push({ ...row, run: "pre_open" }); continue; }
+      const evening = { ...row, run: "evening", [key]: "2026-10-08T14:30:00Z" };
+      out.push(evening, { ...row, run: "pre_open", change: { ...row.change, from_id: evening.id, [key === "made_at" ? "from_made_at" : "from_computed_at"]: evening[key] } });
+    }
+  }
+  return { ranges, scores };
+}
+
+cases.push({
+  name: "company-evening-preview",
+  path: "/india/stocks/HDFCBANK",
+  widths: [1280, 390],
+  waitFor: ".fh-chart svg",
+  api: companyApi((p) => {
+    // the newest stored range per horizon of the real sample (as of 2026-10-08), N+1 as the evening preview
+    const newest = new Map();
+    for (const r of hdfcHistory.ranges) newest.set(r.horizon_days, r);
+    const published = [...newest.values()].map(({ change, inputs, notes, center, sigma_h, calibration_id, ticker, ...r }) => ({ ...r, run: r.horizon_days === 1 ? "evening" : "pre_open" }));
+    return { ...p, published_ranges: published, forecast_history: withEvening(hdfcHistory) };
+  }),
+  expectText: ["evening preview · never traded", "pre-open revision of the evening run", "hollow = evening run"],
+  check: async (page) => {
+    const problems = [];
+    const eve = await page.$$eval(".chart .fan .tg.eve", (c) => c.length);
+    if (eve !== 1) problems.push(`price chart marks ${eve} evening targets, expected 1 (N+1)`);
+    const tags = await page.$$eval(".fh-runs > .fh-run .fh-tag", (ts) => ts.map((t) => t.textContent));
+    if (!tags.includes("evening") || !tags.includes("pre-open")) problems.push(`run tags ${JSON.stringify(tags)} lack evening or pre-open`);
+    const hollow = await page.$$eval(".fh-chart circle.eve", (c) => c.length);
+    if (hollow !== 2) problems.push(`forecast history draws ${hollow} evening points, expected 2 (one range, one score)`);
+    return problems;
+  },
+});

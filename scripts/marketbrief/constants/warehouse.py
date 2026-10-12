@@ -30,6 +30,7 @@ MSG_DUPLICATE_TABLE = "read models: table {table!r} is built by two modules (own
 SERVE_VERBATIM = "verbatim"  # 1.0 pages: the payload as stored
 SERVE_PAGE = "page"  # 2.0 page payloads: plus cutoff and built_at at the top and status.freshness
 SERVE_STATUS = "status"  # the status page: plus freshness at the top
+INVALID_PAGES_KEY = "invalid_pages"  # status payload: pages that failed validation this sync (old rows kept)
 FRESH_MINUTES = 1140  # a page older than this is stale (two missed syncs, docs/ws/b4.md; web/lib/data/constants.ts)
 FRESHNESS_FRESH, FRESHNESS_STALE, FRESHNESS_UNKNOWN = "fresh", "stale", "unknown"
 RM_STATUS = "status"

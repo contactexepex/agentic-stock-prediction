@@ -69,6 +69,51 @@
                    "payload_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
                    "payload": {"cutoff": "2026-10-07T11:58:00Z", "built_at": null,
                                "status": {"freshness": {"state": "unknown", "built_at": null, "age_minutes": null}}}}
+    },
+    {
+      "name": "an unchanged page counts its freshness from the market's last sync (synced_at) when that is later",
+      "mode": "page",
+      "synced_at": "2026-10-07T11:00:00Z",
+      "row": {"market": "us", "page_key": "_", "as_of": "2026-10-05", "cutoff": "2026-10-05T20:00:00Z",
+              "built_at": "2026-10-05T20:00:00Z", "schema_version": "2.0.0", "source_commit": "abc",
+              "payload_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+              "payload": {"status": {"market": "us"}}},
+      "expected": {"market": "us", "page_key": "_", "as_of": "2026-10-05", "cutoff": "2026-10-05T20:00:00Z",
+                   "built_at": "2026-10-05T20:00:00Z", "schema_version": "2.0.0", "source_commit": "abc",
+                   "payload_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+                   "payload": {"cutoff": "2026-10-05T20:00:00Z", "built_at": "2026-10-05T20:00:00Z",
+                               "status": {"market": "us",
+                                          "freshness": {"state": "fresh", "built_at": "2026-10-07T11:00:00Z",
+                                                        "age_minutes": 60}}}}
+    },
+    {
+      "name": "a synced_at older than the page's own built_at is ignored",
+      "mode": "page",
+      "synced_at": "2026-10-06T00:00:00Z",
+      "row": {"market": "india", "page_key": "_", "as_of": "2026-10-06", "cutoff": "2026-10-07T11:00:00Z",
+              "built_at": "2026-10-07T11:00:00Z", "schema_version": "2.0.0", "source_commit": "abc",
+              "payload_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+              "payload": {"status": {}}},
+      "expected": {"market": "india", "page_key": "_", "as_of": "2026-10-06", "cutoff": "2026-10-07T11:00:00Z",
+                   "built_at": "2026-10-07T11:00:00Z", "schema_version": "2.0.0", "source_commit": "abc",
+                   "payload_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+                   "payload": {"cutoff": "2026-10-07T11:00:00Z", "built_at": "2026-10-07T11:00:00Z",
+                               "status": {"freshness": {"state": "fresh", "built_at": "2026-10-07T11:00:00Z",
+                                                        "age_minutes": 60}}}}
+    },
+    {
+      "name": "the status mode ignores synced_at (rm.status's own built_at is the sync)",
+      "mode": "status",
+      "synced_at": "2026-10-07T11:00:00Z",
+      "row": {"market": "us", "page_key": "_", "as_of": null, "cutoff": "2026-10-05T20:00:00Z",
+              "built_at": "2026-10-05T20:00:00Z", "schema_version": "2.0.0", "source_commit": "abc",
+              "payload_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+              "payload": {"market": "us"}},
+      "expected": {"market": "us", "page_key": "_", "as_of": null, "cutoff": "2026-10-05T20:00:00Z",
+                   "built_at": "2026-10-05T20:00:00Z", "schema_version": "2.0.0", "source_commit": "abc",
+                   "payload_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+                   "payload": {"market": "us", "freshness": {"state": "stale", "built_at": "2026-10-05T20:00:00Z",
+                                                             "age_minutes": 2400}}}
     }
   ]
 }

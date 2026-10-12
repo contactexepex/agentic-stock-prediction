@@ -82,7 +82,8 @@ CONTRACT_CASES = (
         table=RM_STATUS,
         mockup="design/mockups/01-home/data.json",
         mockup_payload=status_mockup,
-        # the status page adds plan, last_daily_run and last_news_run (1.0) to the mockups' status record
-        extra_keys=("plan", "last_daily_run", "last_news_run"),
+        # the status page adds plan, last_daily_run and last_news_run (1.0) and the sync's invalid_pages to the
+        # mockups' status record
+        extra_keys=("plan", "last_daily_run", "last_news_run", "invalid_pages"),
     ),
 )
