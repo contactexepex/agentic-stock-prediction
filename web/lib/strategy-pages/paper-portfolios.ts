@@ -13,7 +13,8 @@ export interface OpenTrade {
   horizon_days: number;
   entry_date: string;
   exit_date: string;
-  entry_price: number;
+  /** Null while `price_pending` (entered at D's open, no price stored or checked yet; B4). */
+  entry_price: number | null;
   target_price: number;
   lo80: number;
   lo50: number;
@@ -24,6 +25,8 @@ export interface OpenTrade {
   unrealised_pnl: number | null;
   unrealised_pct: number | null;
   to_target_pct: number | null;
+  /** Entered at D's open but no price stored or checked yet: prices, quantity and unrealised figures are null (B4). */
+  price_pending?: boolean;
 }
 
 export interface TradeCheck {

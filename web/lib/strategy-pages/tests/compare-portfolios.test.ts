@@ -123,3 +123,16 @@ test("receipt states and the idempotency key's format", () => {
   assert.match(newIdempotencyKey(), /^[A-Za-z0-9_-]{8,64}$/);
   assert.notEqual(newIdempotencyKey(), newIdempotencyKey());
 });
+
+test("a price-pending open trade is counted as open but adds nothing to the unrealised sums", () => {
+  const p = structuredClone(mockup<PaperPortfoliosPayload>("07-paper-portfolios"));
+  const before = openSummary(p);
+  const first = p.open_trades[0];
+  const was = first.unrealised_pnl ?? 0;
+  Object.assign(first, { price_pending: true, entry_price: null, last_price: null, unrealised_pnl: null, unrealised_pct: null });
+  const after = openSummary(p);
+  assert.equal(after.open, before.open);
+  assert.equal(Math.round((after.unrealised ?? 0) * 100), Math.round(((before.unrealised ?? 0) - was) * 100));
+  const group = groupOpenTrades(p.open_trades, p.strategies, { family: null, view: null }).find((g) => g.trades.includes(first))!;
+  assert.ok(group.unrealised !== null && Number.isFinite(group.unrealised));
+});
