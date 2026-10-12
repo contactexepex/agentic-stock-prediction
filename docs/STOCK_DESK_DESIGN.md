@@ -3,8 +3,8 @@
 **Approved by the owner on 12 Oct 2026 (version 4, agreed by both AIs; ChatGPT reviews 1-3, Claude responses 2-4).
 No implementation and no research run starts until the owner says so (owner, 12 Oct 2026).**
 
-**Version 4 (12 Oct 2026), after ChatGPT reviews 1 and 2, for the owner and ChatGPT to review. Design only.** Nothing is built, run or
-changed until both AIs agree every section and the owner approves (section 14).
+**Version 4 (12 Oct 2026), after ChatGPT reviews 1 and 2. Design only.** Both AIs agreed every section and the owner
+approved it (section 14); nothing is built or run until the owner starts it.
 
 **Sources read for this version, in full:**
 - the F&O project `exepex/trading`:
@@ -532,16 +532,16 @@ Each step is one batch under CLAUDE.md's delivery strategy: one builder, one jud
    Axis Direct NRI. Which applies changes which horizons can ever pay.
 
 **Owner's answers (12 Oct 2026):**
-- **1. First meeting:** approved with the design: desk meeting 1 on S1 with S9 (section 11), not started until the
-  owner says so.
-- **Long-history rebuild** (section 11, amendment A): yes, rebuild and freeze it with `model_history.py`, as part of
-  meeting 1 when it starts.
+- **1. First meeting:** not answered separately; the owner approved the design, whose section 11 makes desk meeting 1
+  S1 with S9. Not started until the owner says so.
+- **Long-history rebuild** (section 11, amendment A): "Yes, rebuild it". Not started yet (no implementation until the
+  owner says so).
 - **2. Out-of-watchlist fetch:** still open.
 - **3. Slack ranking:** yes, count independent strategy families only (a later small change to B6's alert, judged as
   usual; not started yet).
 - **4. India broker:** the owner will use **Groww**. Its NRI account availability and its published charges (brokerage,
   DP and any NRI charges) must be confirmed from Groww's own schedule before any cost uses them; nothing here
-  asserts them. Until then research labels India costs as v16's zero-brokerage scenario. Replacing v16's scenario
+  asserts them. Replacing v16's scenario
   or the lab's Axis Direct costs is a separate owner-approved change (PLAN_v16 is never edited; a clarification
   goes to its errata).
 
@@ -557,16 +557,16 @@ Reviews 1 and 2 answered the questions of versions 2 and 3. The open ones are in
 
 | Section | Claude | ChatGPT | Owner |
 |---|---|---|---|
-| 1 Why a team | Agreed; v3 removes the size exception (response 2, 2.1) | Agreed || Approved 12 Oct 2026 |
-| 2 Where we stand | Agreed; v3 corrects the cost hurdle and the "trades" wording (2.7) | Agreed || Approved 12 Oct 2026 |
-| 3 Fit with PLAN_v16 | Agreed | Agreed || Approved 12 Oct 2026 |
-| 4 Edge map | Agreed; v4 applies amendment A and adds S10 (response 3) | Agreed || Approved 12 Oct 2026 |
-| 5 The team | Agreed; v3 adds the opportunity record and the model rule (2.3, 2.8) | Agreed || Approved 12 Oct 2026 |
-| 6 Scorecards | Agreed; v4 adds review 2's bounds on shadow attribution (response 3) | Agreed || Approved 12 Oct 2026 |
-| 7 Two loops | Agreed | Agreed || Approved 12 Oct 2026 |
-| 8 Evidence rules | Agreed; v3 freezes the cohort first (2.5) | Agreed || Approved 12 Oct 2026 |
-| 9 Risk and money | Agreed; v3 marks the additions diagnostic (2.8) | Agreed || Approved 12 Oct 2026 |
-| 10 Running cost | Agreed; v3 follows 5.2 for models (2.8) | Agreed || Approved 12 Oct 2026 |
+| 1 Why a team | Agreed; v3 removes the size exception (response 2, 2.1) | Agreed | Approved 12 Oct 2026 |
+| 2 Where we stand | Agreed; v3 corrects the cost hurdle and the "trades" wording (2.7) | Agreed | Approved 12 Oct 2026 |
+| 3 Fit with PLAN_v16 | Agreed | Agreed | Approved 12 Oct 2026 |
+| 4 Edge map | Agreed; v4 applies amendment A and adds S10 (response 3) | Agreed | Approved 12 Oct 2026 |
+| 5 The team | Agreed; v3 adds the opportunity record and the model rule (2.3, 2.8) | Agreed | Approved 12 Oct 2026 |
+| 6 Scorecards | Agreed; v4 adds review 2's bounds on shadow attribution (response 3) | Agreed | Approved 12 Oct 2026 |
+| 7 Two loops | Agreed | Agreed | Approved 12 Oct 2026 |
+| 8 Evidence rules | Agreed; v3 freezes the cohort first (2.5) | Agreed | Approved 12 Oct 2026 |
+| 9 Risk and money | Agreed; v3 marks the additions diagnostic (2.8) | Agreed | Approved 12 Oct 2026 |
+| 10 Running cost | Agreed; v3 follows 5.2 for models (2.8) | Agreed | Approved 12 Oct 2026 |
 | 11 Build order | Agreed; v4 applies amendments A and B and the S9 conditions (response 3) | Agreed | Approved 12 Oct 2026 |
 
 The design is final when both AIs mark every section "agreed" (or the owner settles a disagreement) and the owner
