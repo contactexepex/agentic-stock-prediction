@@ -50,7 +50,8 @@ The dashboard has moved to `github.com/exepex/omenix-dashboard`. Until the owner
 `web/`, `api/` or `design/` of this repository changes: no edits, no new mockups, no dependency bumps. All dashboard
 and mockup work happens only in `exepex/omenix-dashboard`. Backend work (`data/`, `scripts/`, routines, warehouse
 sync) continues as normal; a backend change that would need an edit under `web/`, `api/` or `design/` (for example a
-new API field or a rebuilt catalogue example) is held and raised with the owner instead.
+new API field or a rebuilt catalogue example) is held and raised with the owner instead. While the freeze lasts it overrides the web lane of "Delivery strategy",
+the one-builder permission to edit `web/` files, and the Layout's descriptions of those folders as being built.
 
 ## Layout
 - `config/markets/<market>.yaml` per market: exchange calendar, timezone, market-level symbols
