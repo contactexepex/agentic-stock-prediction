@@ -11,8 +11,10 @@ researchers, forecaster or AI traders) and posts nothing to Slack. Its rows are 
   marked `run: "evening"`;
 - model scores go to `model_scores` with `run: "evening"`.
 The next pre-open run (routine/PROMPT.md) adds overnight news and cues and writes the revision of record in `ranges`
-and `strategy_predictions`. Only those rows trade: if the pre-open run fails, nothing trades that day. The website
-shows the evening and pre-open values side by side (B12's forecast history).
+and `strategy_predictions`. Only those rows trade: if the pre-open run fails, nothing trades that day. On the
+website, B12's forecast history shows the evening model scores beside the pre-open ones. The evening ranges and
+predictions are stored for it, but no page reads them yet; they show once B12 reads them (B10's `range_runs` and
+`strategy_predictions_evening`).
 
 Data rules: files under `data/` are append-only. Only the scripts below write there; you write only under `work/`.
 Every step prints a JSON summary: save it under `work/steps/`.
@@ -22,8 +24,9 @@ Every step prints a JSON summary: save it under `work/steps/`.
 
 2. Session check: `python scripts/market_status.py > work/steps/market_status.json`.
    - If `in_session` or `late_run` is true, the day's bar is not final yet: stop, and say so in your final message.
-   - Do not stop on `trading_day` false. India's Friday evening run falls on a Saturday local date, and after a day
-     without a session the steps below find nothing new, because they skip ids already stored.
+   - Do not stop on `trading_day` false. India's Friday evening run falls on a Saturday local date. After a day
+     without a session, steps 4-6 write nothing new, because they skip ids already stored (`features.py` and
+     `calibrate.py` still append their usual rows).
 
 3. Close bars and indicators:
    - `python scripts/collect_prices.py > work/steps/collect_prices.json` (the day's final bars);
@@ -36,7 +39,7 @@ Every step prints a JSON summary: save it under `work/steps/`.
 
 4. Model scores: `python scripts/model_scores.py --evening > work/steps/model_scores.json`. It appends each
    ticker's P(up) per horizon for the next session, tagged `run: "evening"` (a row only where the probability
-   changed). The pre-open run's own model scores are the revision. If it fails, note it and go on; step 5 then uses
+   changed). The pre-open run's own model scores are the revision. If it fails, note it and go on; step 6 then uses
    the newest stored scores.
 
 5. Preview ranges: `python scripts/ranges.py --evening > work/steps/ranges.json`. It writes the 50% and 80% ranges
@@ -45,19 +48,22 @@ Every step prints a JSON summary: save it under `work/steps/`.
 
 6. Preview predictions: `python scripts/lab.py predict --evening > work/steps/lab_predict.json`. It appends the
    rule strategies' and baselines' predictions for D, the next session, to `strategy_predictions_evening`. Ids
-   already stored there are skipped. It writes no abstentions, cost views or picks. Exit 2 (`ok` false, e.g. the
-   evening ranges or scores are missing): note its `message` and go on.
+   already stored there are skipped. It writes no abstentions, cost views or picks. Without evening ranges for D
+   (step 5 failed or wrote none), it still exits 0, with `predictions` 0 and every row counted in
+   `abstained_not_stored`: name that in your final message. On a non-zero exit, note its `message` and go on.
 
 7. Save: `git add data && git diff --cached --quiet || git commit -m "<market> evening forecast TODAY"` (TODAY =
    `date -u +%F`), then `git push origin HEAD:main`. If the push is rejected, `git pull --rebase origin main` and push
    again. If that rebase stops on a conflict in an append-only `data/` file (a news run appended to the same day file
    meanwhile), resolve it as step 12 of routine/PROMPT.md says: main's version, then only this run's added lines
-   whose `id` is not in it. A conflict outside `data/`, or a second failed push: stop and say so.
+   whose `id` is not in it. A conflicted file without an `id` (a price CSV the post-close run also appended
+   that day) keeps main's version alone (`git show origin/main:<path>`): both runs stored the session's final bars.
+   A conflict outside `data/`, or a second failed push: stop and say so.
 
 8. Warehouse (optional, never blocking): only when step 7 pushed a commit,
    `python scripts/warehouse_sync.py > work/steps/warehouse_sync.json`. It copies the market's stored data as of now
-   into MotherDuck, rebuilds the read models whose payload changed (the company pages then show the evening preview)
-   and revalidates the app's cache of them. Needs `MOTHERDUCK_TOKEN`; without it the local file under `work/` is
+   into MotherDuck, rebuilds the read models whose payload changed (the company pages then show the evening model
+   scores) and revalidates the app's cache of them. Needs `MOTHERDUCK_TOKEN`; without it the local file under `work/` is
    written instead. Note any failure or skip; never retry and never run `--full`.
 
 9. End with a short message:

@@ -1,6 +1,6 @@
 Run the weekly research run for MARKET=<india|us> in this repository (docs/SPEC.md F6.2; session B3, notes in
-docs/ws/b3.md). Schedule: Friday 19:30 New York time for both markets (owner decision 2026-10-10; cron in
-docs/DESIGN.md section 2), after the week's last post-close and evening runs. It is separate from the existing weekly review (step 10a of the first pre-open run of the ISO week), which
+docs/ws/b3.md). Schedule: Friday 19:30 New York time for both markets (owner decision 2026-10-10: Friday evening; cron
+in docs/DESIGN.md section 2), after the week's last post-close and evening runs. It is separate from the existing weekly review (step 10a of the first pre-open run of the ISO week), which
 stays as it is. Follow CLAUDE.md. Work from the repo root. Export `MB_MARKET=<market>` and `PYTHONPATH=scripts`.
 Research only: never place trades; the director's proposals change nothing until the owner applies them. Run every
 step below even on a week without a session: each script says when it has nothing to do.

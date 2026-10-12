@@ -375,8 +375,8 @@ shows the path.
    words for every head-to-head trade settled today and for the day's 5 biggest wins and 5 biggest
    misses across all trades (decision 43); each grounded in the trade's automatic reason (F1.10) and
    citing ids; a gate checks ids and numbers (like `lessons.py`).
-2. **Weekly research director** (Opus, in a new weekly run, Friday 19:30 New York time for both markets since the owner's decision of
-   2026-10-10 (first planned for Saturday), separate from the existing
+2. **Weekly research director** (Opus, in a new weekly run on Friday evening New York time for both markets since the owner's decision
+   of 2026-10-10 (first planned for Saturday), separate from the existing
    weekly review, which stays step 10a of the first pre-open run of the ISO week): reads the scoreboard (F7), the news-impact study
    (F3), the week's EOD analyses and lessons; writes the weekly report: who is ahead and why, which
    information helped, and proposals (new strategy versions, weights, thresholds) as config diffs for
@@ -664,7 +664,7 @@ trades to rank"), and keeps the best strategy overall beside the per-company bes
 | Anthropic API | dashboard chat and `/ask` | a dedicated workspace with a $20 monthly spend limit and a key in it |
 | Neo4j | relationship graph, optional | none |
 
-Routine schedule per market (per market per weekday: 1 pre-open + 2 intraday + 1 post-close; plus 31 combined news
+Routine schedule per market (per market per weekday: 1 pre-open + 2 intraday + 1 post-close + 1 evening forecast; plus 31 combined news
 sessions a week for both markets (owner decision 2026-10-12) and 1 weekly research run):
 
 | Run | India | US | Contents |
@@ -674,7 +674,7 @@ sessions a week for both markets (owner decision 2026-10-12) and 1 weekly resear
 | Post-close (new) | 17:45 IST | 18:15 New York | close bars, settlement, EOD analyst, sync, Slack close results |
 | Evening forecast (owner decision 2026-10-10) | 21:30 UTC Mon-Fri | 18:30 New York Mon-Fri | preview ranges, model scores and rule predictions on the close (never traded), sync |
 | News (combined india+us session; owner decision 2026-10-12) | 10:45 IST daily, 13:45 IST weekdays | 11:27 and 17:27 New York daily, 14:27 New York weekdays | news, articles, clusters, sync |
-| Weekly research (new; Friday since owner decision 2026-10-10) | Friday 19:30 New York | Friday 19:30 New York | news-impact study, research director, weekly post |
+| Weekly research (new; Friday evening since owner decision 2026-10-10; 19:30 pending the owner's answer to 19:00 vs 19:30) | Friday 19:30 New York | Friday 19:30 New York | news-impact study, research director, weekly post |
 
 ## 8. How the UI connects to the backend
 
