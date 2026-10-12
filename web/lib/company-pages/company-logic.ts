@@ -142,7 +142,7 @@ export function companyEventEffect(type: string): EventEffect | null {
 }
 
 /** A range row the card and the chart draw: the horizon, its exit session, target and 50% / 80% bands. */
-export type RangeRow = Pick<PublishedRange, "horizon_days" | "exit_date" | "target_price" | "lo50" | "hi50" | "lo80" | "hi80">;
+export type RangeRow = Pick<PublishedRange, "horizon_days" | "exit_date" | "target_price" | "lo50" | "hi50" | "lo80" | "hi80" | "run">;
 
 /** The published ranges per horizon, sorted by horizon: B12's `published_ranges` (ranges.py, shown whatever the
  *  strategies' live_from) when the payload carries the field, else the reference strategy's predictions (payloads

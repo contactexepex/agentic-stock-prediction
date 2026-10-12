@@ -4,7 +4,7 @@ copy in a temporary folder, outside any repository); nothing here ever writes a 
 
 The director writes work/research_review.json:
 `{"findings": [{"text", "cited_ids"}], "proposals": [{"proposal_id", "kind", "file", "diff", "rationale",
-"cited_ids"}], "prompt_version": "director-v1"}`. Checks: findings 1-60 words and rationales 1-80 words, each citing
+"cited_ids"}], "prompt_version": "director-v2"}`. Checks: findings 1-60 words and rationales 1-80 words, each citing
 ids of the week's inputs (director_facts.citable), every number in them one of the cited records' numbers, no trade
 advice; proposal ids p-<iso_week>-<n> in order; kind new_strategy_version | weight | threshold; file one of
 PROPOSAL_FILES; the diff (unified, paths a/<file> b/<file>, with context lines) applies; for config/strategies.yaml
