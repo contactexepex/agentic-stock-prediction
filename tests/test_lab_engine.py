@@ -81,6 +81,28 @@ def test_qualifies_and_quantity():
     assert quantity("us", 1000.0, 300.0) == 3.333333
 
 
+def test_costs_groww_config_hand_checked():
+    # The configured India broker (config/costs.yaml, Groww NRI Non-PIS, SPEC decision 54): B = S = 100000;
+    # brokerage max(.001 x 100000, 100) x 2 = 200.00, STT .001 x 200000 = 200.00, exchange .0000307 x 200000 =
+    # 6.14, SEBI 0.20, stamp 15.00, GST .18 x (200 + 6.14 + 0.2) = 37.1412 -> 37.14; market 458.48. Your view adds
+    # no reporting charge and DP Rs 20 x 1.18 = 23.60 on the sale: 482.08.
+    rate = lab_costs.rates("india")
+    views = lab_costs.cost_views("india", rate, (100000.0, 100000.0), 50.0)
+    assert views["market"]["total"] == 458.48 and views["market"]["lines"]["brokerage"] == 200.0
+    assert views["your"]["total"] == 482.08
+    assert views["your"]["lines"]["dp_charge"] == 23.6 and "nri_reporting_buy" not in views["your"]["lines"]
+    # below Rs 1 lakh the Rs 100 minimum applies: B 5000 and S 5100 pay 100 + 100
+    assert lab_costs.cost_views("india", rate, (5000.0, 5100.0), 5.0)["market"]["lines"]["brokerage"] == 200.0
+    # a buy alone carries no DP charge
+    assert "dp_charge" not in lab_costs.cost_views("india", rate, (100000.0, 0.0), 50.0)["your"]["lines"]
+
+
+def test_dp_charge_gst_switch():
+    rate = {**INDIA_RATES, "dp_charge_min": 20.0, "dp_charge_rate": 0.0}
+    assert lab_costs.india_your_lines(rate, 0.0, 1000.0)["dp_charge"] == 20.0
+    assert lab_costs.india_your_lines({**rate, "dp_charge_gst": True}, 0.0, 1000.0)["dp_charge"] == pytest.approx(23.6)
+
+
 def test_costs_hand_checked_both_views():
     # India N+1 RELIANCE, market view: B = 100000, S = 102000; brokerage .0075 x 100000 + .0075 x 102000 = 1515.00,
     # STT .001 x 202000 = 202.00, exchange 6.2014 -> 6.20, SEBI 0.202 -> 0.20, stamp .00015 x B = 15.00,

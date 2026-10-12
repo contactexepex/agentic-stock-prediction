@@ -353,7 +353,7 @@ trades).
 | exit_quantity, adjustment_ids | Shares after a split or bonus in the window, and that adjustment | `adjustments` (exists) | shares, ids | `4.36167`, empty |
 | entry_value, exit_value | Quantity × price | engine | ₹ / $ | `1000.00` -> `1042.00` |
 | gross_pnl | Profit before costs | engine | ₹ / $ | `42.00` |
-| costs, cost_lines | Round-trip charges with their parts, the **market-cost view** that strategies are ranked on (F1.6; rates in `config/costs.yaml`: the statutory ones marked verify, the `broker:` charges owner-confirmed 2026-10-08). India: brokerage (0.75 %, at least ₹50 per order), STT, exchange, SEBI, stamp duty, GST. US: BUX order fee converted to $, SEC fee. The owner's own extra charges are in the [Cost view](#cost-view) | B2's engine | ₹ / $ | `2.34` = order fee `2.32` + SEC fee `0.02`; India RELIANCE N+1 `1966.41` |
+| costs, cost_lines | Round-trip charges with their parts, the **market-cost view** that strategies are ranked on (F1.6; rates in `config/costs.yaml`: the statutory ones marked verify, the `broker:` charges: India Groww from 2026-10-12, SPEC decision 54, US owner-confirmed 2026-10-08). India: brokerage (Groww 0.10 %, at least ₹100 per order; Axis Direct 0.75 %, at least ₹50, until 2026-10-12), STT, exchange, SEBI, stamp duty, GST. US: BUX order fee converted to $, SEC fee. The owner's own extra charges are in the [Cost view](#cost-view) | B2's engine | ₹ / $ | `2.34` = order fee `2.32` + SEC fee `0.02`; India RELIANCE N+1 `1966.41` |
 | net_pnl | Profit after costs (the headline number) | engine | ₹ / $ | `39.66` |
 | return_pct | Net profit as % of the amount (compares across amounts, decision 44) | engine | % | `3.97` |
 | prob_up, target_price, lo80, hi80 | What was predicted | prediction | 0-1, ₹ / $ | `0.583`, `227.84`, `218.36`-`237.72` |
@@ -387,8 +387,9 @@ The examples follow B2's split (`marketbrief/lab/reasons.py`).
 
 The two cost views of one record (owner decisions 50-51):
 - **market cost**: the costs strategies are ranked on, the same as the [paper trade](#paper-trade)'s `costs`;
-- **your cost**: market cost plus the owner's own charges. India: the NRI reporting charge ₹200 on the buy date and
-  ₹200 on the sell date, and the DP charge. US: BUX's FX markup 0.75 % each way and the 0.20 % a year portfolio fee,
+- **your cost**: market cost plus the owner's own charges. India: the DP charge (Groww: ₹20 plus GST per scrip sold)
+  and the NRI reporting charge per trade date (none with Groww; ₹200 on the buy date and ₹200 on the sell date under
+  Axis Direct until 2026-10-12). US: BUX's FX markup 0.75 % each way and the 0.20 % a year portfolio fee,
   pro-rated.
 
 It also holds the **cost-viable** flag: whether the expected gain after your cost is above zero (owner decision of
@@ -422,7 +423,7 @@ None of the example predictions or picks is cost-viable: a round trip at your co
 | expected_gain_your_pct | `p × move − (1 − p) × loss − your_cost_pct` (predictions and picks only) | B2, `lab/gain.py` | % | `-1.9891` |
 | cost_viable | Expected gain after your cost is above zero (predictions and picks only; empty without a probability) | B2, decision 51, owner decision of 2026-10-07 | yes/no | `false` |
 | market_costs, market_cost_lines | The market view, total and per charge | B2 | ₹ / $ | `2.34` = order fee `2.32` + SEC fee `0.02` |
-| your_costs, your_cost_lines | Your view, total and per charge | B2 | ₹ / $ | `17.68` = market lines + FX markup `15.31` + portfolio fee `0.03`; India adds `nri_reporting_buy` and `nri_reporting_sell` `200` each and `dp_charge` |
+| your_costs, your_cost_lines | Your view, total and per charge | B2 | ₹ / $ | `17.68` = market lines + FX markup `15.31` + portfolio fee `0.03`; India adds `nri_reporting_buy` and `nri_reporting_sell` (`200` each under Axis Direct, absent with Groww from 2026-10-12) and `dp_charge` (Groww: `23.6`) |
 | net_pnl_market, return_pct_market, net_pnl_your, return_pct_your | Profit after costs in each view (settlements only) | B2 | ₹ / $, % | `39.66` / `3.966`; `24.32` / `2.432` |
 | holding_days | Calendar days from D to the exit (the US portfolio fee) | calendar | days | `5` |
 | eurusd_entry, eurusd_exit | The EUR/USD closes used for the US order fee and FX markup | `EURUSD=X` (B2) | rate | `1.17` (example rate) |
