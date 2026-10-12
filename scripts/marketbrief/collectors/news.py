@@ -144,15 +144,18 @@ def is_failed(parsed, status: int) -> bool:
     return status >= 400 or bool(parsed.bozo and not parsed.entries)
 
 
-def fetch_with_retry(url: str, before_attempt=None):
+def fetch_with_retry(url: str, before_attempt=None, is_google: bool = False):
     """(parsed feed, status) with one retry: Google News occasionally fails a single query. `before_attempt` (the
-    run's pacer) runs before each request; a rate-limit or captcha answer (news_fetch.google_block) is not retried."""
+    run's pacer) runs before each request; for Google News a rate-limit or captcha answer (news_fetch.google_block)
+    is not retried, while an outlet feed keeps its one retry on any failure."""
     for _attempt in range(FETCH_ATTEMPTS):
         if before_attempt is not None:
             before_attempt()
         parsed = fetch_feed(url)
         status = parsed.get("status", 200)
-        if not is_failed(parsed, status) or status in PERMANENT_STATUSES or google_block(parsed, status):
+        if not is_failed(parsed, status) or status in PERMANENT_STATUSES:
+            break
+        if is_google and google_block(parsed, status):
             break
         time.sleep(RETRY_PAUSE_SECONDS)
     return parsed, status
@@ -255,7 +258,7 @@ class NewsCollector:
         is_google = job["feed"].startswith(FEED_PREFIX_GNEWS)
         if is_google and self.pacing.skip_if_stopped(job):
             return  # Google News rate-limited this run: not asked (listed in google_skipped)
-        parsed, status = fetch_with_retry(job["url"], self.pacing.pacer(is_google).wait)
+        parsed, status = fetch_with_retry(job["url"], self.pacing.pacer(is_google).wait, is_google)
         blocked = is_google and self.pacing.check(job, parsed, status)
         if is_google:
             self.sliced_queries += 1 if job.get("slice") else 0

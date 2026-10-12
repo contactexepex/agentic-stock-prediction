@@ -409,3 +409,53 @@ def test_every_yahoo_call_site_gets_the_paced_module():
         "scripts/marketbrief/model/history_cache.py", "scripts/marketbrief/intraday/quotes.py",
         "scripts/marketbrief/lifecycle/sources.py",
     }
+
+
+def test_fast_info_reads_are_paced_and_a_lazy_rate_limit_stops_the_rest():
+    """yfinance's fast_info asks Yahoo when a value is read from it, after the property itself returned."""
+    fake, asked = FakeTime(), []
+
+    class FastInfo:
+        def __init__(self, symbol):
+            self.symbol = symbol
+
+        def __getitem__(self, key):
+            asked.append(f"{self.symbol}:{key}")
+            if self.symbol == "B":
+                raise YFRateLimitError("Too Many Requests. Rate limited.")
+            return 101.5
+
+    class Ticker:
+        def __init__(self, symbol):
+            self.symbol = symbol
+
+        @property
+        def fast_info(self):
+            return FastInfo(self.symbol)    # lazy: no request yet
+
+    pacer = yahoo_pacing.YahooPacer(RequestPacer(0.5, clock=fake.clock, sleep=fake.sleep))
+    yf = yahoo_pacing.PacedYfinance(types.SimpleNamespace(Ticker=Ticker), pacer)
+    assert yf.Ticker("A").fast_info["lastPrice"] == 101.5
+    with pytest.raises(YFRateLimitError):
+        _ = yf.Ticker("B").fast_info["lastPrice"]
+    with pytest.raises(yahoo_pacing.YahooStoppedError):
+        _ = yf.Ticker("C").fast_info["lastPrice"]
+    assert asked == ["A:lastPrice", "B:lastPrice"]          # the lazy read tripped the stop: C was never asked
+    assert pacer.report()["yahoo_stopped"] == "rate_limited at B (YFRateLimitError)"
+
+
+def test_outlet_feeds_keep_their_retry_and_google_stops_at_once(monkeypatch):
+    """A 429 from an outlet feed is retried once as before; a 429 from Google News is not retried."""
+    calls = []
+
+    def fetch_feed(url):
+        calls.append(url)
+        return feedparser.FeedParserDict(status=429, bozo=False, entries=[], href=url, headers={})
+
+    monkeypatch.setattr(cn, "fetch_feed", fetch_feed)
+    monkeypatch.setattr(cn.time, "sleep", lambda _seconds: None)
+    cn.fetch_with_retry("https://outlet.example/rss")
+    assert calls == ["https://outlet.example/rss"] * 2
+    calls.clear()
+    cn.fetch_with_retry("https://news.google.com/rss/search?q=x", None, True)
+    assert calls == ["https://news.google.com/rss/search?q=x"]

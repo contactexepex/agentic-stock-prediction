@@ -88,8 +88,32 @@ class PacedTicker:
             method = getattr(self._ticker, name)
             return lambda *args, **kwargs: self._pacer.call(self._symbol, lambda: method(*args, **kwargs))
         if hasattr(type(found), "__get__"):
-            return self._pacer.call(self._symbol, lambda: getattr(self._ticker, name))
+            value = self._pacer.call(self._symbol, lambda: getattr(self._ticker, name))
+            if name in LAZY_PROPERTIES:
+                return PacedLazy(value, self._symbol, self._pacer)
+            return value
         return found
+
+
+# Properties whose object asks Yahoo later, when a value is read from it (yfinance's fast_info).
+LAZY_PROPERTIES = frozenset({"fast_info"})
+
+
+class PacedLazy:
+    """A lazy yfinance object (fast_info): each item or attribute read goes through the YahooPacer, so a rate limit
+    raised by its deferred request still trips the stop and is paced."""
+
+    def __init__(self, value, symbol: str, pacer: YahooPacer):
+        """Wrap the lazy object."""
+        self._value, self._symbol, self._pacer = value, symbol, pacer
+
+    def __getitem__(self, key):
+        """value[key], paced."""
+        return self._pacer.call(self._symbol, lambda: self._value[key])
+
+    def __getattr__(self, name: str):
+        """value.name, paced."""
+        return self._pacer.call(self._symbol, lambda: getattr(self._value, name))
 
 
 class PacedYfinance:
