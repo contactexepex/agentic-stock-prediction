@@ -27,4 +27,6 @@ judge's PASS.
 
 ## Reviews
 
-(none yet)
+- [Review 1: stock desk design v2 — business logic and closure decisions](review_1_2026-10-12-stock-desk-design.md)
+- [Review 2: stock desk design v3](review_2_2026-10-12-stock-desk-design.md)
+- [Review 3: stock desk design v4 — closure](review_3_2026-10-12-stock-desk-design.md)

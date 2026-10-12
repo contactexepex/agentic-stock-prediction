@@ -15,8 +15,8 @@ the same rules (`CLAUDE.md`, "How to work with the owner and with ChatGPT").
   critiques the other's answer. Disagreements are stated openly, with reasons, and settled with data.
 - **Read first:**
   - `docs/PLAN_v16.md`: the approved accounts, costs, risk and evaluation design;
-  - `docs/STOCK_DESK_DESIGN.md`: the team-of-experts design, under review (on branch `docs/stock-desk-design`
-    until approved);
+  - `docs/STOCK_DESK_DESIGN.md`: the team-of-experts design, agreed by both AIs and approved by the owner on
+    12 Oct 2026 (reviews and responses in `reviews/`);
   - `CLAUDE.md`: layout, data rules and the judge process.
 
 ## How to work (always)
