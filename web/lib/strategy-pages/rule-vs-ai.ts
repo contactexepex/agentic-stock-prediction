@@ -1,6 +1,7 @@
 // The Rule vs AI page's own presentation logic (B16; design/mockups/06-rule-vs-ai, notes.md "Shown but computed by
 // the page"): who leads, the matches on identical company-days, the per-company sums, the cumulative lines per
 // family and the picks' cost counts. Pure: no React, no DOM.
+import { DOW_LONG, fmtDateYear } from "../ui/format.ts";
 import { figure, type CostView, type Family, type ScoreboardRow, type Strategy } from "./scoreboard.ts";
 
 export interface SettledTrade {
@@ -283,4 +284,12 @@ export function viableLine(picked: readonly Pick[]): string {
   const market = clears ? `${clears} clear${clears === 1 ? "s" : ""} market costs` : "none clears market costs";
   const your = known ? (viable ? `${viable} viable at your cost` : "none viable at your cost") : "your-cost view not stored";
   return `${market} · ${your}`;
+}
+
+/** The review card's line when no weekly review is stored by the cut-off. The weekday is the due date's own (the
+ * research run is Friday evening, New York time, since the owner's decision of 2026-10-10; B13's `review_due`). */
+export function reviewDueWords(due: { date: string; iso_week: string } | null): string {
+  if (!due) return "No weekly review written by the cut-off.";
+  const weekday = DOW_LONG[new Date(due.date.slice(0, 10) + "T00:00:00Z").getUTCDay()];
+  return `No weekly review written by the cut-off. The next one (${due.iso_week}) is due on ${weekday} ${fmtDateYear(due.date)}, after the cut-off.`;
 }
