@@ -69,6 +69,10 @@ OPEN_TRADE_FIELDS = (
     "unrealised_pnl",
     "unrealised_pct",
     "to_target_pct",
+    "price_pending",
+    "entry_price_source",
+    "last_price_source",
+    "last_price_time",
     "paper",
 )
 

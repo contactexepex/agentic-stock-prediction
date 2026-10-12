@@ -32,7 +32,8 @@ def opened(trade_id, view, family, **extra):
         "trade_id": trade_id, "view": view, "strategy_id": f"{family}.x", "family": family, "ticker": "AAPL",
         "horizon_days": 3, "entry_date": "2026-10-12", "exit_date": "2026-10-15", "entry_price": 100.0,
         "last_price": 102.0, "last_price_date": "2026-10-12", "quantity": 9.0, "amount": 1000.0, "currency": "USD",
-        "unrealised_pnl": 18.0, "unrealised_pct": 2.0, **extra,
+        "unrealised_pnl": 18.0, "unrealised_pct": 2.0, "lo80": 95.0, "lo50": 98.0, "hi50": 103.0, "hi80": 106.0,
+        "target_price": 101.5, "to_target_pct": -0.5, **extra,
     }  # fmt: skip
 
 
@@ -69,6 +70,9 @@ def make(monkeypatch):
     monkeypatch.setattr(all_trades.rm_common, "settled_trades", lambda _ctx: settlements)
     monkeypatch.setattr(all_trades.rm_common, "open_trades", lambda _ctx: opens)
     monkeypatch.setattr(all_trades.portfolio_service, "pnl_report", lambda _context: ledger)
+    checks = [{"trade_id": "o1", "check_at": "2026-10-12T05:00:00Z", "band": "inside_80", "flags": ["far_from_target"],
+               "flagged": True, "ret_since_entry_pct": 2.0, "view": "accuracy"}]  # fmt: skip
+    monkeypatch.setattr(all_trades.rm_company, "market_trade_checks", lambda _ctx: checks)
     ctx = lab_context("us")
     ctx.__dict__["collected"] = frozenset({"AAPL"})
     ctx.__dict__["dashboard"] = {"as_of": "2026-10-09"}
@@ -120,6 +124,8 @@ def test_accuracy_view_on_one_page_per_entry_session(block, pages):
     assert (day["entered"], day["not_entered"], day["open"], day["closed"]) == (4, 1, 0, 3)
     assert (day["wins"], day["losses"], day["flat"], day["net_pnl_market"]) == (1, 1, 1, 9.5)
     assert index["2026-10-12"]["open"] == 1
+    assert (index["2026-10-12"]["unrealised_pnl"], index["2026-10-12"]["flagged_open"]) == (18.0, 1)
+    assert (day["unrealised_pnl"], day["flagged_open"]) == (None, 0)
 
 
 def test_sessions_older_than_the_pages_are_dropped_but_still_counted(monkeypatch, make):
@@ -165,6 +171,20 @@ def test_open_trade_price_sources_and_pending(block, pages):
     assert rows["o1"]["unrealised_pnl"] == 18.0 and rows["o1"]["pnl_market"] is None and rows["o1"]["outcome"] is None
     assert rows["o2"]["price_pending"] is True and rows["o2"]["entry_price"] is None
     assert rows["o2"]["unrealised_pnl"] is None
+    assert (rows["o1"]["lo80"], rows["o1"]["hi80"], rows["o1"]["target_price"], rows["o1"]["to_target_pct"]) == (
+        95.0,
+        106.0,
+        101.5,
+        -0.5,
+    )
+    assert rows["o1"]["check"] == {
+        "check_at": "2026-10-12T05:00:00Z",
+        "band": "inside_80",
+        "flags": ["far_from_target"],
+        "flagged": True,
+        "ret_since_entry_pct": 2.0,
+    }
+    assert rows["o2"]["check"] is None and rows["a1"]["check"] is None and rows["a1"]["lo80"] is None
     closed = rows["a1"]
     assert (closed["entry_price_source"], closed["last_price_source"], closed["exit_date"]) == (
         "daily_bar",
@@ -181,7 +201,12 @@ def test_owner_trades_on_your_cost_collected_only(block, pages):
     assert rows["m3"]["state"] == "open" and rows["m3"]["side"] == "buy" and rows["m3"]["quantity"] == 2.0
     assert rows["m3"]["unrealised_pnl"] == 2.0 and rows["m3"]["unrealised_pct"] == 1.05  # 2.0 / (95 x 2), before costs
     assert rows["m3"]["pnl_your"] is None
+    everything = summary_of(block, "all", "all")
+    assert (everything["unrealised_pnl"], everything["flagged_open"]) == (18.0, 1)  # o1 only
+    head = summary_of(block, "head_to_head", "all")
+    assert (head["unrealised_pnl"], head["flagged_open"]) == (None, 0)  # o2 is price pending
     mine = summary_of(block, "mine", "mine")
+    assert mine["unrealised_pnl"] == 2.0
     assert (mine["open"], mine["closed"], mine["wins"], mine["net_pnl_your"]) == (1, 1, 1, 20.0)
 
 
@@ -200,4 +225,8 @@ def test_market_page_open_trades_and_checks_are_head_to_head_only(monkeypatch):
     monkeypatch.setattr(rm_portfolio.rm_company, "market_trade_checks", lambda _ctx: checks)
     ctx = lab_context("us")
     assert [t["trade_id"] for t in rm_portfolio.open_trades(ctx)] == ["o2"]
+    pending = opened("o3", "head_to_head", "rule", price_pending=True, entry_price_source=None)
+    opens.append(pending)
+    passed = rm_portfolio.open_trades(ctx)[-1]
+    assert (passed["price_pending"], passed["entry_price_source"], passed["last_price_time"]) == (True, None, None)
     assert [t["trade_id"] for t in rm_portfolio.trade_checks(ctx)] == ["o2"]

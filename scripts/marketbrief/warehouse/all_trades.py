@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from marketbrief.portfolio import service as portfolio_service
 from marketbrief.utils.numbers import json_safe_float
-from marketbrief.warehouse import rm_common
+from marketbrief.warehouse import rm_common, rm_company
 from marketbrief.warehouse.rm_company import first_of, sessions_back
 from marketbrief.warehouse.rm_entities import iso_day
 from marketbrief.warehouse.rm_registry import BuildContext
@@ -31,7 +31,12 @@ from marketbrief.warehouse.rm_registry import BuildContext
 WINDOW_SESSIONS = 10
 SESSION_PAGES = 60  # accuracy-view trades: one page per entry session, the last 60 (owner's size concern, 2026-10-12)
 SESSION_KEY_PREFIX = "trades:"
-SESSION_COUNT_KEYS = ("open", "closed", "wins", "losses", "flat", "win_rate", "net_pnl_market", "net_pnl_your")
+SESSION_COUNT_KEYS = (
+    "open", "closed", "wins", "losses", "flat", "win_rate", "net_pnl_market", "net_pnl_your", "unrealised_pnl",
+    "flagged_open",
+)  # fmt: skip
+RANGE_KEYS = ("lo80", "lo50", "hi50", "hi80", "target_price", "to_target_pct")  # an open strategy trade's own range
+CHECK_KEYS = ("check_at", "band", "flags", "flagged", "ret_since_entry_pct")  # its latest intraday check
 SCOPE_ALL, SCOPE_HEAD_TO_HEAD, SCOPE_MINE = "all", "head_to_head", "mine"
 SCOPE_OF_VIEW = {"accuracy": SCOPE_ALL, "head_to_head": SCOPE_HEAD_TO_HEAD}
 FAMILY_ALL, FAMILY_MINE = "all", "mine"
@@ -63,7 +68,7 @@ def trade_row(**fields) -> dict:
         "exit_date", "state", "not_entered_reason", "outcome", "entry_price", "entry_price_source",
         "exit_or_last_price", "last_price_source", "last_price_date", "last_price_time", "price_pending", "quantity",
         "amount", "currency", "unrealised_pnl", "unrealised_pct", "pnl_market", "pnl_your", "return_pct_market",
-        "return_pct_your", "settled_at",
+        "return_pct_your", "settled_at", *RANGE_KEYS, "check",
     )  # fmt: skip
     return {**{key: fields.get(key) for key in keys}, "paper": True}
 
@@ -108,8 +113,16 @@ def closed_strategy_trades(ctx: BuildContext) -> list[dict]:
     return out
 
 
+def latest_checks(ctx: BuildContext) -> dict[str, dict]:
+    """trade_id -> its row of the market's latest intraday trade check by the cut-off (B12's market_trade_checks), in
+    CHECK_KEYS."""
+    return {row["trade_id"]: {key: row.get(key) for key in CHECK_KEYS} for row in rm_company.market_trade_checks(ctx)}
+
+
 def open_strategy_trades(ctx: BuildContext, settled_ids: set[str]) -> list[dict]:
-    """B4's Open-trade records (from D's open) without a settlement stored by the cut-off."""
+    """B4's Open-trade records (from D's open) without a settlement stored by the cut-off, with their own range and
+    their latest intraday check (null when the latest check has no row for the trade)."""
+    checks = latest_checks(ctx)
     out = []
     for trade in rm_common.open_trades(ctx):
         if trade["trade_id"] in settled_ids:
@@ -139,6 +152,8 @@ def open_strategy_trades(ctx: BuildContext, settled_ids: set[str]) -> list[dict]
                 currency=trade.get("currency"),
                 unrealised_pnl=money(trade.get("unrealised_pnl")),
                 unrealised_pct=trade.get("unrealised_pct"),
+                **{key: json_safe_float(trade.get(key)) for key in RANGE_KEYS},
+                check=checks.get(trade["trade_id"]),
             )  # fmt: skip
         )
     return out
@@ -207,6 +222,7 @@ def summary_row(scope: str, family: str, period: str, trades: list[dict], curren
     decided = wins + losses + flat
     market = [t["pnl_market"] for t in closed if t["pnl_market"] is not None]
     your = [t["pnl_your"] for t in closed if t["pnl_your"] is not None]
+    unrealised = [t["unrealised_pnl"] for t in trades if t["state"] == STATE_OPEN and t["unrealised_pnl"] is not None]
     return {
         "scope": scope,
         "family": family,
@@ -220,6 +236,8 @@ def summary_row(scope: str, family: str, period: str, trades: list[dict], curren
         "net_pnl_market": round(sum(market), MONEY_DIGITS) if market else None,
         "net_pnl_your": round(sum(your), MONEY_DIGITS) if your else None,
         "pnl_your_missing": sum(1 for t in closed if t["pnl_your"] is None),
+        "unrealised_pnl": round(sum(unrealised), MONEY_DIGITS) if unrealised else None,
+        "flagged_open": sum(1 for t in trades if t["state"] == STATE_OPEN and (t["check"] or {}).get("flagged")),
         "currency": currency,
     }
 

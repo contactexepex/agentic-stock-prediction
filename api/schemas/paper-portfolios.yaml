@@ -227,7 +227,8 @@ AllTrades:
 AllTradesSession:
   type: object
   description: One accuracy-view entry session's counts (not_entered trades never counted in the others)
-  required: [session_date, entered, not_entered, open, closed, wins, losses, flat, win_rate, net_pnl_market, net_pnl_your]
+  required: [session_date, entered, not_entered, open, closed, wins, losses, flat, win_rate, net_pnl_market, net_pnl_your,
+             unrealised_pnl, flagged_open]
   properties:
     session_date: {$ref: '#/components/schemas/IsoDate'}
     entered: {type: integer, description: Every accuracy-view trade of the session, not_entered included}
@@ -240,10 +241,12 @@ AllTradesSession:
     win_rate: {type: ['number', 'null']}
     net_pnl_market: {type: ['number', 'null']}
     net_pnl_your: {type: ['number', 'null']}
+    unrealised_pnl: {type: ['number', 'null'], description: Sum over the session's open trades with a price, before costs}
+    flagged_open: {type: integer}
 AllTradesSummaryRow:
   type: object
   required: [scope, family, period, open, closed, wins, losses, flat, win_rate, net_pnl_market, net_pnl_your,
-             pnl_your_missing, currency]
+             pnl_your_missing, unrealised_pnl, flagged_open, currency]
   properties:
     scope: {type: string, enum: [all, head_to_head, mine]}
     family: {type: string, enum: [all, rule, ai, baseline, mine]}
@@ -257,13 +260,16 @@ AllTradesSummaryRow:
     net_pnl_market: {type: ['number', 'null'], description: Sum over closed trades after market cost (null for mine)}
     net_pnl_your: {type: ['number', 'null'], description: Sum over closed trades with a your-cost figure}
     pnl_your_missing: {type: integer, description: Closed trades without a your-cost figure yet}
+    unrealised_pnl: {type: ['number', 'null'], description: Sum over the open trades with a price, before costs}
+    flagged_open: {type: integer, description: Open trades whose latest intraday check is flagged}
     currency: {type: ['string', 'null']}
 AllTradesRow:
   type: object
   required: [id, scope, view, strategy_id, family, pick_rule, side, ticker, horizon_days, entry_date, exit_date, state,
              not_entered_reason, outcome, entry_price, entry_price_source, exit_or_last_price, last_price_source,
              last_price_date, last_price_time, price_pending, quantity, amount, currency, unrealised_pnl,
-             unrealised_pct, pnl_market, pnl_your, return_pct_market, return_pct_your, settled_at, paper]
+             unrealised_pct, pnl_market, pnl_your, return_pct_market, return_pct_your, settled_at, lo80, lo50, hi50,
+             hi80, target_price, to_target_pct, check, paper]
   properties:
     id: {type: string, description: The trade id (strategy trades) or the portfolio trade id (mine)}
     scope: {type: string, enum: [all, head_to_head, mine]}
@@ -296,4 +302,24 @@ AllTradesRow:
     return_pct_market: {type: ['number', 'null']}
     return_pct_your: {type: ['number', 'null']}
     settled_at: {type: ['string', 'null'], format: date-time}
+    lo80: {type: ['number', 'null'], description: Open strategy rows - the trade's own 80% range (null otherwise)}
+    lo50: {type: ['number', 'null']}
+    hi50: {type: ['number', 'null']}
+    hi80: {type: ['number', 'null']}
+    target_price: {type: ['number', 'null']}
+    to_target_pct: {type: ['number', 'null']}
+    check:
+      description: Open strategy rows - the trade's row of the market's latest intraday check by the cut-off, or null
+      oneOf:
+        - type: 'null'
+        - type: object
+          required: [check_at, band, flags, flagged, ret_since_entry_pct]
+          properties:
+            check_at: {type: string, format: date-time}
+            band: {type: ['string', 'null']}
+            flags:
+              type: ['array', 'null']
+              items: {type: string}
+            flagged: {type: ['boolean', 'null']}
+            ret_since_entry_pct: {type: ['number', 'null']}
     paper: {type: boolean, const: true}
