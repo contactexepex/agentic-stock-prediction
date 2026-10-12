@@ -14,8 +14,9 @@ block, as of the cut-off. Research only: a paper trade is a record, never an ord
 - Open rows carry unrealised_pnl / unrealised_pct before costs (pnl_* null, outcome null); closed rows pnl_* after
   costs. The summary sums closed rows only.
 - Page `_` (all_trades): the summary of every trade (per scope and family, to date and in the last WINDOW_SESSIONS
-  sessions to the as-of date), the head-to-head and owner's trades (every open one, and the closed or not-entered ones
-  whose exit is in that window) and the index of the accuracy-view session pages. The accuracy view (about 200 trades
+  sessions to the as-of date), the listed trades (every open one, and the closed or not-entered ones whose exit is in
+  that window; the accuracy view only while LIST_ACCURACY_ON_MARKET_PAGE, step 1 of the size fix) and the index of
+  the accuracy-view session pages. The accuracy view (about 200 trades
   a session) is listed per entry session D on its own page `trades:<D>` (the last SESSION_PAGES sessions), so the
   market's page does not grow with the trade count (owner's size concern, 2026-10-12)."""
 
@@ -31,6 +32,9 @@ from marketbrief.warehouse.rm_registry import BuildContext
 WINDOW_SESSIONS = 10
 SESSION_PAGES = 60  # accuracy-view trades: one page per entry session, the last 60 (owner's size concern, 2026-10-12)
 SESSION_KEY_PREFIX = "trades:"
+# Step 1 of the size fix (docs/ws/b13.md): the accuracy-view rows stay on page `_` too while B16's deployed card lists
+# them from there; step 2 (after B16's page reads the session pages and is deployed) sets this False.
+LIST_ACCURACY_ON_MARKET_PAGE = True
 SESSION_COUNT_KEYS = (
     "open", "closed", "wins", "losses", "flat", "win_rate", "net_pnl_market", "net_pnl_your", "unrealised_pnl",
     "flagged_open",
@@ -300,12 +304,14 @@ def session_entry(day: str, trades: list[dict]) -> dict:
 
 
 def all_trades(ctx: BuildContext, context) -> dict:
-    """rm.portfolio's `all_trades` block (page `_`): the window, the summary of every trade, the head-to-head and
-    owner's trades (open, and closed or not entered with the exit in the window) and the index of the accuracy-view
-    session pages (`sessions_pages`)."""
+    """rm.portfolio's `all_trades` block (page `_`): the window, the summary of every trade, the listed trades (open,
+    and closed or not entered with the exit in the window; the accuracy view only while LIST_ACCURACY_ON_MARKET_PAGE)
+    and the index of the accuracy-view session pages (`session_pages`)."""
     trades = every_trade(ctx, context)
     window_from = first_of(sessions_back(ctx.cfg, ctx.as_of, WINDOW_SESSIONS))
-    listed = [t for t in trades if t["scope"] != SCOPE_ALL and listed_in(t, window_from)]
+    listed = [
+        t for t in trades if listed_in(t, window_from) and (LIST_ACCURACY_ON_MARKET_PAGE or t["scope"] != SCOPE_ALL)
+    ]
     return {
         "window": {"sessions": WINDOW_SESSIONS, "from": window_from, "to": ctx.as_of},
         "summary": summary(trades, window_from, ctx.cfg.get("currency")),

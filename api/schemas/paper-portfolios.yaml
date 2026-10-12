@@ -199,10 +199,10 @@ AllTrades:
   description: >-
     Every paper trade in one place as of the cut-off (owner request 2026-10-12). Scope all = the accuracy view (every
     strategy), head_to_head = the head-to-head view (never pooled with all: two views of the same predictions), mine =
-    the owner's own trades (WS4's FIFO ledger, your cost only). The summary counts every trade; listed here: the
-    head-to-head and owner's trades (every open one, and the closed or not-entered ones whose exit is in the window).
-    The accuracy view is listed per entry session on GET /portfolios/sessions/{date} (index: sessions). Win / loss on
-    the net P&L after market cost (mine: after your cost).
+    the owner's own trades (WS4's FIFO ledger, your cost only). The summary counts every trade; listed here: every
+    open trade and the closed or not-entered ones whose exit is in the window (the accuracy view only during step 1 of
+    the size fix, docs/ws/b13.md). The accuracy view is also listed per entry session on GET
+    /portfolios/sessions/{date} (index: sessions). Win / loss on the net P&L after market cost (mine: after your cost).
   required: [window, summary, trades, sessions]
   properties:
     window:
@@ -218,7 +218,7 @@ AllTrades:
       items: {$ref: '#/components/schemas/AllTradesSummaryRow'}
     trades:
       type: array
-      description: Head-to-head and mine; open first, then by exit (or entry) date newest first, then by id
+      description: Open, and closed or not entered with the exit in the window (the accuracy view while step 1 of the size fix lasts; then head-to-head and mine only); open first, then by exit (or entry) date newest first, then by id
       items: {$ref: '#/components/schemas/AllTradesRow'}
     sessions:
       type: array
