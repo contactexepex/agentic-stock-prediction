@@ -15,7 +15,7 @@ import {
   CHANNEL, commandArguments, companiesCounts, deactivation, EVENT_TONE, EVENT_WORDS, newsSince, onboardingWords, RESULT,
   TOOL, type Command, type LifecycleEvent,
 } from "../../../../../lib/market-pages/companies.ts";
-import { NEWS_STATUS } from "../../../../../lib/ui/constants.ts";
+import { NEWS_STATUS, refusalWords } from "../../../../../lib/ui/constants.ts";
 import { fmtDate, fmtDateYear, fmtLocal, money, price } from "../../../../../lib/ui/format.ts";
 import { companyPath } from "../../../../../lib/ui/routes.ts";
 import type { CompanyRecord, GoLive, PageBase } from "../../../../../lib/ui/types.ts";
@@ -60,7 +60,7 @@ function ActiveCard({ p, market, open }: { p: CompaniesPayload; market: Market; 
     <Card label="Active companies">
       <CardHead
         title={`Active companies (${rows.length})`}
-        help="Every company that is predicted and traded on paper. Amount = money per paper trade (the market’s default unless set for the company). Actions record a request: deactivate (takes effect at the next pre-open run; open paper trades still settle), change the amount, or delete (dashboard only, with a typed confirmation; the company is then excluded everywhere, decision 12)."
+        help="Every company that is predicted and traded on paper. Amount = money per paper trade (the market’s default unless set for the company). Actions record a request: deactivate (takes effect at the next morning run; open paper trades still settle), change the amount, or delete (dashboard only, with a typed confirmation; the company is then left out everywhere)."
         end={<button className="md-btn filled small" type="button" onClick={() => open({ kind: "add" })}><Icon name="apartment" />Add company</button>}
       />
       {!rows.length ? <Quiet>No active company: add one to start predicting it.</Quiet> : (
@@ -87,9 +87,9 @@ function ActiveCard({ p, market, open }: { p: CompaniesPayload; market: Market; 
                     </span>
                   </td>
                   <td className="num last"><b>{price(cur, c.last_close)}</b><Delta value={c.change_pct} /></td>
-                  <td className="num amt cp"><b>{money(cur, c.amount)}</b>{c.amount_overridden ? <Label tone="neutral" tip="Set for this company; differs from the market’s default (decision 44).">custom</Label> : null}</td>
+                  <td className="num amt cp"><b>{money(cur, c.amount)}</b>{c.amount_overridden ? <Label tone="neutral" tip="Set for this company; differs from the market’s default.">custom</Label> : null}</td>
                   <td className="num cw">
-                    {c.agreement_n1 ? <span data-tip={`${c.agreement_n1.buy} of ${c.agreement_n1.of} strategies would buy ${c.name} at N+1 today (decision 30).`}>{`${c.agreement_n1.buy} of ${c.agreement_n1.of}`}</span> : <span className="muted">—</span>}
+                    {c.agreement_n1 ? <span data-tip={`${c.agreement_n1.buy} of ${c.agreement_n1.of} strategies would buy ${c.name} for a 1-day hold today.`}>{`${c.agreement_n1.buy} of ${c.agreement_n1.of}`}</span> : <span className="muted">—</span>}
                   </td>
                   <td className="num cw">{String(c.open_trades ?? 0)}</td>
                   <td className="cm">
@@ -111,7 +111,7 @@ function InactiveCard({ p, market, open }: { p: CompaniesPayload; market: Market
   const cur = p.currency, rows = p.companies.filter((c) => c.state === "inactive"), lt = p.status.session.local_time;
   return (
     <Card label="Inactive companies">
-      <CardHead title={`Inactive companies (${rows.length})`} help="Still collected (prices, news, filings, announcements) but never predicted or traded; their open paper trades settle normally. Reactivate takes effect at the next pre-open run (F8.4). Only this page lists them (decision 13)." />
+      <CardHead title={`Inactive companies (${rows.length})`} help="Still collected (prices, news, filings, announcements) but never predicted or traded; their open paper trades settle normally. Reactivate takes effect at the next morning run. Only this page lists them." />
       {!rows.length ? <Quiet>No inactive company.</Quiet> : (
         <div className="md-table-wrap">
           <table className="md-table tbl co">
@@ -162,7 +162,7 @@ function RequestsCard({ p, market, sent }: { p: CompaniesPayload; market: Market
     <Card label="Requests">
       <CardHead
         title="Requests"
-        help="Every company command from any channel (the dashboard, Slack, the command line, the Claude app) is logged with who asked (from the channel’s sign-in, never typed in), its result and the reason when refused (F10). Accepted writes are pending until the next run imports them. A deleted company is masked here (decision 12)."
+        help="Every company command from any channel (the dashboard, Slack, the command line, the Claude app) is logged with who asked (from the channel’s sign-in, never typed in), its result and the reason when refused. Accepted requests are pending until the next run imports them. A deleted company is hidden here."
         end={`${sent.length} sent from this page · ${p.commands.length} recent`}
       />
       {sent.length ? (
@@ -172,7 +172,7 @@ function RequestsCard({ p, market, sent }: { p: CompaniesPayload; market: Market
               <Icon name="pending" />
               <div>
                 <b className="t">{`${r.result === "duplicate" ? "Already recorded" : "Pending"}: ${r.summary}`}</b>
-                <div className="s">{r.message ?? "Appended to the inbox with your sign-in and an idempotency key; the next run imports it (F10)."}</div>
+                <div className="s">{r.message ?? "Saved. It takes effect at the next morning run. Sending it twice is safe."}</div>
               </div>
             </div>
           ))}
@@ -187,7 +187,7 @@ function RequestsCard({ p, market, sent }: { p: CompaniesPayload; market: Market
             const tail = [
               `via ${CHANNEL[c.channel ?? ""] ?? c.channel ?? "an unknown channel"}`,
               c.actor ?? "—",
-              c.refusal_code ? c.refusal_code.replace(/_/g, " ") : null,
+              c.refusal_code ? refusalWords(c.refusal_code) : null,
               c.record_ids.length ? `wrote ${c.record_ids.length} record${c.record_ids.length === 1 ? "" : "s"}` : null,
             ].filter(Boolean).join(" · ");
             return (
@@ -215,7 +215,7 @@ function HistoryCard({ p, market }: { p: CompaniesPayload; market: Market }) {
     <Card label="Lifecycle history">
       <CardHead
         title="Lifecycle history"
-        help="The watchlist is data (F8): every add, deactivate, reactivate and amount change is an append-only event with who asked, the channel, when it was recorded and when it counts (the next pre-open run; seeded adds count from the start of stored history). Events of a deleted company are excluded on read (decision 12)."
+        help="Every change to the list is kept, with who asked, the channel, when it was recorded and when it counts (the next morning run; the starting list counts from the start of stored history). Changes of a deleted company are hidden."
         end={`${p.lifecycle.length} events${p.deleted_count ? ` · ${p.deleted_count} deleted ${s(p.deleted_count, "company", "companies")} excluded` : ""}`}
       />
       {!p.lifecycle.length ? <Quiet>No event stored.</Quiet> : (
@@ -263,12 +263,12 @@ export function CompaniesView({ p, market }: { p: CompaniesPayload; market: Mark
   const cur = p.currency;
   return (
     <div className="mb-companies">
-      <PageHead page={p} title="Companies" subtitle={`the watchlist as data: ${p.companies.length} ${s(p.companies.length, "company", "companies")} · ${p.name} · data as of the ${fmtDate(p.as_of, false)} close · research only`} />
+      <PageHead page={p} title="Companies" subtitle={`The companies this app follows, and their history: ${p.companies.length} ${s(p.companies.length, "company", "companies")} · ${p.name} · data as of the ${fmtDate(p.as_of, false)} close · research only`} />
       <KpiRow>
-        <Kpi icon="apartment" tone="success" label="Active" value={String(counts.active)} sub="predicted and traded on paper every session" tip="Active companies are collected, predicted and traded on paper (F8.2)." />
-        <Kpi icon="pending" tone={counts.inactive ? "neutral" : ""} label="Inactive" value={String(counts.inactive)} sub={counts.inactive ? `still collected, never predicted: ${inactive.map((c) => c.ticker).join(", ")}` : "none"} tip="Inactive companies stay collected (prices, news, filings) but get no prediction or paper trade; their open paper trades still settle (decision 13)." />
-        <Kpi icon="account_balance_wallet" tone="paper" label="Default per paper trade" value={money(cur, p.default_amount)} sub={`${counts.custom} ${s(counts.custom, "company has", "companies have")} a custom amount`} tip="The market’s default money per paper trade (decision 26); a company can have its own amount (decision 44)." />
-        <Kpi icon="schedule" tone={counts.pending ? "warn" : "neutral"} label="Pending requests" value={String(counts.pending)} sub={counts.pending ? "waiting for the next import" : "nothing waiting"} tip="Requests from any channel are appended to the inbox and imported by the next run (F10); until then they are pending." />
+        <Kpi icon="apartment" tone="success" label="Active" value={String(counts.active)} sub="predicted and traded on paper every session" tip="Active companies are collected, predicted and traded on paper." />
+        <Kpi icon="pending" tone={counts.inactive ? "neutral" : ""} label="Inactive" value={String(counts.inactive)} sub={counts.inactive ? `still collected, never predicted: ${inactive.map((c) => c.ticker).join(", ")}` : "none"} tip="Inactive companies stay collected (prices, news, filings) but get no prediction or paper trade; their open paper trades still settle." />
+        <Kpi icon="account_balance_wallet" tone="paper" label="Default per paper trade" value={money(cur, p.default_amount)} sub={`${counts.custom} ${s(counts.custom, "company has", "companies have")} a custom amount`} tip="The market’s default money per paper trade; a company can have its own amount." />
+        <Kpi icon="schedule" tone={counts.pending ? "warn" : "neutral"} label="Pending requests" value={String(counts.pending)} sub={counts.pending ? "waiting for the next import" : "nothing waiting"} tip="Your change is saved and takes effect at the next morning run; until then it is pending." />
       </KpiRow>
       <div style={{ marginTop: 16 }}><ActiveCard p={p} market={market} open={open} /></div>
       <div style={{ marginTop: 16 }}><InactiveCard p={p} market={market} open={open} /></div>

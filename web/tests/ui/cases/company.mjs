@@ -5,7 +5,7 @@
 import { readFileSync } from "node:fs";
 import { mockupPayload } from "../fixtures.mjs";
 
-const PAPER = "No proven strong signals today";
+const PAPER = "Not proven yet: these are tests, not tips.";
 
 export function companyPayload(market, ticker) {
   const m = mockupPayload("03-company", market);
@@ -58,7 +58,7 @@ const company = (name, market, ticker, widths, extra = {}) => ({
 });
 
 export const cases = [
-  company("company-reliance", "india", "RELIANCE", [1280, 1024, 390]),
+  company("company-reliance", "india", "RELIANCE", [1280, 1024, 390], { expectText: [PAPER, "RELIANCE", "strategies would buy Reliance Industries for a 1-day hold", "see how often they’ve been right", "What our paper trades on Reliance Industries did"], expectSelector: [".co-sum", ".co-sofar", "#settled-trades"] }),
   company("company-nvda", "us", "NVDA", [1280]),
   company("company-hdfcbank", "india", "HDFCBANK", [1280, 390], { expectText: [PAPER, "Latest results"] }),
   company("company-maruti", "india", "MARUTI", [1280], { expectText: [PAPER, "could not become trades"] }),
@@ -70,7 +70,7 @@ export const cases = [
     widths: [1280, 390],
     waitFor: ".phead",
     api: companyApi((p) => ({ ...p, predictions: [], head_to_head: [], open_trades: [], trade_checks: [], settled: [], reasons: [], news: [], results: [], events: [], lifecycle: [], agreement: {}, bars: p.bars })),
-    expectText: [PAPER, "No open paper trade on this company.", "No settled paper trade yet.", "No analyst note", "No results digest", "Nothing scheduled.", "No published range stored for this company at N+1 today.", "it arrives with the next page build"],
+    expectText: [PAPER, "No open paper trade on this company.", "No finished paper trade yet.", "No analyst note", "No results digest", "Nothing scheduled.", "No likely price range stored for this company for a 1-day hold today.", "it arrives with the next morning run"],
   },
   {
     name: "company-no-bars",
@@ -92,10 +92,10 @@ export const cases = [
       const problems = [];
       const exitLine = () => page.$eval(".chart .vl.on", (l) => l.getAttribute("x1")).catch(() => null);
       const before = await exitLine();
-      await page.click('[aria-label="Horizon"] button:has-text("N+3")');
+      await page.click('[aria-label="Horizon"] button:has-text("3 days")');
       const after = await exitLine();
       if (!before || before === after) problems.push("the N+3 tab did not move the chart's exit line");
-      if (!(await page.textContent(".dec")).includes("Published range at N+3")) problems.push("the range cell did not follow the tab");
+      if (!(await page.textContent(".dec")).includes("Likely price range · 3-day hold")) problems.push("the range cell did not follow the tab");
       await page.focus(".chart svg");
       await page.keyboard.press("ArrowLeft");
       if (!(await page.$(".ctip.on"))) problems.push("ArrowLeft on the chart did not show a day");
@@ -132,9 +132,9 @@ cases.push(
       await page.focus(".agc rect.hit >> nth=2");
       await page.keyboard.press("Enter");
       const head = await page.textContent(".rk thead");
-      if (!head.includes("Today at N+3")) problems.push("Enter on the N+3 bar did not select N+3 in the ranking");
+      if (!head.includes("Today (3-day hold)")) problems.push("Enter on the N+3 bar did not select N+3 in the ranking");
       const pressed = await page.$$eval('[aria-label="Horizon"] button[aria-pressed="true"]', (b) => b.map((x) => x.textContent));
-      if (!pressed.every((t) => t === "N+3")) problems.push(`horizon tabs not in step: ${pressed.join(",")}`);
+      if (!pressed.every((t) => t === "3 days")) problems.push(`horizon tabs not in step: ${pressed.join(",")}`);
       return problems;
     },
   },
@@ -199,7 +199,7 @@ cases.push(
     widths: [1280],
     waitFor: ".phead",
     api: lifecycleApi((p) => ({ ...p, predictions: [], head_to_head: [], trade_checks: [], settled: [], reasons: [] })),
-    expectText: ["No prediction was made for this session", "No head-to-head pick stored", "No intraday check of these trades", "No settled paper trade yet.", "No analyst note"],
+    expectText: ["No prediction was made for this session", "No head-to-head pick stored", "No intraday check of these trades", "No finished paper trade yet.", "No analyst note"],
   },
 );
 
@@ -381,7 +381,7 @@ cases.push(
     widths: [1280],
     waitFor: ".phead",
     api: companyApi((p) => ({ ...p, forecast_history: { ranges: [], scores: [] } })),
-    expectText: ["No range or score run stored for this company at N+1 in the last 10 as-of dates."],
+    expectText: ["No range or score run stored for this company for a 1-day hold in the last 10 as-of dates."],
   },
 );
 

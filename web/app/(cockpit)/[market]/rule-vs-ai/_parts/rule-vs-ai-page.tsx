@@ -6,14 +6,16 @@
 // GET /api/v1/markets/{market}/review (rm.review). Paper trades only; nothing here is advice.
 import Link from "next/link";
 import { useState } from "react";
+import { expectedWords } from "../../../../../components/blocks/costs.tsx";
 import { PageFooter, PageHead, SignalsBand } from "../../../../../components/blocks/page-head.tsx";
 import { LineChart } from "../../../../../components/charts/line-chart.tsx";
 import { Icon } from "../../../../../components/ui/icon.tsx";
-import { Avatar, Card, CardHead, FamilyLabel, GoLink, Label, MoneyDelta, Odds, PaperTag, Quiet } from "../../../../../components/ui/primitives.tsx";
+import { Avatar, Card, CardHead, ExpectedMoney, FamilyLabel, GoLink, Label, MoneyDelta, Odds, PaperTag, Quiet } from "../../../../../components/ui/primitives.tsx";
 import { ErrorState, LoadingState, PageState } from "../../../../../components/ui/states.tsx";
 import type { Market } from "../../../../../lib/data/constants.ts";
-import { FAMILY, FAMILY_SHORT, MIN_TRADES_TO_RANK, PAPER_LABEL, PICK_RULE, type Family } from "../../../../../lib/ui/constants.ts";
-import { DASH, fmtDate, money, moneyDecimals, pct, signed } from "../../../../../lib/ui/format.ts";
+import { EXPECTED_MEANS, FAMILY, FAMILY_SHORT, MIN_TRADES_TO_RANK, PAPER_LABEL, PICK_RULE, type Family } from "../../../../../lib/ui/constants.ts";
+import { noneFinishedYet, tooEarly } from "../../../../../lib/ui/empty.ts";
+import { DASH, fmtDate, fmtLocal, holdLabel, money, moneyDecimals, pct, signed } from "../../../../../lib/ui/format.ts";
 import { companyPath, pagePath } from "../../../../../lib/ui/routes.ts";
 import type { GoLive, PageBase } from "../../../../../lib/ui/types.ts";
 import { usePage } from "../../../../../lib/ui/use-api.ts";
@@ -26,6 +28,16 @@ import { CostSwitch, LuckBar } from "../../_b16/parts.tsx";
 import "./rule-vs-ai.css";
 
 type Payload = PageBase & RuleVsAiPayload & { go_live: GoLive | null };
+
+/** "No rule-vs-AI trade has finished yet. …; results appear at the after-close run (next: …)." (review section 4) */
+const noneYet = (p: Payload) => noneFinishedYet([], p.status.runs.post_close?.next_at, p.market, p.status.session.local_time, "rule-vs-AI trade");
+
+/** The scorecard's verdict while no winner can be named: how many trades finished of the 20 needed per side. */
+function verdictWaiting(p: Payload): string {
+  const fams = (["rule", "ai"] as const).map((f) => familyRow(p.rows, f)?.trades ?? 0);
+  const done = Math.min(...fams);
+  return done ? `Too early to call: ${done} trades finished, ${MIN_TRADES_TO_RANK} needed per side` : noneYet(p);
+}
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 const familyIcon = (f: Family) => FAMILY[f][1];
 
@@ -45,7 +57,7 @@ function RuleVsAi({ p, market }: { p: Payload; market: Market }) {
       <PageHead page={p} title="Rule vs AI" subtitle={`head-to-head paper trades on identical company-days · ${p.name} · data as of the ${fmtDate(p.as_of, false)} close · research only`} />
       <SignalsBand page={p} goLive={p.go_live} strategies={Object.keys(p.strategies).length} />
       <div className="ctrls">
-        <CostSwitch value={cost} onChange={setCost} help="Market cost: brokerage, taxes and fees (the ranking view). Your cost adds your own broker’s charges; the go-live bar uses it (decision 50). The switch changes the scorecard, the slice tables, the matches and the per-company sums (per-trade your-cost figures from the cost views; a figure not stored says so); the cumulative lines and the EOD analyst stay on market cost." />
+        <CostSwitch value={cost} onChange={setCost} help="Market fees: brokerage and taxes. Your fees: also your own broker’s extra charges. The test that decides whether a strategy is proven uses your fees. The switch changes the scorecard, the slice tables, the matches and the per-company sums (per-trade your-cost figures from the cost views; a figure not stored says so); the cumulative lines and the after-close write-up stay on market fees." />
       </div>
       <div style={{ marginTop: 16 }}><Scorecard p={p} cost={cost} /></div>
       <div style={{ marginTop: 16 }}><Picks p={p} /></div>
@@ -78,12 +90,12 @@ function Scorecard({ p, cost }: { p: Payload; cost: CostView }) {
     return (
       <div className={`side${leads ? " lead" : ""}`}>
         <div className="fh"><Avatar icon={familyIcon(f)} tone={f === "ai" ? "info" : ""} size="sm" /><b>{FAMILY[f][0]}</b><small>{r ? `· ${strategyName(p, r.strategy_id)}` : "· no settled head-to-head trade yet"}</small></div>
-        {!r ? <Quiet>Nothing settled yet in the head-to-head view.</Quiet> : (
+        {!r ? <Quiet>{noneFinishedYet([], p.status.runs.post_close?.next_at, p.market, p.status.session.local_time, "rule-vs-AI trade")}</Quiet> : (
           <>
-            <div className="net">{net === null ? <NotStored /> : <MoneyDelta currency={cur} value={net} decimals={d} />}<small>{`profit after ${cost} cost on ${plural(r.trades, "trade")} · ${tooFewToRank(r) ? `too few to rank (under ${MIN_TRADES_TO_RANK})` : "enough to rank"}`}</small></div>
+            <div className="net">{net === null ? <NotStored /> : <MoneyDelta currency={cur} value={net} decimals={d} />}<small>{`profit after ${cost} cost on ${plural(r.trades, "trade")} · ${tooFewToRank(r) ? tooEarly(r.trades) : "enough to compare"}`}</small></div>
             <div className="st">
               <div data-tip={`${pct(figure(r, "win_rate", cost))} of trades made money after ${cost} cost.`}>Win rate<b>{pct(figure(r, "win_rate", cost))}</b></div>
-              <div data-tip="Average distance of the exit close from the predicted target, in percent (F1.9).">Target error<b>{signed(r.avg_target_error_pct)}</b></div>
+              <div data-tip="Average distance of the exit close from the predicted target, in percent.">Target error<b>{signed(r.avg_target_error_pct)}</b></div>
               <div data-tip={`Mean return per trade after ${cost} cost; drawdown ${money(cur, figure(r, "max_drawdown", cost), d, true)}, worst streak ${figure(r, "worst_losing_streak", cost) ?? DASH}.`}>Per trade<b>{signed(figure(r, "mean_return_pct", cost))}</b></div>
             </div>
             <LuckBar row={r} cost={cost} />
@@ -95,7 +107,7 @@ function Scorecard({ p, cost }: { p: Payload; cost: CostView }) {
   return (
     <Card label="Head-to-head scorecard">
       <CardHead title="Head-to-head: the strongest rule strategy vs the strongest AI trader" end={<><PaperTag label={p.status.paper_label || PAPER_LABEL} />{`forward · as of the ${fmtDate(p.as_of, false)} close`}</>}
-        help="The head-to-head view (F1, decisions 41-42): every session, for each company, the family’s strongest strategy picks one horizon under each of two pick rules (best expected gain, highest probability); each pick is one paper trade of the company’s amount. Rule and AI trade on identical company-days, so their results compare fairly. Figures after the selected costs; the luck test says whether the gap could be chance." />
+        help="Every day, the best rule strategy and the best AI each pick trades on the same companies, so the comparison is fair: each picks one holding period two ways (biggest expected gain, highest chance), and each pick is one paper trade of the company’s amount. Figures after the selected fees; the luck test says whether a lead could just be chance." />
       <div className="vs">
         {side("rule", R)}
         <div className="mid">
@@ -106,11 +118,11 @@ function Scorecard({ p, cost }: { p: Payload; cost: CostView }) {
               <div>{lead.leader === "level" ? "identical results so far" : `by ${money(cur, lead.by, d)} after ${cost} cost`}</div>
               <div className="muted">{`${R.trades + A.trades} trades in all · ${p.status.paper_label || PAPER_LABEL}`}</div>
             </>
-          ) : <div className="who">No verdict yet</div>}
+          ) : <div className="who">{verdictWaiting(p)}</div>}
         </div>
         {side("ai", A)}
       </div>
-      <p className="note">A lead on a handful of trades is mostly luck (SPEC section 6): the luck bar must clear zero after correction before anyone is called better. Nothing here is advice.</p>
+      <p className="note">A lead on a few trades is mostly luck. We only call a winner when the luck test clears zero. Nothing here is advice.</p>
     </Card>
   );
 }
@@ -119,14 +131,14 @@ function CostLabels({ p, k }: { p: Payload; k: Pick }) {
   const cur = p.currency, clears = (k.expected_gain_pct ?? 0) > 0, cd = pickCandidate(k);
   return (
     <>
-      <Label tone={clears ? "success" : "neutral"} icon={clears ? "check" : "close"}
-        tip={`Expected gain after market costs ${signed(k.expected_gain_pct)} of ${money(cur, k.amount)}: ${pct(k.prob_up, 1)} × ${signed(k.move_pct)} − ${pct(k.prob_up === null ? null : 1 - k.prob_up, 1)} × ${k.loss_pct ?? DASH}% − ${k.costs_pct ?? DASH}% (brokerage, taxes and fees of config/costs.yaml; strategies are ranked on this view).`}>
-        {`${signed(k.expected_gain_pct)} · ${clears ? "clears market costs" : "below market costs"}`}
+      <Label tone="neutral" icon={clears ? "check" : "close"}
+        tip={`${EXPECTED_MEANS} Expected after market fees (brokerage, taxes and exchange fees) ${signed(k.expected_gain_pct)} of ${money(cur, k.amount)}: ${pct(k.prob_up, 1)} chance × ${signed(k.move_pct)} if right − ${pct(k.prob_up === null ? null : 1 - k.prob_up, 1)} × ${k.loss_pct ?? DASH}% if wrong − ${k.costs_pct ?? DASH}% fees. Strategies are ranked on this view.`}>
+        {expectedWords(k.expected_gain_pct ?? 0)}
       </Label>
       {cd && cd.cost_viable !== null && cd.cost_viable !== undefined ? (
         <Label tone={cd.cost_viable ? "success" : "warn"} icon={cd.cost_viable ? "check" : "warning"}
-          tip={`Decision 51, your own costs: with your broker’s extra charges the round trip is ${cd.your_cost_pct ?? DASH}% and the expected gain ${signed(cd.expected_gain_your_pct)}, so this pick is ${cd.cost_viable ? "viable" : "not viable"} at your cost. The flag never blocks a paper trade.`}>
-          {cd.cost_viable ? "viable at your cost" : "not viable at your cost"}
+          tip={`Your broker charges more than the basic market fees (for example, currency markup and reporting charges): the round trip costs ${cd.your_cost_pct ?? DASH}%. After those, the expected gain is ${signed(cd.expected_gain_your_pct)}. The flag never blocks a paper trade.`}>
+          {cd.cost_viable ? "Worth it after your broker’s fees" : "Not worth it after your broker’s fees"}
         </Label>
       ) : null}
     </>
@@ -138,7 +150,7 @@ function Picks({ p }: { p: Payload }) {
   return (
     <Card label="Today’s head-to-head picks">
       <CardHead title={<>{`Today’s picks for ${fmtDate(p.session_date)}`} <PaperTag label={p.status.paper_label || PAPER_LABEL} /></>} end={picked.length ? viableLine(picked) : "no pick today"}
-        help="The paper trades both families will make at the open of the session being predicted: for each company, the strongest rule strategy and the strongest AI trader each pick one horizon per pick rule. “Clears market costs” is the ranking view; “viable at your cost” adds your broker’s charges (decision 51)." />
+        help="The paper trades both families will make at the open of the session being predicted: for each company, the strongest rule strategy and the strongest AI trader each pick one holding period, two ways. “Expected” is an average if the odds hold, not a result; “worth it after your fees” also counts your own broker’s extra charges." />
       {!today.length ? <Quiet>No head-to-head picks stored for the session.</Quiet> : (
         <div className="pks">
           {(["rule", "ai"] as const).map((f) => {
@@ -148,10 +160,10 @@ function Picks({ p }: { p: Payload }) {
                 <div className="h"><Avatar icon={familyIcon(f)} tone={f === "ai" ? "info" : ""} size="sm" /><b>{FAMILY[f][0]}</b><span className="muted">{first ? `· ${strategyName(p, first.strategy_id)} · ${plural(fk.length, "pick")}` : "· no candidate today"}</span></div>
                 {fk.map((k) => (
                   <div key={k.id} className="pk">
-                    <span className="l1"><Link className="tk" href={companyPath(p.market, k.ticker)}>{k.ticker}</Link><small>{`${companyName(p, k.ticker)} · ${PICK_RULE[k.pick_rule] ?? k.pick_rule}`}</small><span className="h-lab">{`N+${k.horizon_days}`}</span></span>
+                    <span className="l1"><Link className="tk" href={companyPath(p.market, k.ticker)}>{k.ticker}</Link><small>{`${companyName(p, k.ticker)} · ${PICK_RULE[k.pick_rule] ?? k.pick_rule}`}</small><span className="h-lab" data-tip={`N+${k.horizon_days}`}>{holdLabel(k.horizon_days ?? 0)}</span></span>
                     <span className="l2">
-                      <Odds p={k.prob_up} tip={`${pct(k.prob_up, 1)} chance of a rise from the open to the N+${k.horizon_days} close.`} />
-                      <span className="g"><MoneyDelta currency={cur} value={k.expected_gain_pct === null ? null : (k.expected_gain_pct * k.amount) / 100} decimals={moneyDecimals(cur)} /></span>
+                      <Odds p={k.prob_up} tip={`${pct(k.prob_up, 1)} chance of a rise from the open to the close ${k.horizon_days} trading day${k.horizon_days === 1 ? "" : "s"} later.`} />
+                      <span className="g"><ExpectedMoney currency={cur} value={k.expected_gain_pct === null ? null : (k.expected_gain_pct * k.amount) / 100} decimals={moneyDecimals(cur)} /></span>
                       <CostLabels p={p} k={k} />
                     </span>
                   </div>
@@ -175,14 +187,14 @@ function Matches({ p, cost }: { p: Payload; cost: CostView }) {
       return (
         <span className="res">
           <b>{net === null ? <NotStored /> : <MoneyDelta currency={cur} value={net} decimals={d} />}</b>
-          <small>{`${strategyName(p, t.strategy_id)} · N+${t.horizon_days} · ${signed(ret)}`}<span className="cw">{` · target ${t.target_reached ? "reached" : "missed"}, error ${t.target_error_pct === null ? DASH : Math.abs(t.target_error_pct).toFixed(2) + "%"}`}</span></small>
+          <small>{`${strategyName(p, t.strategy_id)} · ${holdLabel(t.horizon_days)} · ${signed(ret)}`}<span className="cw">{` · target ${t.target_reached ? "reached" : "missed"}, error ${t.target_error_pct === null ? DASH : Math.abs(t.target_error_pct).toFixed(2) + "%"}`}</span></small>
         </span>
       );
     }
     const never = notEnteredFor(p.trades, m, f);
-    if (never) return <span className="res"><b className="muted">no trade</b><small>{`${strategyName(p, never.strategy_id)} · N+${never.horizon_days} · ${NOT_ENTERED[never.status] ?? never.status.replace(/_/g, " ")}`}</small></span>;
+    if (never) return <span className="res"><b className="muted">no trade</b><small>{`${strategyName(p, never.strategy_id)} · ${holdLabel(never.horizon_days ?? 0)} · ${NOT_ENTERED[never.status] ?? never.status.replace(/_/g, " ")}`}</small></span>;
     const k = pickFor(p.picks, m, f);
-    if (k && k.status === "picked") return <span className="res"><b className="muted">open</b><small>{`${strategyName(p, k.strategy_id)} · N+${k.horizon_days} · not settled by the cut-off`}</small></span>;
+    if (k && k.status === "picked") return <span className="res"><b className="muted">open</b><small>{`${strategyName(p, k.strategy_id)} · ${holdLabel(k.horizon_days ?? 0)} · not finished yet`}</small></span>;
     return <span className="muted" data-tip={k ? "This family had no strategy buying this company at any horizon that day." : "No head-to-head pick stored for this family and day."}>{k ? "no candidate" : "no pick stored"}</span>;
   };
   const winner = (m: Match) => {
@@ -201,7 +213,7 @@ function Matches({ p, cost }: { p: Payload; cost: CostView }) {
       <CardHead title={<>Match by match: identical company-days <PaperTag label={p.status.paper_label || PAPER_LABEL} /></>}
         end={`after ${cost} cost · ${tally.both ? `${tally.both} match${tally.both === 1 ? "" : "es"}: rule ${tally.rule}, AI ${tally.ai}, draw ${tally.draw}` : "no completed match yet"}`}
         help={`One row per company, entry session and pick rule in the head-to-head view (the entry session under the company name). Where both families’ trades have settled, the row says who made more after ${cost} cost (a draw when they made the same, e.g. the same horizon picked, so the same trade). A side whose pick is still running shows “open”; “no candidate” means that family had no strategy buying the company that day; “no pick stored” means no pick of that family is stored for that day.`} />
-      {!list.length ? <Quiet>No settled head-to-head trade yet.</Quiet> : (
+      {!list.length ? <Quiet>{noneYet(p)}</Quiet> : (
         <div className="md-table-wrap">
           <table className="md-table tbl mt">
             <thead><tr><th>Company · entry</th><th className="cm">Pick rule</th><th>Rule</th><th>AI</th><th>Who won</th></tr></thead>
@@ -255,10 +267,10 @@ function Slices({ p, cost }: { p: Payload; cost: CostView }) {
   return (
     <Card label="By pick rule and regime">
       <CardHead title={<>Gain-pick vs probability-pick, and by regime <PaperTag label={p.status.paper_label || PAPER_LABEL} /></>}
-        help="The same head-to-head trades cut two ways (F7.1): by the pick rule that chose the horizon (best expected gain vs highest probability) and by the market regime at prediction time (F2.6)." />
+        help="The same rule-vs-AI trades cut two ways: by how the holding period was picked (biggest expected gain vs highest chance) and by the market’s mood on the day of the prediction." />
       <div className="sub2" style={{ margin: "0 0 8px" }}>By pick rule</div>
       {pr.length ? <SliceTable p={p} rows={pr} cost={cost} first="Family × pick rule" firstOf={(r) => PICK_RULE[r.pick_rule ?? ""] ?? r.pick_rule} /> : <Quiet>No pick-rule row yet.</Quiet>}
-      <div className="sub2" style={{ margin: "14px 0 8px" }}>By market regime at prediction time</div>
+      <div className="sub2" style={{ margin: "14px 0 8px" }}>By the market’s mood on the day of the prediction</div>
       {rg.length ? <SliceTable p={p} rows={rg} cost={cost} first="Family × regime" firstOf={(r) => <span>{REGIME_WORDS[r.regime ?? ""] ?? r.regime}<small className="muted" style={{ display: "block", fontSize: 11 }}>{strategyName(p, r.strategy_id)}</small></span>} /> : <Quiet>No regime row yet.</Quiet>}
     </Card>
   );
@@ -273,7 +285,7 @@ function PerCompany({ p, cost }: { p: Payload; cost: CostView }) {
     <Card label="Per company">
       <CardHead title={<>Per company <PaperTag label={p.status.paper_label || PAPER_LABEL} /></>} end={<>{`after ${cost} cost`}<GoLink href={pagePath(p.market, "watchlist")}>Watchlist</GoLink></>}
         help={`Rule vs AI on each company, head-to-head view: settled trades, profit after ${cost} cost and how many made money, summed from the settled head-to-head trades (the page sums the trades itself to give both cost views). A per-company lead on a few trades is mostly luck.`} />
-      {!sums.length ? <Quiet>No settled head-to-head trade on any company yet.</Quiet> : (
+      {!sums.length ? <Quiet>{noneYet(p)}</Quiet> : (
         <div className="md-table-wrap">
           <table className="md-table tbl mt">
             <thead><tr><th>Company</th><th>Rule</th><th>AI</th><th>Ahead</th></tr></thead>
@@ -302,8 +314,8 @@ function Cumulative({ p }: { p: Payload }) {
   return (
     <Card label="Cumulative profit">
       <CardHead title="Cumulative profit after market cost, head-to-head" end={<PaperTag label={p.status.paper_label || PAPER_LABEL} />}
-        help="Each family’s settled head-to-head trades added up by exit date (F2.8), starting at zero on the first entry date. Identical picks add the same trade to both lines." />
-      {!lines.dates.length ? <Quiet>No settled head-to-head trade yet.</Quiet> : (
+        help="Each side’s finished rule-vs-AI trades added up by exit date, starting at zero on the first entry date. Identical picks add the same trade to both lines." />
+      {!lines.dates.length ? <Quiet>{noneYet(p)}</Quiet> : (
         <LineChart label={`Cumulative head-to-head profit by exit date: rule ${money(cur, lines.rule.at(-1), moneyDecimals(cur), true)}, AI ${money(cur, lines.ai.at(-1), moneyDecimals(cur), true)}.`}
           labels={lines.dates.map((x) => fmtDate(x, false))} height={200}
           series={[{ key: "r", name: "Rule", values: lines.rule }, { key: "a", name: "AI", values: lines.ai }]}
@@ -318,8 +330,8 @@ function Why({ p }: { p: Payload }) {
   return (
     <Card label="Why: the end-of-day analyst">
       <CardHead title={<>Why: the end-of-day analyst <PaperTag label={p.status.paper_label || PAPER_LABEL} /></>} end={e ? `session ${fmtDate(e.session_date)} · ${e.settled_trades} trades settled` : undefined}
-        help="After each close the EOD analyst (Sonnet, F6.1) sums the day per family and per pick rule, writes a summary of at most 150 words citing ids, and a reason of at most 60 words for every head-to-head trade settled that day, grounded in the trade’s automatic reason split (market, sector, news, company). A deterministic gate checks every id and number. It explains; it never predicts." />
-      {!e ? <Quiet>No end-of-day analysis stored by the cut-off.</Quiet> : (
+        help="After each close an AI writes a short, checked explanation of what happened: the day per side and pick rule, a summary of at most 150 words, and a reason of at most 60 words for every rule-vs-AI trade that finished that day, grounded in the trade’s automatic split (market, sector, news, company). A check confirms every source and number. It explains, it never predicts." />
+      {!e ? <Quiet>{`The after-close write-up appears after the first trades finish${p.status.runs.post_close?.next_at ? ` (next after-close run ${fmtLocal(p.status.runs.post_close.next_at, p.market, p.status.session.local_time, true)})` : ""}.`}</Quiet> : (
         <>
           <div className="fam3">
             {(["rule", "baseline", "ai"] as const).map((f) => {
@@ -366,7 +378,7 @@ function ReviewCard({ p, market }: { p: Payload; market: Market }) {
   const r = res.state === "ready" ? res.envelope.payload.reviews[0] ?? null : null;
   const head = (
     <CardHead title="The week’s research review" end={r ? `${r.iso_week} · ${fmtDate(r.period_start, false)}–${fmtDate(r.period_end, false)}` : undefined}
-      help="Every Friday evening, New York time (both markets), the research director (Opus, F6.2) reads the scoreboard, the news-impact study, the week’s EOD analyses and lessons, and writes who is ahead and why, which information helped, and proposals as config diffs. It changes nothing itself: every proposal stays “proposed” until the owner approves it." />
+      help="Every Friday evening, New York time (both markets), an AI reviews the week (the scores, which news helped, the after-close write-ups and lessons) and suggests changes. Nothing changes until the owner approves." />
   );
   if (res.state === "loading") return <Card label="Weekly research review" className="rev">{head}<LoadingState label="Loading the research review" cards={1} /></Card>;
   if (res.state === "error") return <Card label="Weekly research review" className="rev">{head}<ErrorState problem={res.problem} onRetry={res.reload} /></Card>;
@@ -421,10 +433,10 @@ function NewsImpact({ rp }: { rp: ReviewPayload }) {
               {rows.map((x) => (
                 <tr key={x.id}>
                   <td><b>{x.event_type.replace(/_/g, " ")}</b><small className="muted" style={{ display: "block", fontSize: 11 }}>{`${x.status.replace(/_/g, " ")} · ${x.materiality} · ${x.iso_week}`}</small></td>
-                  <td className="num">{`N+${x.horizon_days}`}</td>
+                  <td className="num">{holdLabel(x.horizon_days)}</td>
                   <td className="num">{x.n_events}</td>
                   <td className="num" data-tip={x.ci_low_pct !== null ? `Mean move beyond the market and sector ${signed(x.mean_abnormal_pct)}, 95% interval ${signed(x.ci_low_pct)} to ${signed(x.ci_high_pct)}.` : "No interval yet."}>{signed(x.mean_abnormal_pct)}</td>
-                  <td>{x.enough ? <Label tone="success" icon="check">enough</Label> : <Label tone="neutral">too few</Label>}</td>
+                  <td>{x.enough ? <Label tone="success" icon="check">enough</Label> : <Label tone="neutral">too early to tell</Label>}</td>
                 </tr>
               ))}
             </tbody>

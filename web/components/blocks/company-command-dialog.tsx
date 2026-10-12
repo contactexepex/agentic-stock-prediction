@@ -160,7 +160,7 @@ export function CommandDialog({ intent, market, currency, defaultAmount, onClose
           <div className="r"><span>Request</span><span>{preview?.summary}</span></div>
         </div>
         <div className="muted" style={{ fontSize: 12.5 }}>
-          Confirm records this request with your sign-in and an idempotency key; a double click never records twice. It is pending until the next run imports it.
+          Confirm saves this request with your sign-in; a double click never records it twice. It takes effect at the next morning run.
         </div>
       </>
     );
@@ -194,21 +194,21 @@ export function CommandDialog({ intent, market, currency, defaultAmount, onClose
       case "add":
         body = (
           <>
-            <div>{`Takes the exchange symbol and an optional amount (F8.3). The onboarding checks the identifiers (${market === "india" ? "NSE and Yahoo symbols" : "ticker, Yahoo symbol and SEC CIK"}), refuses ETFs, ${market === "india" ? "BSE-only and unknown" : "unknown"} symbols, sets the sector, backfills prices, news and filings, runs the collect gate, and only then appends the add event. The company is predicted from the next pre-open run.`}</div>
+            <div>{`Takes the exchange symbol and an optional amount. The onboarding checks the identifiers (${market === "india" ? "NSE and Yahoo symbols" : "ticker, Yahoo symbol and SEC CIK"}), refuses ETFs, ${market === "india" ? "BSE-only and unknown" : "unknown"} symbols, sets the sector, backfills prices, news and filings, runs the collect gate, and only then appends the add event. The company is predicted from the next morning run.`}</div>
             <Field label="Exchange symbol">
               <input type="text" autoFocus value={symbol} onChange={(e) => setSymbol(e.target.value)} placeholder={market === "india" ? "NSE symbol, e.g. TCS" : "NYSE or Nasdaq ticker, e.g. AMZN"} aria-label="Exchange symbol" />
             </Field>
             <Field label={`Amount per paper trade (${currency}, optional)`}>
               <input type="number" min="1" step="1" value={amountText} onChange={(e) => setAmountText(e.target.value)} placeholder={String(defaultAmount)} aria-label="Amount" />
             </Field>
-            <div className="muted" style={{ fontSize: 12.5 }}>Next: the identifiers are checked and a summary (name, exchange, sector, Yahoo symbol, CIK, amount) is shown with Confirm and Cancel; only Confirm starts the onboarding (F8.7).</div>
+            <div className="muted" style={{ fontSize: 12.5 }}>Next: the identifiers are checked and a summary (name, exchange, sector, Yahoo symbol, CIK, amount) is shown with Confirm and Cancel; only Confirm starts the onboarding.</div>
           </>
         );
         break;
       case "amount":
         body = (
           <>
-            <div>{`Money per paper trade. Today ${money(currency, intent.company.amount)}${intent.company.amount_overridden ? " (set for this company)" : " (the default)"}. In India a trade is skipped when one share costs more than the amount. Takes effect at the next pre-open run.`}</div>
+            <div>{`Money per paper trade. Today ${money(currency, intent.company.amount)}${intent.company.amount_overridden ? " (set for this company)" : " (the default)"}. In India a trade is skipped when one share costs more than the amount. Takes effect at the next morning run.`}</div>
             <Field label={`New amount (${currency})`}>
               <input type="number" min="1" step="1" autoFocus value={amountText} onChange={(e) => setAmountText(e.target.value)} aria-label="New amount" />
             </Field>
@@ -219,20 +219,20 @@ export function CommandDialog({ intent, market, currency, defaultAmount, onClose
       case "reactivate":
         body = (
           <>
-            <div>{intent.kind === "deactivate" ? "It stays collected (prices, news, filings) but gets no new prediction or paper trade; its open paper trades still settle. Takes effect at the next pre-open run (F8.4)." : "Predictions and paper trades resume from the next pre-open run (F8.4)."}</div>
+            <div>{intent.kind === "deactivate" ? "It stays collected (prices, news, filings) but gets no new prediction or paper trade; its open paper trades still settle. Takes effect at the next morning run." : "Predictions and paper trades resume from the next morning run."}</div>
             {intent.kind === "deactivate" ? (
               <Field label="Reason">
                 <input type="text" maxLength={REASON_MAX_CHARS} value={reason} onChange={(e) => setReason(e.target.value)} placeholder={`optional, in your words (at most ${REASON_MAX_CHARS} characters)`} aria-label="Reason" />
               </Field>
             ) : null}
-            <div className="muted" style={{ fontSize: 12.5 }}>Recorded with your sign-in and an idempotency key; pending until the next run imports it.</div>
+            <div className="muted" style={{ fontSize: 12.5 }}>Saved with your sign-in; sending it twice is safe. It takes effect at the next morning run.</div>
           </>
         );
         break;
       case "delete":
         body = (
           <>
-            <div className="warn"><Icon name="warning" /><div><b>This cannot be undone from the cockpit.</b> A delete appends a tombstone: the company is excluded on read everywhere, the warehouse and the graph drop it at the next sync, and every scoreboard and track record is computed without it from then on (F8.5, decision 12). Raw records stay in git history. Delete is available here only, never from Slack.</div></div>
+            <div className="warn"><Icon name="warning" /><div><b>This cannot be undone from the cockpit.</b> A delete appends a tombstone: the company is excluded on read everywhere, the warehouse and the graph drop it at the next sync, and every scoreboard and track record is computed without it from then on. Raw records stay in the project’s history. Delete is available here only, never from Slack.</div></div>
             <Field label={`Type ${intent.company.ticker} to confirm`}>
               <input type="text" autoFocus autoComplete="off" value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={intent.company.ticker} aria-label={`Type ${intent.company.ticker} to confirm`} />
             </Field>

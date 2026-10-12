@@ -13,14 +13,18 @@ Every read is as of ctx.cutoff (each row's own storage time); times are ISO UTC 
 
 from __future__ import annotations
 
-from datetime import datetime, time, timedelta
+import math
+from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 import pandas as pd
 
 from marketbrief.constants.warehouse import (
     DEFAULT_HORIZON,
+    GO_LIVE_CHECK_FIELDS,
     GO_LIVE_FIELDS,
+    GO_LIVE_NEAREST_FIELDS,
+    INTRADAY_LOCAL,
     POST_CLOSE_LOCAL,
     REFERENCE_STRATEGY,
     STRATEGY_FIELDS,
@@ -28,7 +32,14 @@ from marketbrief.constants.warehouse import (
 from marketbrief.core import calendar
 from marketbrief.lab import reads as lab_reads
 from marketbrief.lab import registry
-from marketbrief.lab.constants import GO_LIVE_TRADES, STATUS_SETTLED, VIEW_ACCURACY
+from marketbrief.lab.constants import (
+    DAYS_PER_MONTH,
+    FAMILY_BASELINE,
+    GO_LIVE_MONTHS,
+    GO_LIVE_TRADES,
+    STATUS_SETTLED,
+    VIEW_ACCURACY,
+)
 from marketbrief.lab import compare, heatmaps, scoreboard
 from marketbrief.lab.scoreboard import latest_settlements
 from marketbrief.pipeline.market_status import status as market_session
@@ -101,17 +112,29 @@ def level_block(tile: dict | None) -> dict | None:
     }
 
 
-def next_post_close(cfg: dict, cutoff_time: datetime) -> str | None:
-    """The next scheduled post-close run after the cut-off: the market's local start time on a session day."""
+def next_scheduled(cfg: dict, cutoff_time: datetime, local_times: tuple[str, ...]) -> str | None:
+    """The first of the market's local start times `local_times` (HH:MM) after the cut-off on a session day."""
     zone = ZoneInfo(cfg["timezone"])
-    hour, minute = (int(part) for part in POST_CLOSE_LOCAL[cfg["market"]].split(":"))
+    starts = sorted(time(*(int(part) for part in hhmm.split(":"))) for hhmm in local_times)
     day = cutoff_time.astimezone(zone).date()
     for _ in range(LOOKAHEAD_DAYS):
-        start = datetime.combine(day, time(hour, minute), zone)
-        if start > cutoff_time and calendar.is_session(cfg, day):
-            return iso_z(start)
+        if calendar.is_session(cfg, day):
+            for start_time in starts:
+                start = datetime.combine(day, start_time, zone)
+                if start > cutoff_time:
+                    return iso_z(start)
         day += timedelta(days=1)
     return None
+
+
+def next_post_close(cfg: dict, cutoff_time: datetime) -> str | None:
+    """The next scheduled post-close run after the cut-off: the market's local start time on a session day."""
+    return next_scheduled(cfg, cutoff_time, (POST_CLOSE_LOCAL[cfg["market"]],))
+
+
+def next_intraday(cfg: dict, cutoff_time: datetime) -> str | None:
+    """The next scheduled intraday check after the cut-off (INTRADAY_LOCAL on a session day)."""
+    return next_scheduled(cfg, cutoff_time, INTRADAY_LOCAL[cfg["market"]])
 
 
 def runs(ctx: BuildContext, session_date: str) -> dict:
@@ -212,24 +235,73 @@ def strategies(ctx: BuildContext, fields: tuple[str, ...] = STRATEGY_FIELDS) -> 
     return {key: {name: entry[name] for name in fields} for key, entry in ctx.shared("strategies", compute).items()}
 
 
+def go_live_rows(ctx: BuildContext) -> list[dict]:
+    """The scoreboard rows the go-live bar is measured on: per strategy, accuracy view, forward basis, all horizons,
+    with their go_live block."""
+    return [
+        row
+        for row in lab_summary(ctx)["scoreboard"]
+        if row["scope"] == SCOPE_STRATEGY
+        and row["view"] == VIEW_ACCURACY
+        and row["basis"] == BASIS_FORWARD
+        and str(row["horizon_days"]) == ALL_HORIZONS
+        and row.get("go_live")
+    ]
+
+
+def reference_go_live(ctx: BuildContext) -> dict | None:
+    """The reference strategy's whole go_live block (lab/scoreboard.go_live), or None before its first settled trade."""
+    return next((row["go_live"] for row in go_live_rows(ctx) if row["strategy_id"] == REFERENCE_STRATEGY), None)
+
+
 def go_live(ctx: BuildContext) -> dict:
     """The reference strategy's position against the go-live bar (accuracy view, all horizons, forward basis); with
     no settled trade yet: not proven, 0 months, every trade still needed, baseline comparison unknown."""
 
     def compute() -> dict:
-        for row in lab_summary(ctx)["scoreboard"]:
-            if (
-                row["scope"] == SCOPE_STRATEGY
-                and row["strategy_id"] == REFERENCE_STRATEGY
-                and row["view"] == VIEW_ACCURACY
-                and row["basis"] == BASIS_FORWARD
-                and str(row["horizon_days"]) == ALL_HORIZONS
-                and row.get("go_live")
-            ):
-                return {key: row["go_live"][key] for key in GO_LIVE_FIELDS}
+        found = reference_go_live(ctx)
+        if found is not None:
+            return {key: found[key] for key in GO_LIVE_FIELDS}
         return {"proven": False, "months_forward": 0.0, "trades_needed": GO_LIVE_TRADES, "beats_best_baseline": None}
 
     return ctx.shared("go_live", compute)
+
+
+def earliest_go_live(live_from: str | None) -> str | None:
+    """The earliest date the go-live bar's months can be met: live_from + GO_LIVE_MONTHS months (ISO date; months
+    of DAYS_PER_MONTH days, as lab/scoreboard.go_live counts them), or None without a live_from."""
+    if live_from is None:
+        return None
+    start = date.fromisoformat(str(live_from)[:10])
+    return (start + timedelta(days=math.ceil(GO_LIVE_MONTHS * DAYS_PER_MONTH))).isoformat()
+
+
+def go_live_checks(ctx: BuildContext) -> dict:
+    """The reference strategy's two other go-live checks (drawdown within the limit, profit in calm and in volatile
+    regimes; null while it has no settled trade; docs/ux/plain_language_review.md D1) and the earliest date its
+    months can be met (`earliest_date`, from its live_from in config/strategies.yaml)."""
+    found = reference_go_live(ctx) or {}
+    spec = next((entry for entry in registry.strategies() if entry["id"] == REFERENCE_STRATEGY), {})
+    checks = {key: found.get(key) for key in GO_LIVE_CHECK_FIELDS}
+    return {**checks, "earliest_date": earliest_go_live(spec.get("live_from"))}
+
+
+def go_live_nearest(ctx: BuildContext) -> dict | None:
+    """The rule strategy or AI trader nearest the go-live bar (fewest settled trades still needed, then the most months
+    forward, then the id), with its name and settled trades; None before any of them has a settled trade (D2). The
+    Strategy lab's "Nearest to go-live" card ranks the same way on its shown slice."""
+    rows = [row for row in go_live_rows(ctx) if row["family"] != FAMILY_BASELINE]
+    if not rows:
+        return None
+    row = min(rows, key=lambda r: (r["go_live"]["trades_needed"], -r["go_live"]["months_forward"], r["strategy_id"]))
+    names = {spec["id"]: spec.get("name") for spec in registry.strategies()}
+    return {
+        "strategy_id": row["strategy_id"],
+        "name": names.get(row["strategy_id"]) or row["strategy_id"],
+        "family": row["family"],
+        "trades": row["trades"],
+        **{key: row["go_live"].get(key) for key in GO_LIVE_NEAREST_FIELDS},
+    }
 
 
 # The shared derived records (Company, Agreement, Open trade) live in rm_entities.py; re-exported here so every page

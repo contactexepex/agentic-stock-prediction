@@ -12,7 +12,7 @@ import { Segmented } from "../../../../../components/ui/controls.tsx";
 import { Card, CardHead, FamilyLabel, MoneyDelta, PaperTag, Quiet } from "../../../../../components/ui/primitives.tsx";
 import { BAND, BAND_SHORT, FAMILY, FAMILY_SHORT, FLAG, FLAG_SHORT, PAPER_LABEL, PICK_RULE } from "../../../../../lib/ui/constants.ts";
 import { useApi } from "../../../../../lib/ui/use-api.ts";
-import { DASH, fmtDate, fmtLocal, moneyDecimals, price, signed } from "../../../../../lib/ui/format.ts";
+import { DASH, fmtDate, fmtLocal, holdLabel, moneyDecimals, price, signed } from "../../../../../lib/ui/format.ts";
 import { companyPath, pagePath } from "../../../../../lib/ui/routes.ts";
 import type { PageBase } from "../../../../../lib/ui/types.ts";
 import type { Strategy } from "../../../../../lib/strategy-pages/scoreboard.ts";
@@ -139,7 +139,7 @@ function who(p: Props["p"], row: AllTradesRow) {
     <span>
       {row.strategy_id ? <Link className="tk" href={`${pagePath(p.market, "lab")}#${encodeURIComponent(row.strategy_id)}`}>{name}</Link> : name}{" "}
       {row.family !== "mine" ? <FamilyLabel family={row.family}>{FAMILY_SHORT[row.family]}</FamilyLabel> : null}
-      <small>{[row.horizon_days ? `N+${row.horizon_days}` : null, row.pick_rule ? PICK_RULE[row.pick_rule] ?? row.pick_rule : null].filter(Boolean).join(" · ")}</small>
+      <small>{[row.horizon_days ? holdLabel(row.horizon_days) : null, row.pick_rule ? PICK_RULE[row.pick_rule] ?? row.pick_rule : null].filter(Boolean).join(" · ")}</small>
     </span>
   );
 }

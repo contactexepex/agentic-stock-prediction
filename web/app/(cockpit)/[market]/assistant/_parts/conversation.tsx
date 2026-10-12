@@ -9,6 +9,7 @@ import { Avatar } from "../../../../../components/ui/primitives.tsx";
 import type { Market } from "../../../../../lib/data/constants.ts";
 import type { AnswerRecord, CitedRecord } from "../../../../../lib/assistant/types.ts";
 import { kindIcon, kindPage, kindWords, stateWords } from "../../../../../lib/assistant/words.ts";
+import { WHY_NO_BUY_SELL_ANCHOR } from "../../../../../lib/ui/constants.ts";
 import { fmtLocal } from "../../../../../lib/ui/format.ts";
 import { pagePath } from "../../../../../lib/ui/routes.ts";
 import type { Pending } from "./use-assistant.ts";
@@ -79,6 +80,7 @@ function Answer({ market, localTime, answer }: { market: Market; localTime: stri
             {words}
           </span>
           data as of {fmtLocal(answer.as_of, market, localTime, true)}
+          {answer.status === "declined" ? <> · <Link href={`${pagePath(market, "help")}#${WHY_NO_BUY_SELL_ANCHOR}`}>Why the app does not tell you when to buy or sell</Link></> : null}
           {answer.history_turns ? <span className="muted"> · follows {answer.history_turns} earlier question{answer.history_turns === 1 ? "" : "s"}</span> : null}
         </div>
         {answer.cited.length ? (
@@ -168,6 +170,7 @@ export function Composer({ max, busy, disabled, onAsk, starters, startersLabel }
 
 /** Generic starters for a market with no question yet (page copy: no company, date or number). */
 export const STARTERS = [
+  "Can I rely on these signals yet?",
   "Why did a paper trade end as it did?",
   "Rule or AI: who did better on the last settled day?",
   "Which strategies agree on a company today, and why?",

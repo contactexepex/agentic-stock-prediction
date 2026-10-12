@@ -12,16 +12,16 @@ test("cost views of the Home mockup's picks", () => {
   const k = picked[0];
   assert.equal(pickCandidate(k)?.horizon_days, k.horizon_days);
   assert.equal(typeof yourViable(k), "boolean");
-  assert.match(viableLine(picked), /^(none clears|\d+ clears?) market costs · /);
+  assert.match(viableLine(picked), /^(none|\d+) expected to beat market fees · /);
 });
 
 test("viable line words", () => {
   const base = { prob_up: 0.6, move_pct: 2, loss_pct: 1, costs_pct: 0.5, amount: 1000 };
   const a: Pick = { ...base, horizon_days: 1, expected_gain_pct: 0.3, candidates: [{ horizon_days: 1, cost_viable: true }] };
   const b: Pick = { ...base, horizon_days: 2, expected_gain_pct: -0.1, candidates: [{ horizon_days: 2, cost_viable: false }] };
-  assert.equal(viableLine([a, b]), "1 clears market costs · 1 viable at your cost");
-  assert.equal(viableLine([b]), "none clears market costs · none viable at your cost");
-  assert.equal(viableLine([{ ...b, candidates: [] }]), "none clears market costs · your-cost view not stored");
+  assert.equal(viableLine([a, b]), "1 expected to beat market fees · 1 worth it after your fees");
+  assert.equal(viableLine([b]), "none expected to beat market fees · none worth it after your fees");
+  assert.equal(viableLine([{ ...b, candidates: [] }]), "none expected to beat market fees · your fees not stored");
 });
 
 test("page slices", () => {

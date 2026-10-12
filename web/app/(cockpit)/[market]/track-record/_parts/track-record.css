@@ -61,3 +61,4 @@
   .p-track .kv{grid-template-columns:1fr 1fr}
   .p-track .x td,.p-track .x th{padding-left:6px;padding-right:6px}
 }
+.tr-intro{margin:12px 0 0;font-size:14px;color:var(--md-sys-color-on-surface-variant)}

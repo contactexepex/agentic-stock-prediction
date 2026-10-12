@@ -1,7 +1,9 @@
 "use client";
 // Page 03, Company (design/mockups/03-company/, SPEC section 6 page 3): one company's day in the order the investor
-// asks it — where it stands, the chart with today's targets and ranges, the open paper trades, the settled ones and
-// why they moved, the analyst's words, news with status, results, what is coming and the watchlist settings. Reads
+// asks it (docs/ux/plain_language_review.md L3) — one plain sentence on what the strategies think, the chart with
+// today's targets and ranges, what the paper trades on it did, then the details: the horizon tabs and head-to-head
+// picks, the forecast history, the open paper trades, the settled ones and why they moved, the analyst's words, news
+// with status, results, what is coming and the watchlist settings. Reads
 // GET /api/v1/markets/{market}/stocks/{ticker} (B12, rm.stock). Research only: every signal is Paper, nothing trades.
 import { useState } from "react";
 import { PageFooter, PageHead, SignalsBand } from "../../../../../../components/blocks/page-head.tsx";
@@ -20,6 +22,7 @@ import { CompanyLine, DecisionCard } from "./decision.tsx";
 import { ForecastHistoryCard } from "./forecast-history.tsx";
 import { CompanyLegend } from "./legend.tsx";
 import { PriceChart } from "./price-chart.tsx";
+import { CompanyTradesSoFar, CompanySummary, SETTLED_ANCHOR } from "./summary.tsx";
 import { OpenTradesTable, SettledCard } from "./trades.tsx";
 import "./company.css";
 
@@ -48,7 +51,7 @@ function CompanyBody({ p }: { p: CompanyPayload }) {
       {recorded.map((r, i) => (
         <div className="mb-alert" key={i} style={{ padding: "10px 14px" }} role="status">
           <Icon name="pending" />
-          <div><b className="t">{r.result === "duplicate" ? "Already requested" : "Pending"}: {r.summary}</b><div className="s">Recorded as a request; the next run imports it (F10). Nothing is bought or sold.</div></div>
+          <div><b className="t">{r.result === "duplicate" ? "Already requested" : "Pending"}: {r.summary}</b><div className="s">Saved as a request; it takes effect at the next morning run. Nothing is bought or sold.</div></div>
         </div>
       ))}
     </div>
@@ -61,15 +64,17 @@ function CompanyBody({ p }: { p: CompanyPayload }) {
         subtitle={`${co.sector ?? "sector not set"} · ${p.name} · data as of the ${fmtDate(p.as_of, false)} close · research only, nothing here trades`}
       />
       <CompanyLine p={p} ctx={ctx} actions={buttons} />
+      <CompanySummary p={p} horizon={horizon} />
+      <PriceChart p={p} ctx={ctx} horizon={horizon} />
+      <CompanyTradesSoFar p={p} ctx={ctx} />
       <SignalsBand page={p} goLive={p.go_live} strategies={Object.keys(p.strategies).length} />
       <DecisionCard p={p} ctx={ctx} horizon={horizon} onHorizon={setHorizon} />
-      <PriceChart p={p} ctx={ctx} horizon={horizon} />
       <div style={{ marginTop: 16 }}><ForecastHistoryCard p={p} ctx={ctx} horizon={horizon} onHorizon={setHorizon} /></div>
       <div style={{ marginTop: 16 }}><OpenTradesTable p={p} ctx={ctx} /></div>
-      <div style={{ marginTop: 16 }}><SettledCard settled={p.settled} ctx={ctx} paperLabel={p.status.paper_label} ticker={co.ticker} /></div>
+      <div style={{ marginTop: 16 }} id={SETTLED_ANCHOR}><SettledCard settled={p.settled} ctx={ctx} paperLabel={p.status.paper_label} ticker={co.ticker} openTrades={p.open_trades} /></div>
       <div className="grid even">
         <div className="col">
-          <ReasonsCard reasons={p.reasons} news={p.news} ctx={ctx} />
+          <ReasonsCard reasons={p.reasons} news={p.news} ctx={ctx} openHeadToHead={p.open_trades.filter((t) => t.view === "head_to_head")} />
           <ResultsCard p={p} ctx={ctx} />
           <WatchlistCard p={p} ctx={ctx} onChangeAmount={() => open("amount")} pending={pending} historyDates={dates} />
         </div>

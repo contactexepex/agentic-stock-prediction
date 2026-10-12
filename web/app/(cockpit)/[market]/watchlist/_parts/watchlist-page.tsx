@@ -21,7 +21,7 @@ import {
   watchlistRows, type SortKey, type WatchlistRow,
 } from "../../../../../lib/market-pages/watchlist.ts";
 import { FLAG } from "../../../../../lib/ui/constants.ts";
-import { fmtDate, fmtLocal, moneyDecimals, pct, price } from "../../../../../lib/ui/format.ts";
+import { fmtDate, fmtLocal, holdLabel, horizonLabel, moneyDecimals, pct, price } from "../../../../../lib/ui/format.ts";
 import { companyPath, pagePath, stockStrategiesPath } from "../../../../../lib/ui/routes.ts";
 import type { AgreementMap, CompanyRecord, GoLive, OpenTrade, PageBase, StrategyMap, TradeCheck } from "../../../../../lib/ui/types.ts";
 import { usePage } from "../../../../../lib/ui/use-api.ts";
@@ -65,12 +65,12 @@ function Kpis({ p, market, rows, horizon }: { p: WatchlistPayload; market: Marke
     <KpiRow>
       <Kpi icon="apartment" label="Companies followed" value={String(rows.length)}
         sub={inactive ? <span>{`${inactive} inactive on the `}<Link href={pagePath(market, "companies")}>Companies page</Link></span> : "all active"}
-        tip="Active companies are predicted and traded on paper. Inactive ones are still collected but never predicted (decision 13); they live on the Companies page." />
-      <Kpi icon="trending_up" tone="success" label={`Most agreed at N+${horizon}`}
+        tip="Active companies are predicted and traded on paper. Inactive ones are still collected but never predicted; they live on the Companies page." />
+      <Kpi icon="trending_up" tone="success" label={`Most strategies like (${holdLabel(horizon)})`}
         value={lead?.agreement ? <Link className="tk" href={stockStrategiesPath(market, lead.company.ticker)}>{lead.company.ticker}</Link> : "None"}
         sub={lead?.agreement ? <span><Label tone="success">{`${lead.agreement.buy} of ${lead.agreement.of} buy`}</Label>{lead.agreement.avg_prob_up != null ? ` avg chance ${pct(lead.agreement.avg_prob_up)}` : " no probability"}</span> : "no strategy buys"}
-        tip="The company most strategies would buy at the selected horizon (decision 30)." />
-      <Kpi icon="account_balance_wallet" tone="paper" label="Open paper trades" value={String(p.open_trades.length)}
+        tip={`The company the largest number of test strategies would buy for this holding period (${horizonLabel(horizon)}). Agreement is not proof: they can all be wrong together.`} />
+      <Kpi icon="account_balance_wallet" tone="paper" label="Paper trades running now" value={String(p.open_trades.length)}
         sub={<span>unrealised <MoneyDelta currency={cur} value={unreal} decimals={moneyDecimals(cur)} /> before costs</span>}
         tip="Paper trades entered and not yet exited, every strategy and horizon; unrealised against the latest stored close, before costs." />
       <Kpi icon="warning" tone={flagged ? "warn" : "neutral"} label="Flagged today"
@@ -104,8 +104,8 @@ function Table({ p, market, rows, horizon, sector, query, sort, onSort }: {
     <section className="card" aria-label="Companies">
       <div className="head">
         <h2>{`${list.length} of ${rows.length} companies`}</h2>
-        <HelpTip tip="One row per active company. Agreement = how many of the strategies that predict it at this horizon would buy (rule, baselines and AI count alike), with the buyers’ average chance of a rise. Range = the published range for the horizon (ranges.py; target as the triangle, last close as the dark line), shown whether or not a strategy is live. Open = this company’s open paper trades and their unrealised profit. Click a row for the company page." />
-        <div className="end">{`N+${horizon} = ${horizonWords(horizon)} · as of the ${fmtDate(p.as_of, false)} close · Paper`}</div>
+        <HelpTip tip="One row per active company. Agreement = how many of the strategies that predict it at this horizon would buy (rule, baselines and AI count alike), with the buyers’ average chance of a rise. Range = where the price is likely to end: the inner band about half the time, the outer band about 8 times in 10 (target as the triangle, last close as the dark line). Trades running = this company’s paper trades not yet sold and their profit so far. Click a row for the company page." />
+        <div className="end">{`${holdLabel(horizon)}: buy at the open, sell at ${horizonWords(horizon)} · data up to the ${fmtDate(p.as_of, false)} close · Paper`}</div>
       </div>
       <div className="md-table-wrap">
         <table className="md-table tbl wl">
@@ -115,11 +115,11 @@ function Table({ p, market, rows, horizon, sector, query, sort, onSort }: {
               <th scope="col" className="num" aria-sort={ariaSort("last", "change")}>
                 <SortButton label="Last" k="last" sort={sort} onSort={onSort} /><span className="sep" aria-hidden="true">·</span><SortButton label="Move" k="change" sort={sort} onSort={onSort} />
               </th>
-              <th scope="col" aria-sort={ariaSort("agreement")}><SortButton label={`Agreement at N+${horizon}`} k="agreement" sort={sort} onSort={onSort} /></th>
+              <th scope="col" aria-sort={ariaSort("agreement")}><SortButton label={`Would buy (${holdLabel(horizon)})`} k="agreement" sort={sort} onSort={onSort} /></th>
               <th scope="col" className="cw" data-tip="Average probability of a rise given by the buyers that give one; 50% is a coin flip.">Chance</th>
-              <th scope="col" className="c2" data-tip="Buyers at each horizon; the selected one is dark.">Buyers N+1…5</th>
-              <th scope="col" className="cw" data-tip="The published 50% and 80% ranges for the horizon (ranges.py), drawn around the last close; the triangle is the target.">{`Range at N+${horizon}`}</th>
-              <th scope="col" className="num cm" aria-sort={ariaSort("open")}><SortButton label="Open" k="open" sort={sort} onSort={onSort} /></th>
+              <th scope="col" className="c2" data-tip="Buyers for each holding period; the selected one is dark.">Buyers, 1 to 5-day holds</th>
+              <th scope="col" className="cw" data-tip="Where the price is likely to end: the inner band about half the time, the outer band about 8 times in 10, drawn around the last close; the triangle is the middle guess (target).">{`Likely price range (${holdLabel(horizon)})`}</th>
+              <th scope="col" className="num cm" aria-sort={ariaSort("open")}><SortButton label="Trades running" k="open" sort={sort} onSort={onSort} /></th>
               <th scope="col" className="c3" aria-label="Open the company page" />
             </tr>
           </thead>
@@ -131,7 +131,7 @@ function Table({ p, market, rows, horizon, sector, query, sort, onSort }: {
                 <tr key={c.ticker} className="row" onClick={(e) => { if (!(e.target as HTMLElement).closest("a, button")) router.push(companyPath(market, c.ticker)); }}>
                   <td><CompanyCell company={c} /></td>
                   <td className="num last"><b>{price(cur, c.last_close)}</b><Delta value={c.change_pct} /></td>
-                  <td className="ag"><AgreementCell row={r.agreement} subject={`${c.name} at N+${horizon}`} /></td>
+                  <td className="ag"><AgreementCell row={r.agreement} subject={`${c.name}, ${holdLabel(horizon)}`} /></td>
                   <td className="cw"><AgreementOdds row={r.agreement} /></td>
                   <td className="c2"><HorizonBars horizons={p.horizons} splits={p.horizons.map((k) => agreementAt(p.agreement, k, c.ticker))} selected={horizon} /></td>
                   <td className="cw">{bands ? <RangeBar currency={cur} bands={bands} last={c.last_close ?? r.range?.base_close ?? null} /> : <span className="muted" data-tip="No published range stored for this company at this horizon.">—</span>}</td>
@@ -200,7 +200,7 @@ export function WatchlistView({ p, market }: { p: WatchlistPayload; market: Mark
         />
         <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           <span className="muted" style={{ fontSize: 12.5 }}>Horizon</span>
-          <HelpTip tip="N+k: buy at the open of the session being predicted, sell at the close of the k-th market session after it. The selector sets the agreement, chance and range columns; it opens on N+1 (decision 39)." />
+          <HelpTip tip="A k-day hold (N+k): buy at the open of the trading day being predicted, sell at the close k trading days later. The selector sets the agreement, chance and range columns; it opens on the 1-day hold." />
           <HorizonTabs horizons={p.horizons} value={horizon} onChange={setHorizon} />
         </span>
       </div>

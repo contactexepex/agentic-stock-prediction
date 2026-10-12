@@ -7,7 +7,7 @@
 // Escape clears. Drawn at the container's width, redrawn on resize. Geometry: lib/company-pages/chart-geometry.ts.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardHead, PaperTag } from "../../../../../../components/ui/primitives.tsx";
-import { DASH, fmtDate, fmtDateYear, money, price, signed } from "../../../../../../lib/ui/format.ts";
+import { DASH, fmtDate, fmtDateYear, holdLabel, money, price, signed } from "../../../../../../lib/ui/format.ts";
 import { LOCALE } from "../../../../../../lib/ui/constants.ts";
 import { barAt, chartGeometry } from "../../../../../../lib/company-pages/chart-geometry.ts";
 import { horizonsOf, publishedRanges, tradeMarks } from "../../../../../../lib/company-pages/company-logic.ts";
@@ -63,7 +63,7 @@ export function PriceChart({ p, ctx, horizon }: { p: CompanyPayload; ctx: PageCt
   const head = (
     <CardHead
       title="Price with today’s targets and ranges"
-      help="Daily candles of the stored sessions (hollow = closed above the open, filled = below). To the right of the last close: the published targets for N+1..N+5 (ranges.py; dots on a dashed line), their 50% and 80% ranges as the shaded fan, and at the selected horizon the spread of every strategy’s target (the thin bar). Triangles mark the paper trades: entries below, exits above, hollow = still open. Hover or use the arrow keys for each day’s prices."
+      help="Daily candles of the stored sessions (hollow = closed above the open, filled = below). To the right of the last close: the likely closing prices for 1- to 5-day holds (dots on a dashed line), their 50% and 80% ranges as the shaded fan, and at the selected horizon the spread of every strategy’s target (the thin bar). Triangles mark the paper trades: entries below, exits above, hollow = still open. Hover or use the arrow keys for each day’s prices."
       end={n ? (<span className="ctl">{n} sessions to {fmtDate(p.bars[n - 1].date)}<span className="muted">·</span><PaperTag label={p.status.paper_label} /></span>) : undefined}
     />
   );
@@ -130,7 +130,7 @@ export function PriceChart({ p, ctx, horizon }: { p: CompanyPayload; ctx: PageCt
               <polygon className="b50" points={g.fan50 ?? ""} />
               <polyline className="tl" points={g.targetLine ?? ""} />
               {g.spread ? <line className="spread" x1={g.spread.x} x2={g.spread.x} y1={g.spread.y1} y2={g.spread.y2} tabIndex={0}
-                data-tip={`${g.spread.count} strategies’ targets at N+${horizon}: ${price(cur, g.spread.min)} to ${price(cur, g.spread.max)}.`} /> : null}
+                data-tip={`${g.spread.count} strategies’ targets for a ${holdLabel(horizon)}: ${price(cur, g.spread.min)} to ${price(cur, g.spread.max)}.`} /> : null}
               {g.targets.map((t) => <circle key={t.k} className={"tg" + (t.on ? " on" : "") + (eveningAt.has(t.k) ? " eve" : "")} cx={t.x} cy={t.y} r={t.on ? 5 : 3.5} />)}
             </g>
           ) : null}
@@ -149,7 +149,7 @@ export function PriceChart({ p, ctx, horizon }: { p: CompanyPayload; ctx: PageCt
           <g className="mk">{markEls}</g>
           {selPred && selected && g.targetTagY != null && selPred.target_price != null ? (
             <g className="ttag">
-              <title>{`N+${horizon} target ${price(cur, selPred.target_price)}${selPred.run === "evening" ? " (evening preview, never traded)" : ""}`}</title>
+              <title>{`${holdLabel(horizon)} target ${price(cur, selPred.target_price)}${selPred.run === "evening" ? " (evening preview, never traded)" : ""}`}</title>
               <line x1={selected.x} x2={W - R + 2} y1={selected.y} y2={g.targetTagY} />
               <rect x={W - R + 2} y={g.targetTagY - 9} width={tagW} height={18} rx={4} />
               <text x={W - R + 2 + tagW / 2} y={g.targetTagY + 4} textAnchor="middle">{price(cur, selPred.target_price)}</text>
@@ -202,7 +202,7 @@ export function PriceChart({ p, ctx, horizon }: { p: CompanyPayload; ctx: PageCt
         ) : null}
         {marks.entries.size || marks.exits.size ? (<><span><i className="tri en" />trade entry</span><span><i className="tri ex" />trade exit</span></>) : null}
         {marks.open.size ? <span><i className="tri en" style={{ borderBottomColor: "var(--md-sys-color-outline)" }} />open trade entry</span> : null}
-        <span className="muted">D = the session being predicted{g.fan80 ? ", +k = the N+k exit session" : ""}. Volume below the candles. Research only.</span>
+        <span className="muted">D = the trading day being predicted{g.fan80 ? ", +k = the day a k-day hold is sold" : ""}. Volume below the candles. Research only.</span>
       </div>
     );
   }

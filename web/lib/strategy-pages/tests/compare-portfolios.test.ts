@@ -78,8 +78,8 @@ test("a trade that never entered is no side of a match, no company trade and no 
 test("the picks' cost line", () => {
   const p = mockup<RuleVsAiPayload>("06-rule-vs-ai");
   const picked = p.picks.filter((pick) => pick.session_date === p.session_date && pick.status === "picked");
-  assert.equal(viableLine(picked), "none clears market costs · none viable at your cost");
-  assert.equal(viableLine([]), "none clears market costs · your-cost view not stored");
+  assert.equal(viableLine(picked), "none expected to beat market fees · none worth it after your fees");
+  assert.equal(viableLine([]), "none expected to beat market fees · your fees not stored");
 });
 
 test("paper portfolios: KPI sums, grouping by strategy and the latest check", () => {

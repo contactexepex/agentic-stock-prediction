@@ -11,10 +11,10 @@ import { strategyOf } from "../../../../../../../components/blocks/records.tsx";
 import { RangeBar } from "../../../../../../../components/charts/small.tsx";
 import { HorizonTabs } from "../../../../../../../components/ui/controls.tsx";
 import { Icon } from "../../../../../../../components/ui/icon.tsx";
-import { Avatar, Card, CardHead, Delta, FamilyLabel, GoLink, Kpi, KpiRow, Label, MoneyDelta, Odds, PaperTag, Quiet } from "../../../../../../../components/ui/primitives.tsx";
+import { Avatar, Card, CardHead, Delta, ExpectedMoney, FamilyLabel, GoLink, Kpi, KpiRow, Label, MoneyDelta, Odds, PaperTag, Quiet } from "../../../../../../../components/ui/primitives.tsx";
 import { PageState } from "../../../../../../../components/ui/states.tsx";
 import { FAMILY, FAMILY_SHORT, MARKET_LABEL, MIN_TRADES_TO_RANK, PICK_RULE, type Family } from "../../../../../../../lib/ui/constants.ts";
-import { fmtDate, horizonWords, money, moneyDecimals, pct, price, signed } from "../../../../../../../lib/ui/format.ts";
+import { fmtDate, holdLabel, horizonWords, money, moneyDecimals, pct, price, signed } from "../../../../../../../lib/ui/format.ts";
 import { companyPath, pagePath } from "../../../../../../../lib/ui/routes.ts";
 import { usePage } from "../../../../../../../lib/ui/use-api.ts";
 import type { Market } from "../../../../../../../lib/data/constants.ts";
@@ -45,24 +45,24 @@ function Kpis({ p, horizon, strategies }: { p: StockStrategiesPayload; horizon: 
   const few = (r: ScoreRow) => (r.sample_badge === "too_few_to_rank" ? <Label tone="neutral">too few to rank</Label> : null);
   return (
     <KpiRow>
-      <Kpi icon="trending_up" tone="success" label={`Agreement at N+${horizon}`} value={a ? `${a.buy} of ${a.of}` : "—"}
+      <Kpi icon="trending_up" tone="success" label={`Would buy (${holdLabel(horizon)})`} value={a ? `${a.buy} of ${a.of}` : "—"}
         sub={a ? <span>strategies buy · {a.avg_prob_up != null ? `avg chance ${pct(a.avg_prob_up)}` : "no probability"}</span> : "no agreement row"}
-        tip="How many of the strategies that predict this company at the selected horizon would buy it (decision 30)." />
+        tip="How many of the strategies that predict this company for the selected holding period would buy it. Agreement is not proof: they can all be wrong together." />
       <Kpi icon="settings" label="Best on this company" value={bestHere ? strategyOf(strategies, bestHere.strategy_id).name : "None yet"}
         sub={bestHere ? <span><MoneyDelta currency={cur} value={bestHere.net_pnl} decimals={dec} /> on {bestHere.trades} trade{bestHere.trades === 1 ? "" : "s"} {few(bestHere)}</span> : "no settled trade on it"}
-        tip={bestHere ? `Profit after costs on this company, all horizons pooled. ${luck(bestHere)} Under ${MIN_TRADES_TO_RANK} trades it is mostly noise (SPEC section 6).` : "No strategy has a settled trade on this company yet."} />
+        tip={bestHere ? `Profit after costs on this company, all horizons pooled. ${luck(bestHere)} Under ${MIN_TRADES_TO_RANK} trades it is mostly noise.` : "No strategy has a settled trade on this company yet."} />
       <Kpi icon="query_stats" tone="info" label="Best overall" value={bestAll ? strategyOf(strategies, bestAll.strategy_id).name : "None yet"}
         sub={bestAll ? <span><MoneyDelta currency={cur} value={bestAll.net_pnl} decimals={dec} /> on {bestAll.trades} trade{bestAll.trades === 1 ? "" : "s"}, all companies {few(bestAll)}</span> : "no settled trade"}
-        tip={bestAll ? `The market's best strategy by profit after costs across all companies, shown beside the per-company best as the luck guard of SPEC section 6. ${luck(bestAll)}` : undefined} />
+        tip={bestAll ? `The market's best strategy by profit after costs across all companies, shown so a lucky streak on one company is not mistaken for skill. ${luck(bestAll)}` : undefined} />
       <Kpi icon="layers" tone="paper" label="Head-to-head today" value={`${picks.length} trade${picks.length === 1 ? "" : "s"}`}
         sub={picks.length ? (
           <span className="labs">
-            <Label tone={viable ? "success" : "neutral"} icon={viable ? "check" : "close"}>{viable ? `${viable} clear market costs` : "none clears market costs"}</Label>
-            <Label tone={yours ? "success" : "warn"} icon={yours ? "check" : "warning"}>{yours ? `${yours} viable at your cost` : "none viable at your cost"}</Label>
+            <Label tone={viable ? "success" : "neutral"} icon={viable ? "check" : "close"}>{viable ? `${viable} expected to beat market fees` : "none expected to beat market fees"}</Label>
+            <Label tone={yours ? "success" : "warn"} icon={yours ? "check" : "warning"}>{yours ? `${yours} worth it after your fees` : "none worth it after your fees"}</Label>
             <PaperTag label={p.status.paper_label} />
           </span>
         ) : "no candidate today"}
-        tip="Up to four paper trades on this company today: the strongest rule strategy and the strongest AI trader × two pick rules (decisions 41-42). “Clears market costs” is the ranking view; “viable at your cost” adds your own broker’s charges (decision 51)." />
+        tip="Up to four paper trades on this company today: the best rule strategy and the best AI trader, each picked two ways. “Expected to beat market fees” is the ranking view; “worth it after your fees” also counts your own broker’s extra charges." />
     </KpiRow>
   );
 }
@@ -100,7 +100,7 @@ function AgreementChart({ p, horizon, onPick }: { p: StockStrategiesPayload; hor
               y -= h;
               return <rect key={f} className={FAMILY[f][2] + (on ? "" : " dim")} x={x} y={y} width={bw} height={h} rx={2} />;
             });
-            const tip = `N+${k}: ${a.buy} of ${a.of} buy · rule ${a.by_family.rule.buy}/${a.by_family.rule.of}, baselines ${a.by_family.baseline.buy}/${a.by_family.baseline.of}, AI ${a.by_family.ai.buy}/${a.by_family.ai.of}${a.avg_prob_up != null ? ` · avg chance ${pct(a.avg_prob_up)}` : ""}. Click to select.`;
+            const tip = `${holdLabel(k)} (N+${k}): ${a.buy} of ${a.of} would buy · rule ${a.by_family.rule.buy}/${a.by_family.rule.of}, baselines ${a.by_family.baseline.buy}/${a.by_family.baseline.of}, AI ${a.by_family.ai.buy}/${a.by_family.ai.of}${a.avg_prob_up != null ? ` · avg chance ${pct(a.avg_prob_up)}` : ""}. Click to select.`;
             return (
               <g key={k}>
                 {rects}
@@ -113,7 +113,7 @@ function AgreementChart({ p, horizon, onPick }: { p: StockStrategiesPayload; hor
           <g className="grid">{[0, Math.round(max / 2), max].map((v) => <line key={v} x1={L} x2={W - R} y1={Y(v)} y2={Y(v)} />)}</g>
           <g className="axis">
             {[0, Math.round(max / 2), max].map((v) => <text key={v} x={L - 6} y={Y(v) + 4} textAnchor="end">{v}</text>)}
-            {p.horizons.map((k, i) => <text key={k} className={"tick" + (k === horizon ? " on" : "")} x={L + slot * i + slot / 2} y={H - 8} textAnchor="middle">N+{k}</text>)}
+            {p.horizons.map((k, i) => <text key={k} className={"tick" + (k === horizon ? " on" : "")} x={L + slot * i + slot / 2} y={H - 8} textAnchor="middle">{`${k}d`}</text>)}
           </g>
         </svg>
       ) : null}
@@ -126,9 +126,9 @@ function AgreementCard({ p, horizon, onPick }: { p: StockStrategiesPayload; hori
   return (
     <Card label="Who agrees, by horizon">
       <CardHead title="Who agrees, by horizon"
-        help="For each horizon N+1..N+5: how many strategies would buy this company (a call counts when it is “up” and at or above the strategy’s own bar), stacked by family. Rule strategies and baselines predict every horizon; AI traders predict N+1, N+3 and N+5 (decision 38). Click a horizon or use the tabs."
+        help="For each holding period from 1 to 5 days: how many strategies would buy this company (a call counts when it is “up” and at or above the strategy’s own bar), stacked by family. Rule strategies and benchmarks predict every holding period; AI traders predict the 1-, 3- and 5-day holds. Click a bar or use the tabs."
         end={<HorizonTabs horizons={p.horizons} value={horizon} onChange={onPick} />} />
-      <div className="sub2">N+{horizon} = {horizonWords(horizon)} · as of the {fmtDate(p.as_of, false)} close · Paper</div>
+      <div className="sub2">{holdLabel(horizon)}: buy at the open, sell at {horizonWords(horizon)} · data up to the {fmtDate(p.as_of, false)} close · Paper</div>
       <AgreementChart p={p} horizon={horizon} onPick={onPick} />
       <div className="agl">
         {a ? FAMILIES.map((f) => {
@@ -170,30 +170,30 @@ function FamilyBox({ family, picks, p, strategies }: { family: "rule" | "ai"; pi
           {k.status !== "picked" ? <span className="line muted">no candidate</span> : (
             <>
               <span className="line">
-                <span className="h-lab">N+{k.horizon_days}</span>
-                <Odds p={k.prob_up} tip={`${pct(k.prob_up, 1)} chance of a rise from the open to the N+${k.horizon_days} close (prediction ${k.prediction_id}).`} />
-                <span className="gain"><MoneyDelta currency={cur} value={expectedGainMoney(k.expected_gain_pct, k.amount)} decimals={dec} /><CostLabels currency={cur} pick={k} /></span>
+                <span className="h-lab" data-tip={`N+${k.horizon_days}`}>{holdLabel(k.horizon_days)}</span>
+                <Odds p={k.prob_up} tip={`${pct(k.prob_up, 1)} chance of a rise from the open to the close ${k.horizon_days} trading day${k.horizon_days === 1 ? "" : "s"} later.`} />
+                <span className="gain"><ExpectedMoney currency={cur} value={expectedGainMoney(k.expected_gain_pct, k.amount)} decimals={dec} /><CostLabels currency={cur} pick={k} /></span>
               </span>
-              <span className="det">to target {signed(k.move_pct)} · downside {signed(-k.loss_pct)} · costs {k.costs_pct}%</span>
+              <span className="det">If right: {signed(k.move_pct)} · if wrong: {signed(-k.loss_pct)} · fees {k.costs_pct}%</span>
             </>
           )}
         </div>
       ))}
       {any?.candidates?.length ? (
         <details className="cand">
-          <summary>Why these horizons: {any.candidates.length} buyable horizons</summary>
+          <summary>Why this holding period: {any.candidates.length} possible</summary>
           <div className="md-table-wrap">
             <table className="md-table">
-              <thead><tr><th>Horizon</th><th className="num">Chance</th><th className="num">To target</th><th className="num">Downside</th><th className="num">Market costs</th><th className="num">Expected</th><th className="num">Your costs</th><th>Viable</th></tr></thead>
+              <thead><tr><th>Hold</th><th className="num">Chance</th><th className="num">If right</th><th className="num">If wrong</th><th className="num">Market fees</th><th className="num">Expected</th><th className="num">Your fees</th><th>Worth it</th></tr></thead>
               <tbody>
                 {any.candidates.map((cd) => (
                   <tr key={cd.horizon_days}>
-                    <td>N+{cd.horizon_days}</td>
+                    <td>{holdLabel(cd.horizon_days)}</td>
                     <td className="num">{pct(cd.prob_up, 1)}</td>
                     <td className="num">{signed(cd.move_pct)}</td>
                     <td className="num">{cd.loss_pct == null ? "—" : signed(-cd.loss_pct)}</td>
                     <td className="num">{cd.costs_pct == null ? "—" : `${cd.costs_pct}%`}</td>
-                    <td className="num"><Delta value={cd.expected_gain_pct} /></td>
+                    <td className="num">{signed(cd.expected_gain_pct)}</td>
                     <td className="num">{cd.your_cost_pct != null ? `${cd.your_cost_pct}%` : "—"}</td>
                     <td>{cd.cost_viable == null ? "—" : cd.cost_viable ? <Label tone="success">yes</Label> : <Label tone="warn">no</Label>}</td>
                   </tr>
@@ -213,7 +213,7 @@ function HeadToHeadCard({ p, strategies }: { p: StockStrategiesPayload; strategi
     <Card label="Today’s head-to-head picks">
       <CardHead
         title={<>Today’s head-to-head picks <PaperTag label={p.status.paper_label} /></>}
-        help={`Decisions 41-42: the strongest rule strategy and the strongest AI trader each choose one horizon under two pick rules: best expected gain (the horizon with the highest p × move − (1 − p) × loss − costs) and highest probability. “Strongest” = the family’s best profit after costs on this company once it has ${MIN_TRADES_TO_RANK} settled trades on it, else across all companies. A pick clears market costs when its expected gain after the market charges is above zero; “viable at your cost” (decision 51) adds your own broker’s charges.`}
+        help={`The best rule strategy and the best AI trader each pick one holding period, in two ways: the biggest expected gain (chance × gain − (1 − chance) × loss − fees, an average if the odds hold, not a result) and the highest chance. “Best” = the side’s best profit after fees on this company once it has ${MIN_TRADES_TO_RANK} finished trades on it, else across all companies. “Worth it after your fees” also counts your own broker’s extra charges.`}
         end={<GoLink href={pagePath(p.market, "compare")}>Rule vs AI</GoLink>}
       />
       {!ks.length ? <Quiet>No head-to-head picks stored for today’s session.</Quiet> : (
@@ -245,8 +245,8 @@ function RankedCard({ p, horizon, onPick, strategies }: { p: StockStrategiesPayl
     <Card label="Every strategy on this company">
       <CardHead
         title={`Every strategy on ${c.name}`}
-        help={`All ${ids.length} strategies, baselines included, ranked by profit after costs on this company (accuracy view, all horizons pooled). Fewer than ${MIN_TRADES_TO_RANK} settled trades on it is “too few to rank” and greyed: a handful of trades is mostly luck (SPEC section 6). Beside each profit: the trades it rests on and the luck test’s interval in the tooltip. “Today” is the strategy’s prediction for the selected horizon: its chance of a rise, target and range, and whether it would trade.`}
-        end={<>today at N+{horizon}<HorizonTabs horizons={p.horizons} value={horizon} onChange={onPick} /></>}
+        help={`All ${ids.length} strategies, baselines included, ranked by profit after costs on this company (accuracy view, all horizons pooled). Fewer than ${MIN_TRADES_TO_RANK} finished trades on it is “too early to tell” and greyed: a handful of trades is mostly luck. Beside each profit: the trades it rests on and the luck test’s interval in the tooltip. “Today” is the strategy’s prediction for the selected horizon: its chance of a rise, target and range, and whether it would trade.`}
+        end={<>today, {holdLabel(horizon)}<HorizonTabs horizons={p.horizons} value={horizon} onChange={onPick} /></>}
       />
       <div className="md-table-wrap">
         <table className="md-table tbl rk" aria-label={`Every strategy on ${c.name}`}>
@@ -254,7 +254,7 @@ function RankedCard({ p, horizon, onPick, strategies }: { p: StockStrategiesPayl
             <tr>
               <th className="cm" scope="col">#</th><th scope="col">Strategy</th><th className="num" scope="col">Profit after costs</th><th className="num cm" scope="col">Trades</th>
               <th className="num cw" scope="col">Win rate</th><th className="num cw" scope="col">Target error</th><th className="c4" scope="col">Overall</th>
-              <th scope="col">Today at N+{horizon}</th><th className="c2" scope="col">Range</th>
+              <th scope="col">Today ({holdLabel(horizon)})</th><th className="c2" scope="col">Range</th>
             </tr>
           </thead>
           <tbody>
@@ -263,7 +263,7 @@ function RankedCard({ p, horizon, onPick, strategies }: { p: StockStrategiesPayl
               if (isRanked(r)) rank += 1;
               const bands = pr ? bandsOf(pr) : null;
               const cls = [r ? (r.sample_badge === "too_few_to_rank" ? "few" : "") : "none", best && r === best ? "best" : ""].filter(Boolean).join(" ");
-              const sub = st.differs_in ? `differs from the reference in ${st.differs_in.replace(/_/g, " ")}` : st.family === "baseline" ? "yardstick, not a contender" : st.family === "ai" ? (st.parameters?.sees_model_score ? "sees the model score" : "blind to the model score") : "the reference rule strategy";
+              const sub = st.differs_in ? `same as the main rule strategy except: ${st.differs_in.replace(/_/g, " ")}` : st.family === "baseline" ? "simple benchmark, not a contender" : st.family === "ai" ? (st.parameters?.sees_model_score ? "sees the model score" : "blind to the model score") : "the main rule strategy";
               const predicts = (st.horizons ?? p.horizons).includes(horizon);
               return (
                 <tr key={id} className={cls || undefined}>
@@ -280,7 +280,7 @@ function RankedCard({ p, horizon, onPick, strategies }: { p: StockStrategiesPayl
                         <b><MoneyDelta currency={cur} value={r.net_pnl} decimals={dec} /></b>
                         <small>on {r.trades} trade{r.trades === 1 ? "" : "s"}<span className="sep"> · </span>{r.sample_badge === "too_few_to_rank" ? <span>too few to rank<span className="sep"> · </span></span> : null}{signed(r.mean_return_pct)}/trade</small>
                       </span>
-                    ) : <span className="muted" tabIndex={0} data-tip="No settled paper trade on this company yet.">no trades yet</span>}
+                    ) : <span className="muted" tabIndex={0} data-tip="No finished paper trade on this company yet.">no trades yet</span>}
                   </td>
                   <td className="num cm">{r ? String(r.trades) : "0"}</td>
                   <td className="num cw">{r ? pct(r.win_rate) : "—"}</td>
@@ -292,17 +292,17 @@ function RankedCard({ p, horizon, onPick, strategies }: { p: StockStrategiesPayl
                     {pr ? (
                       <span className="call">
                         {pr.prob_up != null ? (
-                          <Odds p={pr.prob_up} tip={`${pct(pr.prob_up, 1)} chance of a rise from the open to the N+${horizon} close${pr.model_prob != null ? ` (model ${pct(pr.model_prob, 1)}, adjustment ${signed((pr.agent_adjustment ?? 0) * 100, 1)}: ${pr.adjustment_reason || "none"})` : ""}.${pr.reason ? " " + pr.reason : ""}`} />
+                          <Odds p={pr.prob_up} tip={`${pct(pr.prob_up, 1)} chance of a rise from the open to the close ${horizon} trading day${horizon === 1 ? "" : "s"} later${pr.model_prob != null ? ` (model ${pct(pr.model_prob, 1)}, adjustment ${signed((pr.agent_adjustment ?? 0) * 100, 1)}: ${pr.adjustment_reason || "none"})` : ""}.${pr.reason ? " " + pr.reason : ""}`} />
                         ) : <span className="muted" tabIndex={0} data-tip="Always-buy and follow-yesterday give a direction, not a probability.">{pr.direction === "up" ? "up, no probability" : "down"}</span>}
                         {pr.qualifies ? (
-                          <Label tone="success" icon="check" tip={`Up call at or above the strategy’s bar${pr.threshold != null ? ` (${pct(pr.threshold)})` : ""}: it would buy ${c.name} at the open for N+${horizon}. Paper.`}>would buy</Label>
+                          <Label tone="success" icon="check" tip={`Up call at or above the strategy’s bar${pr.threshold != null ? ` (${pct(pr.threshold)})` : ""}: it would buy ${c.name} at the open for a ${holdLabel(horizon)}. Paper.`}>would buy</Label>
                         ) : (
-                          <Label tone="neutral" tip={pr.direction === "down" ? "A down call: scored as a prediction, never traded (decision 3)." : `Up call below the strategy’s bar${pr.threshold != null ? ` (${pct(pr.threshold)})` : ""}, or filtered out by its regime rule: no trade.`}>{pr.direction === "down" ? "down, no trade" : "no trade"}</Label>
+                          <Label tone="neutral" tip={pr.direction === "down" ? "Predicted down: we score it, but paper trades only buy, never short." : `Up call below the strategy’s bar${pr.threshold != null ? ` (${pct(pr.threshold)})` : ""}, or filtered out by its regime rule: no trade.`}>{pr.direction === "down" ? "down, no trade" : "no trade"}</Label>
                         )}
                         <span className="muted" style={{ fontSize: 12 }} tabIndex={0} data-tip={`Target ${price(cur, pr.target_price)} = the expected exit close; 80% range ${price(cur, pr.lo80)}–${price(cur, pr.hi80)}${pr.range_widen ? ` (widened ${Math.round(pr.range_widen * 100)}% by the trader)` : ""}.`}>target {price(cur, pr.target_price)}</span>
                       </span>
                     ) : (
-                      <span className="muted" tabIndex={0} data-tip={predicts ? "No prediction stored for this horizon." : `This strategy predicts N+${(st.horizons ?? []).join(", N+")} only (decision 38).`}>{predicts ? "—" : `not at N+${horizon}`}</span>
+                      <span className="muted" tabIndex={0} data-tip={predicts ? "No prediction stored for this horizon." : `This strategy predicts ${(st.horizons ?? []).join(", ")}-day holds only.`}>{predicts ? "—" : `no ${holdLabel(horizon)}`}</span>
                     )}
                   </td>
                   <td className="c2">{bands ? <RangeBar currency={cur} bands={bands} last={c.last_close ?? null} /> : <span className="muted">—</span>}</td>

@@ -138,3 +138,9 @@ dialog .dact{display:flex;justify-content:flex-end;gap:8px;padding:0 24px 20px}
 .chleg .tg.eve{background:transparent;border:1.5px solid var(--mb-chart-1)} .chleg .fh-eve{width:9px;height:9px;border-radius:50%;border:1.5px solid var(--mb-chart-ink)}
 .fh-tag{display:inline-block;font-size:11px;font-weight:600;padding:0 6px;margin-right:6px;border-radius:8px;background:var(--md-sys-color-surface-container-high);color:var(--md-sys-color-on-surface-variant);vertical-align:1px}
 .fh-run.eve .fh-tag{background:var(--md-sys-color-secondary-container);color:var(--md-sys-color-on-secondary-container)}
+
+/* The opening sentence and "What our paper trades did" (docs/ux/plain_language_review.md L3) */
+.co-sum{margin-top:16px}
+.co-sofar{margin-top:16px;padding:14px 18px}
+.co-sofar h2{margin:0 0 6px;font-size:15px}
+.co-sofar p{margin:0;font-size:13.5px}
