@@ -20,7 +20,36 @@ export interface AllTradesSummaryRow {
   net_pnl_market: number | null;
   net_pnl_your: number | null;
   pnl_your_missing: number;
+  /** Sum over the open trades with a price, before costs (B13's portfolio-size batch; absent before it). */
+  unrealised_pnl?: number | null;
+  /** Open trades whose latest intraday check is flagged (same batch). */
+  flagged_open?: number;
   currency: string | null;
+}
+
+/** One accuracy-view entry session's counts (all_trades.sessions; its trades on GET /portfolios/sessions/{date}). */
+export interface AllTradesSession {
+  session_date: string;
+  entered: number;
+  not_entered: number;
+  open: number;
+  closed: number;
+  wins: number;
+  losses: number;
+  flat: number;
+  win_rate: number | null;
+  net_pnl_market: number | null;
+  net_pnl_your: number | null;
+  unrealised_pnl: number | null;
+  flagged_open: number;
+}
+
+export interface TradeCheckBrief {
+  check_at: string;
+  band: string | null;
+  flags: string[] | null;
+  flagged: boolean | null;
+  ret_since_entry_pct: number | null;
 }
 
 export interface AllTradesRow {
@@ -55,13 +84,59 @@ export interface AllTradesRow {
   unrealised_pnl?: number | null;
   unrealised_pct?: number | null;
   settled_at: string | null;
+  /** Open strategy rows: the trade's own predicted range and distance to target (null otherwise). */
+  lo80?: number | null;
+  lo50?: number | null;
+  hi50?: number | null;
+  hi80?: number | null;
+  target_price?: number | null;
+  to_target_pct?: number | null;
+  /** Open strategy rows: the latest intraday check of the trade by the cut-off, or null. */
+  check?: TradeCheckBrief | null;
   paper: boolean;
 }
 
 export interface AllTrades {
   window: { sessions: number; from: string | null; to: string | null };
   summary: AllTradesSummaryRow[];
+  /** With `sessions`: the head-to-head and your own trades only (the accuracy view is per session page). */
   trades: AllTradesRow[];
+  /** The accuracy-view entry sessions that have a page (the last 60), newest first; absent in older read models. */
+  sessions?: AllTradesSession[];
+}
+
+/** GET /markets/{m}/portfolios/sessions/{date}: every accuracy-view trade entered on one session. */
+export interface PortfolioSession {
+  market: string;
+  as_of: string | null;
+  session_date: string;
+  summary: AllTradesSession;
+  trades: AllTradesRow[];
+  paper: boolean;
+}
+
+/** Whether the accuracy view's trades are listed per session page (B13's split) rather than in `all_trades.trades`. */
+export const perSession = (all: AllTrades): boolean => Array.isArray(all.sessions);
+
+/** The session a picker opens on: the chosen one if it has a page, else the newest. */
+export function pickSession(all: AllTrades, chosen: string | null): string | null {
+  const dates = (all.sessions ?? []).map((s) => s.session_date);
+  return chosen && dates.includes(chosen) ? chosen : dates[0] ?? null;
+}
+
+/** The open-trades headline of the split read model, per view (never added together): the accuracy view's open trades,
+ * their unrealised P&L before costs and flagged count, and the head-to-head view's open count. Null before the split. */
+export function openHeadline(all: AllTrades): { open: number; unrealised: number | null; flagged: number; h2hOpen: number | null } | null {
+  if (!perSession(all)) return null;
+  const acc = summaryRow(all, "all", "all", "to_date"), h2h = summaryRow(all, "head_to_head", "all", "to_date");
+  return { open: acc?.open ?? 0, unrealised: acc?.unrealised_pnl ?? null, flagged: acc?.flagged_open ?? 0, h2hOpen: h2h ? h2h.open : null };
+}
+
+/** The bands of an open row's own range, or null when any part is missing. */
+export function rowBands(row: AllTradesRow): { lo80: number; lo50: number; hi50: number; hi80: number; target_price: number } | null {
+  const { lo80, lo50, hi50, hi80, target_price } = row;
+  if (lo80 == null || lo50 == null || hi50 == null || hi80 == null || target_price == null) return null;
+  return { lo80, lo50, hi50, hi80, target_price };
 }
 
 /** The summary row of a scope, family and period, or null when the read model has none. */
@@ -88,7 +163,7 @@ export interface TradeFilter {
 }
 
 /** The listed trades of a filter: one scope only (never two views pooled); a result filter keeps closed trades only. */
-export function filterTrades(all: AllTrades, filter: TradeFilter): AllTradesRow[] {
+export function filterTrades(all: AllTrades | { trades: AllTradesRow[] }, filter: TradeFilter): AllTradesRow[] {
   return all.trades.filter((row) => {
     if (row.scope !== filter.scope) return false;
     if (filter.state === "open" && row.state !== "open") return false;
@@ -125,5 +200,13 @@ export function countsWords(row: AllTradesSummaryRow | null): string {
   if (!row) return "nothing recorded yet";
   const parts = [`${row.open} open`, `${row.closed} closed`];
   if (row.closed) parts.push(`${row.wins} won, ${row.losses} lost${row.flat ? `, ${row.flat} even` : ""}`);
+  return parts.join(" · ");
+}
+
+/** A session in the picker's words: "Fri 9 Oct · 209 entered · 180 open · 3 flagged". */
+export function sessionWords(session: AllTradesSession, fmt: (iso: string) => string): string {
+  const parts = [fmt(session.session_date), `${session.entered} entered`, `${session.open} open`];
+  if (session.closed) parts.push(`${session.closed} closed`);
+  if (session.flagged_open) parts.push(`${session.flagged_open} flagged`);
   return parts.join(" · ");
 }

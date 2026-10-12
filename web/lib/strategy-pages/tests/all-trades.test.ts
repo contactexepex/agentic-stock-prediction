@@ -4,8 +4,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
-  countsWords, familiesOf, filterTrades, resultFigure, stateWords, summaryRow, totalFamily, type AllTrades, type AllTradesRow,
-  type AllTradesSummaryRow,
+  countsWords, familiesOf, filterTrades, openHeadline, perSession, pickSession, resultFigure, rowBands, sessionWords, stateWords, summaryRow,
+  totalFamily, type AllTrades, type AllTradesRow, type AllTradesSession, type AllTradesSummaryRow,
 } from "../all-trades.ts";
 
 const sum = (scope: AllTradesSummaryRow["scope"], family: AllTradesSummaryRow["family"], period: AllTradesSummaryRow["period"], over: Partial<AllTradesSummaryRow> = {}): AllTradesSummaryRow =>
@@ -63,4 +63,42 @@ test("the headline counts in words", () => {
   assert.equal(countsWords(summaryRow(block, "all", "all", "to_date")), "1 open · 2 closed · 1 won, 1 lost");
   assert.equal(countsWords(summaryRow(block, "head_to_head", "all", "to_date")), "0 open · 0 closed");
   assert.equal(countsWords(null), "nothing recorded yet");
+});
+
+// B13's portfolio-size split: the accuracy view's trades live on per-session pages, `sessions` lists them newest first.
+const sess = (session_date: string, over: Partial<AllTradesSession> = {}): AllTradesSession =>
+  ({ session_date, entered: 5, not_entered: 1, open: 4, closed: 1, wins: 1, losses: 0, flat: 0, win_rate: 100, net_pnl_market: 2,
+    net_pnl_your: 1, unrealised_pnl: 3, flagged_open: 0, ...over });
+const split: AllTrades = {
+  ...block,
+  summary: [sum("all", "all", "to_date", { open: 7, unrealised_pnl: -12.5, flagged_open: 2 }), sum("head_to_head", "all", "to_date", { open: 3 })],
+  trades: [row("h1", "head_to_head", "open", null)],
+  sessions: [sess("2026-10-09", { flagged_open: 2 }), sess("2026-10-08", { closed: 0 })],
+};
+
+test("per-session pages: whether the split is there, and the session a picker opens on", () => {
+  assert.equal(perSession(block), false);
+  assert.equal(perSession(split), true);
+  assert.equal(perSession({ ...split, sessions: [] }), true);
+  assert.equal(pickSession(split, null), "2026-10-09");
+  assert.equal(pickSession(split, "2026-10-08"), "2026-10-08");
+  assert.equal(pickSession(split, "2026-09-01"), "2026-10-09", "a session without a page falls back to the newest");
+  assert.equal(pickSession({ ...split, sessions: [] }, "2026-10-08"), null);
+  assert.equal(pickSession(block, null), null);
+});
+
+test("the open-trades headline per view from the summary rows, never added together", () => {
+  assert.equal(openHeadline(block), null, "before the split the page keeps reading open_trades");
+  assert.deepEqual(openHeadline(split), { open: 7, unrealised: -12.5, flagged: 2, h2hOpen: 3 });
+  assert.deepEqual(openHeadline({ ...split, summary: [] }), { open: 0, unrealised: null, flagged: 0, h2hOpen: null });
+});
+
+test("an open row's range only when every band and the target are there; a session in words", () => {
+  const full = row("o1", "all", "open", null, { lo80: 90, lo50: 95, hi50: 105, hi80: 110, target_price: 101 });
+  assert.deepEqual(rowBands(full), { lo80: 90, lo50: 95, hi50: 105, hi80: 110, target_price: 101 });
+  assert.equal(rowBands({ ...full, hi80: null }), null);
+  assert.equal(rowBands(row("o2", "all", "open", null)), null);
+  const fmt = (iso: string) => `d${iso.slice(8)}`;
+  assert.equal(sessionWords(split.sessions![0], fmt), "d09 · 5 entered · 4 open · 1 closed · 2 flagged");
+  assert.equal(sessionWords(split.sessions![1], fmt), "d08 · 5 entered · 4 open");
 });

@@ -86,3 +86,12 @@
 .p-portfolios .at-list tr.few td{color:var(--md-sys-color-on-surface-variant)}
 .p-portfolios .at-list .st-ph{display:none}
 @media (max-width:599px){ .p-portfolios .at-list td.cw,.p-portfolios .at-list th.cw,.p-portfolios .at-list td.dt,.p-portfolios .at-list th.dt{display:none} .p-portfolios .at-list td,.p-portfolios .at-list th{padding-left:6px;padding-right:6px} .p-portfolios .at-list .whom .mb-label{display:none} .p-portfolios .at-list td.stc,.p-portfolios .at-list th.stc{display:none} .p-portfolios .at-list .st-ph{display:block;font-size:11px;color:var(--md-sys-color-on-surface-variant);white-space:normal;text-align:right} }
+.p-portfolios .at-sess select{font:inherit;padding:4px 8px;border-radius:8px;border:1px solid var(--md-sys-color-outline-variant);background:var(--md-sys-color-surface-container-lowest);color:var(--md-sys-color-on-surface);max-width:100%;min-width:0;flex:1 1 auto}
+.p-portfolios .at-sess .c{display:flex;flex-wrap:wrap;align-items:center;gap:6px;max-width:100%;min-width:0}
+.p-portfolios .at-list .st{display:inline-flex;align-items:center;gap:4px;font-size:12.5px;white-space:nowrap}
+.p-portfolios .at-list .st .ms{width:15px;height:15px}
+.p-portfolios .at-list .st.flag{color:var(--mb-color-down)} .p-portfolios .at-list .st.ok{color:var(--mb-color-up)}
+/* a narrower range bar than page.css's 100px, so the list fits its card at 1280 */
+.p-portfolios .at-list .rng svg{width:72px}
+/* the State column's words move under the result while the list also carries its range and check columns */
+@media (max-width:1439px){ .p-portfolios .at-list td.stc,.p-portfolios .at-list th.stc{display:none} .p-portfolios .at-list .st-ph{display:block;font-size:11px;color:var(--md-sys-color-on-surface-variant);white-space:normal;text-align:right} }

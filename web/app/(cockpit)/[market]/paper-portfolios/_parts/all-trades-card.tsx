@@ -5,16 +5,20 @@
 // two views of the same predictions: one is shown at a time, never added together. Paper only, never advice.
 import Link from "next/link";
 import { useState } from "react";
+import { RangeBar } from "../../../../../components/charts/small.tsx";
+import { Icon } from "../../../../../components/ui/icon.tsx";
+import { ErrorState, LoadingState } from "../../../../../components/ui/states.tsx";
 import { Segmented } from "../../../../../components/ui/controls.tsx";
 import { Card, CardHead, FamilyLabel, MoneyDelta, PaperTag, Quiet } from "../../../../../components/ui/primitives.tsx";
-import { FAMILY, FAMILY_SHORT, PAPER_LABEL, PICK_RULE } from "../../../../../lib/ui/constants.ts";
+import { BAND, BAND_SHORT, FAMILY, FAMILY_SHORT, FLAG, FLAG_SHORT, PAPER_LABEL, PICK_RULE } from "../../../../../lib/ui/constants.ts";
+import { useApi } from "../../../../../lib/ui/use-api.ts";
 import { DASH, fmtDate, fmtLocal, moneyDecimals, price, signed } from "../../../../../lib/ui/format.ts";
 import { companyPath, pagePath } from "../../../../../lib/ui/routes.ts";
 import type { PageBase } from "../../../../../lib/ui/types.ts";
 import type { Strategy } from "../../../../../lib/strategy-pages/scoreboard.ts";
 import {
-  countsWords, familiesOf, filterTrades, resultFigure, stateWords, summaryRow, totalFamily, type AllTrades, type AllTradesRow,
-  type AllTradesSummaryRow, type ResultFilter, type StateFilter, type SummaryFamily, type TradeScope,
+  countsWords, familiesOf, filterTrades, perSession, pickSession, resultFigure, rowBands, sessionWords, stateWords, summaryRow, totalFamily,
+  type AllTrades, type AllTradesRow, type AllTradesSummaryRow, type PortfolioSession, type ResultFilter, type StateFilter, type SummaryFamily, type TradeScope,
 } from "../../../../../lib/strategy-pages/all-trades.ts";
 import { Control } from "../../_b16/parts.tsx";
 
@@ -31,6 +35,9 @@ export function AllTradesCard({ p, all }: Props) {
   const [scope, setScope] = useState<TradeScope>("all");
   const [state, setState] = useState<StateFilter>("any");
   const [result, setResult] = useState<ResultFilter>("any");
+  const [chosenSession, setChosenSession] = useState<string | null>(null);
+  const session = all && perSession(all) ? pickSession(all, chosenSession) : null;
+  const sessionRes = useApi<PortfolioSession>(scope === "all" && session ? `/api/v1/markets/${p.market}/portfolios/sessions/${session}` : null);
   const label = p.status.paper_label || PAPER_LABEL;
   const head = (
     <CardHead title={<>All paper trades in one place <PaperTag label={label} /></>}
@@ -40,7 +47,8 @@ export function AllTradesCard({ p, all }: Props) {
   if (!all) return <Card label="All paper trades">{head}<Quiet>The list of all paper trades is not in this page’s data yet.</Quiet></Card>;
   const total = summaryRow(all, scope, totalFamily(scope), "to_date");
   const recent = summaryRow(all, scope, totalFamily(scope), "window");
-  const rows = filterTrades(all, { scope, state, result });
+  const split = perSession(all) && scope === "all";
+  const filter = { scope, state, result };
   const cur = p.currency;
   return (
     <Card label="All paper trades" className="at">
@@ -63,9 +71,11 @@ export function AllTradesCard({ p, all }: Props) {
           <Segmented label="Won or lost" value={result} onChange={setResult} options={[{ value: "any", label: "Any" }, { value: "win", label: "Won" }, { value: "loss", label: "Lost" }]} />
         </Control>
       </div>
-      <TradeList p={p} rows={rows} />
+      {split ? (
+        <SessionList p={p} all={all} session={session} onSession={setChosenSession} res={sessionRes} filter={filter} />
+      ) : <TradeList p={p} rows={filterTrades(all, filter)} />}
       <p className="note">
-        {`Closed trades older than the last ${all.window.sessions} sessions are counted above but not listed. A trade that never entered (no stored open price, or one share costs more than its amount) is listed but never counted. Open trades show their result so far, before costs. ${label}: a paper trade is a record, never an order.`}
+        {`${perSession(all) ? `"All strategies" lists the trades entered on one session at a time (the last ${(all.sessions ?? []).length} sessions that have trades; pick one above the list); head-to-head and your own trades are listed whole. ` : ""}Closed trades older than the last ${all.window.sessions} sessions are counted above but not listed. A trade that never entered (no stored open price, or one share costs more than its amount) is listed but never counted. Open trades show their result so far, before costs. ${label}: a paper trade is a record, never an order.`}
       </p>
     </Card>
   );
@@ -134,6 +144,46 @@ function who(p: Props["p"], row: AllTradesRow) {
   );
 }
 
+/** The accuracy view, one entry session at a time (GET /portfolios/sessions/{date}), with its own loading and error state. */
+function SessionList({ p, all, session, onSession, res, filter }: {
+  p: Props["p"]; all: AllTrades; session: string | null; onSession: (date: string) => void;
+  res: ReturnType<typeof useApi<PortfolioSession>>; filter: { scope: TradeScope; state: StateFilter; result: ResultFilter };
+}) {
+  const sessions = all.sessions ?? [];
+  if (!session || !sessions.length) return <Quiet>No strategy trade has been entered yet.</Quiet>;
+  const current = sessions.find((s) => s.session_date === session) ?? null;
+  return (
+    <>
+      <div className="ctrls at-sess">
+        <label className="c">Entry session
+          <select value={session} onChange={(e) => onSession(e.target.value)} aria-label="Entry session">
+            {sessions.map((s) => <option key={s.session_date} value={s.session_date}>{sessionWords(s, (iso) => fmtDate(iso))}</option>)}
+          </select>
+        </label>
+        {current ? <span className="muted">{`${current.open} open · ${current.closed} closed · ${current.wins} won, ${current.losses} lost${current.not_entered ? ` · ${current.not_entered} never entered` : ""}`}</span> : null}
+      </div>
+      {res.state === "loading" ? <LoadingState label="Loading the session’s trades" cards={1} />
+        : res.state === "error" ? <ErrorState problem={res.problem} onRetry={res.reload} />
+          : <TradeList p={p} rows={filterTrades(res.envelope.payload, filter)} />}
+    </>
+  );
+}
+
+/** The latest intraday check of an open trade in words (never colour alone: an icon and words). */
+function CheckCell({ row, p }: { row: AllTradesRow; p: Props["p"] }) {
+  const c = row.check;
+  if (!c) return <span className="muted" data-tip="The market’s latest intraday check by the cut-off has no row for this trade.">{DASH}</span>;
+  const flags = c.flags ?? [];
+  const band = c.band ? BAND[c.band] : null;
+  const tip = `${fmtLocal(c.check_at, p.market, p.status.session.local_time)}: ${signed(c.ret_since_entry_pct)} since entry${band ? `, ${band[0]}` : ""}${flags.length ? `; ${flags.map((f) => FLAG[f] ?? f).join(", ")}` : ""}.`;
+  return (
+    <span className={`st ${c.flagged ? "flag" : band?.[1] ?? ""}`} data-tip={tip}>
+      <Icon name={c.flagged ? "warning" : "check"} />
+      {c.flagged ? flags.map((f) => FLAG_SHORT[f] ?? f).join(", ") || "flagged" : c.band ? BAND_SHORT[c.band] ?? c.band : "checked"}
+    </span>
+  );
+}
+
 function TradeList({ p, rows }: { p: Props["p"]; rows: AllTradesRow[] }) {
   if (!rows.length) return <Quiet>No paper trade matches these filters.</Quiet>;
   const nameOf = (t: string) => p.companies.find((c) => c.ticker === t)?.name ?? t;
@@ -141,7 +191,7 @@ function TradeList({ p, rows }: { p: Props["p"]; rows: AllTradesRow[] }) {
   return (
     <div className="md-table-wrap">
       <table className="md-table tbl at-list">
-        <thead><tr><th>Company</th><th>Whose</th><th className="dt">Dates</th><th className="num cw">Bought at</th><th className="num cw">Sold at / last</th><th className="stc">State</th><th className="num">Result</th></tr></thead>
+        <thead><tr><th>Company</th><th>Whose</th><th className="dt">Dates</th><th className="num cw">Bought at</th><th className="num cw">Sold at / last</th><th className="cw">Range</th><th className="cw">Check</th><th className="stc">State</th><th className="num">Result</th></tr></thead>
         <tbody>
           {rows.map((row) => {
             const cur = row.currency ?? p.currency, d = moneyDecimals(cur), res = resultFigure(row);
@@ -154,9 +204,11 @@ function TradeList({ p, rows }: { p: Props["p"]; rows: AllTradesRow[] }) {
                 <td className="nowrap dt">{row.scope === "mine" ? (row.side === "sell" ? `sold ${fmtDate(row.exit_date, false)}` : `bought ${fmtDate(row.entry_date, false)}`) : <>{row.entry_date ? fmtDate(row.entry_date, false) : DASH}{" → "}{row.exit_date ? fmtDate(row.exit_date, false) : DASH}</>}{row.state === "open" && row.exit_date ? <small className="muted" style={{ display: "block", fontSize: 11 }}>planned exit</small> : null}</td>
                 <td className="num cw">{row.price_pending ? DASH : price(cur, row.entry_price)}</td>
                 <td className="num cw">{row.price_pending ? DASH : price(cur, row.exit_or_last_price)}{lastWords ? <small className="muted" style={{ display: "block", fontSize: 11 }}>{lastWords}</small> : null}</td>
+                <td className="cw">{row.state === "open" && rowBands(row) ? <RangeBar currency={cur} bands={rowBands(row)!} last={row.price_pending ? null : row.exit_or_last_price} entry={row.price_pending ? null : row.entry_price} /> : <span className="muted">{DASH}</span>}</td>
+                <td className="cw">{row.state === "open" ? <CheckCell row={row} p={p} /> : <span className="muted">{DASH}</span>}</td>
                 <td className="stc">{stateWords(row)}</td>
                 <td className="num res">
-                  <span className="st-ph">{stateWords(row)}</span>
+                  <span className="st-ph">{stateWords(row)}{row.state === "open" && row.check?.flagged ? ` · ${(row.check.flags ?? []).map((f) => FLAG_SHORT[f] ?? f).join(", ") || "flagged"}` : ""}</span>
                   {res.value === null ? <span className="muted">{row.state === "closed" ? "not stored yet" : DASH}</span> : <MoneyDelta currency={cur} value={res.value} decimals={d} />}
                   {res.value !== null ? <small className="muted" style={{ display: "block", fontSize: 11 }}>{COST_WORDS[res.cost]}{row.state === "open" && row.unrealised_pct !== null && row.unrealised_pct !== undefined ? ` · ${signed(row.unrealised_pct)}` : ""}</small> : null}
                 </td>
