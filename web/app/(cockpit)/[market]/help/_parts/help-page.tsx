@@ -222,7 +222,7 @@ function Scores({ companies, currency }: { companies: CompaniesForHelp | null; c
     <HelpCard id="scores" title="Scores, and the luck test">
       <Terms
         rows={[
-          ["Profit after costs", "The headline. Market cost = brokerage, taxes and fees; strategies are ranked on it. Your cost adds the charges only you pay (in India the NRI reporting and depository charges, in the US the currency markup and the pro-rated portfolio fee); the go-live bar and your own decisions use it."],
+          ["Profit after costs", "The headline. Market cost = brokerage, taxes and fees; strategies are ranked on it. Your cost adds the charges only you pay (in India the depository charge on each sale, in the US the currency markup and the pro-rated portfolio fee); the go-live bar and your own decisions use it."],
           ["Return per trade", `Profit as a percent of the amount per paper trade (${amount ? `${amount} by default` : "the market’s default amount"}, or the company’s own amount), so companies with different amounts compare.`],
           ["Win rate", "The share of trades that made money after costs."],
           ["Target reached", "The share of trades whose price touched the target at some point in the window, and the typical session it happened."],

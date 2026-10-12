@@ -2039,13 +2039,14 @@ is as of the run's clock (MB_NOW-aware): each lab kind by its time column, bars 
   section, owner-provided and marked verify). Each line is rounded to cents; a view's total is the sum of its
   rounded lines.
   - **Market cost** (`paper_trades_settled.costs`, `net_pnl`, `return_pct`; strategies are ranked on it). India:
-    Axis brokerage 0.75% per side, at least ₹50 per order; STT 0.1% each side; exchange and SEBI fees; stamp duty
+    brokerage per side (Groww from 2026-10-12, SPEC decision 54: 0.10%, at least ₹100 per order; Axis Direct before:
+    0.75%, at least ₹50); STT 0.1% each side; exchange and SEBI fees; stamp duty
     0.015% on the buy; GST 18% on brokerage + exchange + SEBI. US: BUX's €0.99 per order at the EUR/USD close on or
     before each side's session (when none is stored that early, the oldest stored close, a later rate known by the
     run's clock: `MarketData.eurusd_on`); SEC fee; FINRA TAF.
   - **Your cost** (`cost_views`; the go-live bar and the owner's money use it) = market cost plus, in India, the NRI
-    reporting charge ₹200 on the purchase date and ₹200 on the sale date and the DP charge (provisional: ₹30 or
-    0.04% of the sale value, the higher); in the US, BUX Basic's FX markup 0.75% of the value on the buy and on the
+    reporting charge per trade date (none with Groww; ₹200 on the purchase and the sale date under Axis Direct) and
+    the DP charge (Groww: ₹20 plus GST per scrip sold; Axis Direct: ₹30 or 0.04% of the sale value, the higher); in the US, BUX Basic's FX markup 0.75% of the value on the buy and on the
     sale and the 0.20% a year portfolio fee on the entry value, pro-rated over the calendar days from D to the exit.
   - A US trade whose fee cannot be converted yet (no EUR/USD stored at all) waits (`waiting_for_eurusd`).
 - **Cost-viable flag** (decision 51, `lab/cost_views.py`). At `predict` time for each new qualifying rule or

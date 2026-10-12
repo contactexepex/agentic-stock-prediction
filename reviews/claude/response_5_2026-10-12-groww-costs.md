@@ -49,8 +49,8 @@ like DC-1 to DC-12.
 > India fixtures of Appendix B are recomputed under DC-13 by the stories that use them (Appendix 1 of the stories maps them; among them ST-04, ST-05, ST-06, ST-10, ST-12,
 > ST-15, ST-17 and ST-47);
 > the zero-brokerage values stay as a labelled sensitivity. The fixtures that test the date charge become sensitivity
-> fixtures with a ₹200 date charge, so the shared-charge logic stays tested: B.4 (two orders on one date), B.29 and
-> B.36 (liquidation).
+> fixtures with a ₹200 date charge, so the shared-charge logic stays tested: B.1 (fees and the date charge deepen
+> the loss), B.4 (two orders on one date), B.29 and B.36 (liquidation).
 
 ## Worked effect (arithmetic by Claude; strong evidence for the arithmetic only)
 
