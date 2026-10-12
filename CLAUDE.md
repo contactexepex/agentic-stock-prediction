@@ -438,6 +438,11 @@ root as `MB_NOW=2026-10-09T23:59:00Z PYTHONPATH=scripts python docs/plan_volatil
   checking, the reflector, the deviation explainer, the results-analyst, the researchers, the three Sonnet traders and
   the eod-analyst, Opus 5.5 for the forecaster (also the Opus trader), graph-builder, research-director and judge;
   table in DESIGN.md section 13).
+- `routine/EVENING_PROMPT.md` the evening forecast run (owner decision 2026-10-10; Mon-Fri, India 21:30 UTC, US 18:30
+  New York). On the day's final close it runs features, calibrate, `model_scores.py --evening`, `ranges.py --evening`
+  and `lab.py predict --evening`, which write preview rows to `ranges_evening`, `strategy_predictions_evening` and
+  model scores with `run: "evening"`. There are no AI agents and no Slack post. The rows are never traded or scored:
+  the next pre-open run writes the revision of record, and if it fails, nothing trades that day.
 - `routine/PROMPT.md` the routines' saved prompt (one per market). `routine/NEWS_PROMPT.md` the news-only light
   run (one combined session for both markets, India then the US, 31 a week: weekdays 10:45 and 13:45 IST and
   11:27, 14:27 and 17:27 New York time, weekends 10:45 IST, 11:27 and 17:27 New York time, holidays included;
