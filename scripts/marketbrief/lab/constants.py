@@ -43,4 +43,7 @@ MSG_NO_CROSS_SCORE_OR_RANGE = "no cross-market model score or range for these ho
 MSG_NOT_LOCKED = "made_at or first commit not before the open of D (F1.8): refused"
 MSG_NO_EURUSD = "no stored EUR/USD close by {when}: the BUX order fee cannot be converted"
 REASON_NOTE_SKIPPED = "one share at {price} costs more than the amount {amount}"
+RUN_EVENING = "evening"           # strategy_predictions_evening.run (`lab.py predict --evening`)
+MSG_NO_EVENING_RANGES = ("the evening ranges are not readable yet ({error}): `lab.py predict --evening` needs B10's "
+                         "contracts.horizons.ranges_asof(..., run=\"evening\") (ranges_evening). Nothing written.")
 MSG_PICK_TOO_LATE = "picks for D = {session} must be made before its open; refused at {now} (F1.8)"

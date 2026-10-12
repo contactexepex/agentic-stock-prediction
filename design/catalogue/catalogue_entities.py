@@ -22,6 +22,7 @@ from make_examples import (
 
 
 SETTLED_UNTIL = "2026-10-06"   # the newest stored close the examples settle on
+EXAMPLE_DATE = "2026-10-07"    # the examples' cut-off day (a strategy is live from its live_from)
 ACCURACY_STRATEGIES = ("rule.model_news.v1", "rule.model_news_strict.v1", "base.always_up.v1", "base.model_only.v1",
                        "ai.combined.opus.v1", "ai.news_results.sonnet.v1")
 SETTLED_TICKERS = ("NVDA", "JPM", "AAPL", "RELIANCE", "HDFCBANK", "MARUTI")
@@ -139,6 +140,17 @@ def open_trade_rows(past: list[dict], picks: list[dict]) -> list[dict]:
     return rows
 
 
+def strategy_row(spec: dict, accuracy: list[dict]) -> dict:
+    """A registry entry as of the examples' cut-off: live once its live_from (a YAML date) is on or before it."""
+    live_from = spec["live_from"] and str(spec["live_from"])
+    live = bool(live_from) and live_from <= EXAMPLE_DATE
+    note = ("live" if live else f"not live at the examples' cut-off; live from {live_from}" if live_from
+            else "not live yet")
+    return {**spec, "live_from": live_from, "live": live,
+            "settled_trades": sum(t["strategy_id"] == spec["id"] and t["status"] == "settled" for t in accuracy),
+            "status_note": note}
+
+
 def build_all(write, settle, today: list[dict], past: list[dict], specs: list[dict]) -> None:
     from catalogue_costs import cost_rows
     from catalogue_more import build_rest
@@ -158,14 +170,14 @@ def build_all(write, settle, today: list[dict], past: list[dict], specs: list[di
     costs = cost_rows(shown, picks_past + picks_today, settled, past)
     write("cost_view.json", "cost_view", "cost_views", costs)
     write("prediction.json", "prediction", "strategy_predictions", shown)
+    from catalogue_evening import evening_rows
+
+    write("evening_prediction.json", "evening_prediction", "strategy_predictions_evening", evening_rows(shown))
     write("agreement.json", "agreement", None, agree)
     write("head_to_head_pick.json", "head_to_head_pick", "head_to_head_picks", picks_past + picks_today)
     write("paper_trade.json", "paper_trade", "paper_trades_settled", settled)
     write("open_trade.json", "open_trade", None, opens)
     write("scoreboard_row.json", "scoreboard_row", None, scoreboard(settled, costs))
     write("company.json", "company", None, company_rows(agree, opens))
-    write("strategy.json", "strategy", None, [
-        {**s, "live": s["live_from"] is not None,
-         "settled_trades": sum(t["strategy_id"] == s["id"] and t["status"] == "settled" for t in accuracy),
-         "status_note": "not live yet: switched on in Wave 5"} for s in specs])
+    write("strategy.json", "strategy", None, [strategy_row(s, accuracy) for s in specs])
     build_rest(write, settled, opens, EURUSD, r2)

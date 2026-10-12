@@ -2,9 +2,11 @@
 GET /api/v1/markets/{market}/portfolios. Payload PaperPortfolios = design/mockups/07-paper-portfolios/data.json per
 market (notes.md there names every key and its selection rule): the shared blocks of rm_common, the companies with
 their last stored close, the head-to-head portfolios (scoreboard rows of scopes strategy and pick_rule), the open
-trades and the latest intraday trade checks (B4's and B12's derivations, the same rows as rm.trades `_`), and the
-owner's own paper trades and FIFO positions with the EUR view of US positions (WS4/B2's portfolio service), all as of
-the cut-off. Research only: a paper trade is a record, never an order."""
+head-to-head trades and their rows of the latest intraday trade check (B4's and B12's derivations), and the
+owner's own paper trades and FIFO positions with the EUR view of US positions (WS4/B2's portfolio service), and every
+paper trade in one place (`all_trades`, all_trades.py: open and closed, wins and losses; the accuracy view on one page
+per entry session, `trades:<D>`), all as of the cut-off.
+Research only: a paper trade is a record, never an order."""
 
 from __future__ import annotations
 
@@ -15,7 +17,7 @@ from marketbrief.portfolio import service as portfolio_service
 from marketbrief.portfolio.context import Context as PortfolioContext
 from marketbrief.portfolio.settings import load_portfolio_config, market_costs
 from marketbrief.utils.numbers import json_safe_float
-from marketbrief.warehouse import rm_common, rm_company
+from marketbrief.warehouse import all_trades, rm_common, rm_company
 from marketbrief.warehouse.rm_registry import BuildContext, ContractCase, PageBuilder
 from marketbrief.warehouse.rm_strategies import market_mockup, pick, scoreboard_rows
 
@@ -67,6 +69,10 @@ OPEN_TRADE_FIELDS = (
     "unrealised_pnl",
     "unrealised_pct",
     "to_target_pct",
+    "price_pending",
+    "entry_price_source",
+    "last_price_source",
+    "last_price_time",
     "paper",
 )
 
@@ -98,15 +104,19 @@ def h2h_rows(ctx: BuildContext) -> list[dict]:
 
 
 def open_trades(ctx: BuildContext) -> list[dict]:
-    """Every open paper trade of the market (B4's shared derivation, rm_common.open_trades: the same rows as B12's
-    rm.trades `_` and the Company records' counts), in its page fields."""
-    return [pick(trade, OPEN_TRADE_FIELDS) for trade in rm_common.open_trades(ctx)]
+    """The open head-to-head paper trades of the market (B4's shared derivation, rm_common.open_trades), in its page
+    fields. The accuracy view's open trades are on the session pages (all_trades.session_pages; size fix step 2,
+    docs/ws/b13.md)."""
+    return [
+        pick(trade, OPEN_TRADE_FIELDS) for trade in rm_common.open_trades(ctx) if trade["view"] == VIEW_HEAD_TO_HEAD
+    ]
 
 
 def trade_checks(ctx: BuildContext) -> list[dict]:
-    """The rows of the market's latest intraday trade check by the cut-off: B12's rm_company.market_trade_checks
-    (schema TradeCheck), the same list as rm.trades `_`, whole (the 07 page reads its subset of the fields)."""
-    return rm_company.market_trade_checks(ctx)
+    """The head-to-head rows of the market's latest intraday trade check by the cut-off: B12's
+    rm_company.market_trade_checks (schema TradeCheck), whole (the accuracy view's checks are on the session pages, in
+    each open row's `check`)."""
+    return [row for row in rm_company.market_trade_checks(ctx) if row["view"] == VIEW_HEAD_TO_HEAD]
 
 
 def portfolio_context(ctx: BuildContext) -> PortfolioContext:
@@ -161,10 +171,9 @@ def owner_positions(context: PortfolioContext) -> list[dict]:
     return out
 
 
-def owner(ctx: BuildContext) -> dict:
+def owner(ctx: BuildContext, context: PortfolioContext) -> dict:
     """The owner's paper portfolio of the market as of the cut-off, collected companies only (a deleted company's
     trades and position, with its EUR view, are never shown)."""
-    context = portfolio_context(ctx)
     return {
         "trades": [trade for trade in owner_trades(context) if trade["ticker"] in ctx.collected],
         "positions": [position for position in owner_positions(context) if position["ticker"] in ctx.collected],
@@ -174,7 +183,9 @@ def owner(ctx: BuildContext) -> dict:
 
 
 def portfolio_pages(ctx: BuildContext) -> dict[str, dict]:
-    """rm.portfolio: the market's one Paper portfolios page."""
+    """rm.portfolio: the market's Paper portfolios page `_` (`all_trades`: every paper trade in one place) and one page
+    per accuracy-view entry session, `trades:<D>` (all_trades.session_pages)."""
+    context = portfolio_context(ctx)
     return {
         MARKET_PAGE_KEY: {
             **rm_common.header(ctx),
@@ -186,12 +197,14 @@ def portfolio_pages(ctx: BuildContext) -> dict[str, dict]:
             "h2h_rows": h2h_rows(ctx),
             "open_trades": open_trades(ctx),
             "trade_checks": trade_checks(ctx),
-            "owner": owner(ctx),
-        }
+            "owner": owner(ctx, context),
+            "all_trades": all_trades.all_trades(ctx, context),
+        },
+        **all_trades.session_pages(ctx, context),
     }
 
 
-BUILDERS = (PageBuilder(RM_PORTFOLIO, "PaperPortfolios", portfolio_pages, owner="B13"),)
+BUILDERS = (PageBuilder(RM_PORTFOLIO, "PaperPortfoliosTable", portfolio_pages, owner="B13"),)
 CONTRACT_CASES = (
     ContractCase(
         path="/api/v1/markets/{market}/portfolios",
@@ -199,5 +212,7 @@ CONTRACT_CASES = (
         mockup="design/mockups/07-paper-portfolios/data.json",
         mockup_payload=market_mockup,
         map_paths=("$.strategies",),
+        extra_keys=("all_trades",),
+        page_keys=lambda key: key == MARKET_PAGE_KEY,
     ),
 )

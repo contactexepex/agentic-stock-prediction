@@ -29,6 +29,7 @@ from marketbrief.constants.range_publication import (
     OPTIONS_SQL,
     PREDICTIONS_SQL,
 )
+from marketbrief.constants.horizons import RUN_KINDS, RUN_PRE_OPEN
 from marketbrief.core.calendar import market_events, session_close_utc, session_open_utc, sessions_ahead
 from marketbrief.core.clock import utc_now
 from marketbrief.core.horizons import window_sessions
@@ -62,6 +63,7 @@ class RangeContext:
     index_cue: float | None
     index_cue_note: str | None
     opts: pd.DataFrame
+    run: str = RUN_PRE_OPEN  # RUN_EVENING: the evening run (ranges_evening, no overnight cue)
 
 
 @dataclass
@@ -138,8 +140,10 @@ def load_options(con, cfg: dict, ranges_config: dict, made: datetime, first_open
     return option_snapshots
 
 
-def load_context(cfg: dict, ranges_config: dict, con, now: str | None = None) -> RangeContext:
-    """Read the stored snapshot, calibration, predictions, events and cues of one run."""
+def load_context(cfg: dict, ranges_config: dict, con, now: str | None = None,
+                 run: str = RUN_PRE_OPEN) -> RangeContext:
+    """Read the stored snapshot, calibration, predictions, events and cues of one run (`run`: its ids are written
+    once per run's kind, RUN_KINDS)."""
     reg = con.execute(LATEST_REGIME_SQL).df()
     if reg.empty:
         raise SystemExit(MSG_NO_REGIME)
@@ -148,7 +152,7 @@ def load_context(cfg: dict, ranges_config: dict, con, now: str | None = None) ->
     feats = con.execute("SELECT * FROM features_latest WHERE as_of_date = ?", [as_of]).df().set_index("ticker")
     cal = con.execute(CALIBRATION_SQL).df().set_index("horizon_days")
     preds = con.execute(PREDICTIONS_SQL, [as_of]).df()
-    existing = set(con.execute("SELECT id FROM ranges").df()["id"])
+    existing = set(con.execute(f"SELECT id FROM {RUN_KINDS[run]}").df()["id"])
     bars = load_bars(con)
     company = con.execute("SELECT ticker, type, date FROM company_events WHERE date > ?", [as_of]).fetchall()
     rwiden = relation_flags.widen_by_ticker(cfg, ranges_config, con)  # {} unless relation_widen.enabled
@@ -208,6 +212,7 @@ def load_context(cfg: dict, ranges_config: dict, con, now: str | None = None) ->
         index_cue=index_cue,
         index_cue_note=index_cue_note,
         opts=load_options(con, cfg, ranges_config, made, first_open),
+        run=run,
     )
 
 

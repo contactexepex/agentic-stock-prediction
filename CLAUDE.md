@@ -67,13 +67,15 @@ root as `MB_NOW=2026-10-09T23:59:00Z PYTHONPATH=scripts python docs/plan_volatil
   ranges as a fan on the last 20 closes, B10's model P(up) as "chance of going up", the lean, a plain-language why from
   the score's points per feature group, flags (results soon, BLOCKED, contradicted news) and the change since the
   previous run from B12's forecast_history; paper trades and signal tiers in lean words, SIMULATED, once a strategy is
-  live; everything as of the run's clock), then `dashboard` builds
-  `reports/<market>/dashboard.html` (decision-support dashboard, stored data only as of the run's clock:
+  live; everything as of the run's clock). `dashboard` built
+  `reports/<market>/dashboard.html` until the owner retired the file on 2026-10-10: the routine no longer runs it,
+  and the website shows the same data. Its code in `marketbrief/presentation/dashboard/` stays, because the
+  warehouse read models are built from its `gather_dashboard` (decision-support dashboard, stored data only as of the run's clock:
   watchlist, sector heatmap, candlesticks with the published ranges via the vendored TradingView
   Lightweight Charts in `marketbrief/presentation/dashboard/vendor/` (version and SHA-256 in its NOTICE),
   the signal model's P(up) with its points and formula, bull vs bear, news with status, track record;
   "Paper only — no proven edge yet" until the weekly review's `model_skill` is true), and `notify_slack` posts a thread
-  (summary, chart images, HTML file, dashboard) with `SLACK_BOT_TOKEN`, or the summary text alone through
+  (summary, chart images, HTML file) with `SLACK_BOT_TOKEN`, or the summary text alone through
   `SLACK_WEBHOOK_URL`. Processing data (data/, context pack, summaries) and presentation (HTML,
   PNGs, Slack) are separate: `view_data.py` only reads the data for both presentation outputs.
   `backtest` evaluates the
@@ -198,7 +200,7 @@ root as `MB_NOW=2026-10-09T23:59:00Z PYTHONPATH=scripts python docs/plan_volatil
   reasons, news of 30 days / newest 50, results, events of the next 60 days, the last 250 bars; owner, 2026-10-08;
   ranges.py's `published_ranges` whatever a strategy's live_from and the `forecast_history` of every stored range and
   score run of the last 10 as-of dates (B10's N+k labels) with each run's change, `company_history.py`; owner,
-  2026-10-10),
+  2026-10-10; each with `run` evening|pre_open, the evening preview shown until the pre-open range exists),
   rm.bars, rm.stock_strategies (04 page), rm.trades (`_`: every open trade, the latest check, the last 5 sessions'
   settlements; per ticker: the last 60 sessions) and rm.lifecycle (`<ticker>:<date>`, the last 30 sessions: the
   predictions and picks made for that session followed to their checks, settlements and AI reasons), served by
@@ -245,11 +247,13 @@ root as `MB_NOW=2026-10-09T23:59:00Z PYTHONPATH=scripts python docs/plan_volatil
   `strategy_abstentions` (gate_failed, timeout 15 minutes before the open, killed, blocked_quality, earnings_window,
   abstained). Post-close (`routine/POSTCLOSE_PROMPT.md`): B2's `scripts/lab.py settle`, the `eod-analyst` agent and
   its gate `eod-validate|add` -> `trade_reasons_ai`, `eod_analyses` (market-cost view), B6's close alerts. Weekly
-  (`routine/WEEKLY_PROMPT.md`, Saturday 09:51 local): the `research-director` agent and its gate
+  (`routine/WEEKLY_PROMPT.md`, Friday 19:30 New York time for both markets, owner decisions 2026-10-10
+  and 2026-10-12): the `research-director` agent and its gate
   `director-validate|add` (config diffs that apply to a copy, never applied) -> `research_reviews`,
   `reports/<market>/research-<week>.md`.
 - Tools and channels (B5, SPEC F10; docs/ws/b5.md): the `web/` Next.js project (App Router; `package.json`, lockfile,
-  `tsconfig.json`, `next.config.ts` owned by B5; later sessions only add dependency lines). The governed tool layer
+  `tsconfig.json`, `next.config.ts` owned by B5; later sessions only add dependency lines; the 2026-10-12 one-builder rule
+  below lets the builder of a change edit them). The governed tool layer
   `web/lib/tools/` implements `mcp/tools.yaml`; `mcp/build_registry.py` generates `registry.generated.ts` from it and
   `mcp/agents/*.yaml` (allowed tools, day budgets, kill switch per agent; `assistant` has read tools only), checked by
   `tests/test_b5_tools.py`. Identity comes only from the channel's auth, never from arguments. Every write needs an
@@ -360,7 +364,11 @@ root as `MB_NOW=2026-10-09T23:59:00Z PYTHONPATH=scripts python docs/plan_volatil
   N+1. Legacy rows are never pooled with N+k; the context pack's signal-model section shows N+k scores only, and
   `ai_replay score` scores calls recorded before `n_plus_k_from` on their old window apart (`legacy_cc`).
   `contracts/horizons.py` `scores_asof` (`variant=base|cross_market`) and `ranges_asof` give the N+k records as of
-  a time (no look-ahead).
+  a time (no look-ahead). The evening run (B17, option C): `ranges.py --evening` writes the day's-close ranges to
+  `ranges_evening` (same ids as the pre-open rows, `run: "evening"`, no overnight cue), never scored or traded;
+  `ranges_asof(..., run="evening")` reads them, its default stays the pre-open rows in `ranges`; new `model_scores`
+  rows carry `run` (`model_scores.py --evening`; null on older rows = pre_open); `range_runs` and `score_runs` give
+  every run of a window of as-of dates, labelled by run (B12's forecast history).
 - Paper portfolio and signal tiers (WS4; `scripts/portfolio.py --market india|us`, logic in `marketbrief/portfolio/`,
   settings `config/portfolio.yaml`, notes `docs/ws/ws4.md`): research only, a paper trade is a record, never an order.
   `add-trade` validates (watchlist ticker, a session, price = the stored bar's open/close or a manual price inside its
@@ -382,7 +390,8 @@ root as `MB_NOW=2026-10-09T23:59:00Z PYTHONPATH=scripts python docs/plan_volatil
   `config/strategies.yaml` (`registry.is_live`: settle, pick and the forward summary skip pre-live rows, predict
   rehearses)): `predict` (pre-open, rule strategies and baselines from B10's
   per-horizon scores and ranges -> `strategy_predictions`, blocks as `strategy_abstentions`, the cost-viable rows
-  of decision 51 of the new qualifying ones -> `cost_views`), `pick` (pre-open,
+  of decision 51 of the new qualifying ones -> `cost_views`; `predict --evening` after the close ->
+  `strategy_predictions_evening` (preview from B10's evening ranges, never traded)), `pick` (pre-open,
   refused at or after D's open: the head-to-head picks per company, family and pick rule -> `head_to_head_picks`,
   and the cost-viable rows of every pick and of each qualifying prediction without one yet -> `cost_views`; "best expected gain" = the horizon with the highest
   expected gain per session held), `settle` (post-close: every due trade of both views -> `paper_trades_settled` in
@@ -443,6 +452,11 @@ root as `MB_NOW=2026-10-09T23:59:00Z PYTHONPATH=scripts python docs/plan_volatil
   checking, the reflector, the deviation explainer, the results-analyst, the researchers, the three Sonnet traders and
   the eod-analyst, Opus 5.5 for the forecaster (also the Opus trader), graph-builder, research-director and judge;
   table in DESIGN.md section 13).
+- `routine/EVENING_PROMPT.md` the evening forecast run (owner decision 2026-10-10; Mon-Fri, India 21:30 UTC, US 18:30
+  New York). On the day's final close it runs features, calibrate, `model_scores.py --evening`, `ranges.py --evening`
+  and `lab.py predict --evening`, which write preview rows to `ranges_evening`, `strategy_predictions_evening` and
+  model scores with `run: "evening"`. There are no AI agents and no Slack post. The rows are never traded or scored:
+  the next pre-open run writes the revision of record, and if it fails, nothing trades that day.
 - `routine/PROMPT.md` the routines' saved prompt (one per market). `routine/NEWS_PROMPT.md` the news-only light
   run (one combined session for both markets, India then the US, 31 a week: weekdays 10:45 and 13:45 IST and
   11:27, 14:27 and 17:27 New York time, weekends 10:45 IST, 11:27 and 17:27 New York time, holidays included;
@@ -520,8 +534,8 @@ orchestrating session itself (its own edits and merge-conflict resolutions inclu
 - Batches: plan work as a few batches (a feature, a refactor chunk, or a group of related fixes with
   the cosmetic issues that touch the same files), build the whole batch, then one review per batch;
   never a review cycle per small item. The reviewer lists every finding in one pass.
-- Build workflow (keep it fast): the builder runs the fast tier while iterating and the full suite
-  once at the end; live network checks only when a collector or fetcher changed (otherwise saved
+- Build workflow (keep it fast): the builder runs the fast tier while iterating and, for a real code
+  change, the full suite once at the end (see "Lean process" below); live network checks only when a collector or fetcher changed (otherwise saved
   fixtures); the golden harness (`tests/golden/golden.py`) once at the end for refactors. Every number
   in a build report (test counts, row counts, timings) is pasted from command output, never retyped.
   Mechanical work (moves, renames, refactor steps proven by the golden harness) runs on Sonnet with
@@ -536,13 +550,32 @@ orchestrating session itself (its own edits and merge-conflict resolutions inclu
 - Tests (offline; a guard in `tests/conftest.py` fails any test whose Python code reaches the network;
   it sees Python sockets only, not C libraries or node): the fast tier
   `python -m pytest -m "not slow" -n auto` on each edit, the full suite `python -m pytest -n auto`
-  before review or merge. GitHub Actions (`.github/workflows/tests.yml`) runs the full suite on every
+  before review or merge of a real code change (a small change relies on CI; see "Lean process" below). GitHub Actions (`.github/workflows/tests.yml`) runs the full suite on every
   push and PR, except `test_every_logged_commit_exists` (CI cannot see local, unpushed build branches).
   A reviewer may cite the passing CI run for the reviewed commit as evidence of the full suite instead
   of rerunning it, but still runs the tests specific to the change and `tests/test_judgments.py`
-  locally. A merge review reruns tests when a conflict touched code, and the orchestrator always runs
-  the full suite after any merge that brings in code changes (CI also runs on push). New end-to-end
-  tests go in `SLOW` in `tests/conftest.py`.
+  locally. A merge review reruns tests when a conflict touched code. After a merge, the green CI run on
+  main is the full-suite evidence; nobody reruns the full suite locally just because main moved. New
+  end-to-end tests go in `SLOW` in `tests/conftest.py`.
+- Lean process (owner decision 2026-10-12, to cut token cost):
+  - One builder per change: a single session makes the whole change, across every file it needs,
+    whoever built those files first. File ownership by session no longer splits a change.
+  - Small changes (docs, wording, agent instructions, page text): the judge reviews the diff only; the
+    reviewer still runs `tests/test_judgments.py` locally, and the green CI run replaces a local
+    full-suite run, before and after the merge.
+  - Real code changes (scripts, SQL views, schemas, config, web code) keep the full checks: the full
+    suite before review (the green CI run for the reviewed commit counts, as above) and the end-to-end
+    run where the scope rule asks for it.
+  - Nobody reruns the full suite locally only because main moved under a merge; the green CI run on
+    the merged commit is the evidence. A merge-conflict resolution is still judged.
+  - Finished build sessions are archived. A new change (a batch counts as one change) starts one fresh
+    session, which ends when the change is merged.
+  - This supersedes, for all work from 2026-10-12, docs/SPEC.md section 10's session workflow where it
+    differs: file ownership by session (the intro and step 5's shared-doc proposals), the full-suite runs
+    of step 1 (for small changes), step 3 and the "Rule change" paragraph, and step 3's exemption of
+    `judgments/log.jsonl` conflicts from judging. Step 3's log-merge rule (main's lines kept as they are,
+    the branch's appended after them) still holds; every merge-conflict resolution, including one in
+    `judgments/log.jsonl`, is judged.
 - Daily runs are gated by `scripts/validate.py` (deterministic checks after each stage, settings
   in `config/validate.yaml`) and, for the reflector's lessons, by `scripts/lessons.py validate`, for the results-analyst's bullets by `scripts/results_digest.py validate`,
   for the deviation-explainer's notes by `scripts/intraday_check.py validate`, for the AI traders by

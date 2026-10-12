@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 import common  # noqa: E402
 from marketbrief.core.database import connect  # noqa: E402
 from marketbrief.core.market_config import load_market  # noqa: E402
-from marketbrief.warehouse import company_payloads, rm_company  # noqa: E402
+from marketbrief.warehouse import company_payloads, company_sources, rm_company  # noqa: E402
 from marketbrief.warehouse.company_sources import read_sources  # noqa: E402
 from marketbrief.warehouse.rm_registry import BuildContext  # noqa: E402
 
@@ -337,7 +337,7 @@ def test_published_ranges_show_when_no_strategy_is_live(root, monkeypatch):
     assert first == {"id": f"{AS_OF}-{ticker}-1d", "made_at": "2026-10-07T02:30:00Z", "as_of_date": AS_OF,
                      "session_date": SESSION, "exit_date": "2026-10-08", "horizon_days": 1, "base_close": 1000.0,
                      "target_price": 1010.0502, "lo50": 980.0, "hi50": 1020.0, "lo80": 960.0, "hi80": 1040.0,
-                     "regime": "CALM"}
+                     "regime": "CALM", "run": "pre_open"}
 
 
 SESSIONS = {"2026-10-05": ("2026-10-06", "2026-10-07"), "2026-10-06": ("2026-10-07", "2026-10-08"),
@@ -416,3 +416,54 @@ def test_forecast_history_keeps_every_run_with_its_change(root):
     assert later["scores"][0]["change"] is None and later["ranges"][0]["change"] is None
     spec = openapi_spec.bundle()
     assert schema_check.errors(history[ticker], {"$ref": "#/components/schemas/ForecastHistory"}, spec) == []
+
+
+def write_kind(root: Path, kind: str, rows: list[dict]) -> None:
+    """Append rows to a kind's file of the fixture root (India)."""
+    path = root / "data" / "india" / kind / "2026" / "10" / "2026-10-07.jsonl"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a") as handle:
+        handle.write("".join(json.dumps(row) + "\n" for row in rows))
+
+
+def test_published_ranges_fall_back_to_the_evening_preview(root):
+    """B17's evening run (option C): a company with a pre-open range of the as-of date shows it (run pre_open); a
+    company without one yet shows that date's evening preview (run evening); an evening row stored after the cut-off
+    never shows."""
+    ticker, other = list(company_mockup()["india"]["pages"])[:2]
+    write_kind(root, "ranges", [published_range(ticker, AS_OF, 1, "2026-10-07T02:30:00Z", 0.0)])
+    evening = [{**published_range(name, AS_OF, 1, "2026-10-06T21:30:00Z", 0.0), "lo80": 955.0, "run": "evening"}
+               for name in (ticker, other)]
+    late = {**published_range(other, AS_OF, 2, "2026-10-07T13:00:00Z", 0.0), "run": "evening"}  # after the cut-off
+    write_kind(root, "ranges_evening", evening + [late])
+    rows = company_sources.published_ranges(FixtureContext(load_market("india"), connect("india"), CUTOFF), AS_OF)
+    assert sorted((row["ticker"], row["horizon_days"], row["run"], row["lo80"]) for row in rows) == sorted(
+        [(ticker, 1, "pre_open", 960.0), (other, 1, "evening", 955.0)])
+
+
+def test_forecast_history_shows_the_evening_and_the_pre_open_run(root):
+    """Each run carries `run`; the pre-open revision's change is taken from the evening run of the same id; a score
+    row without `run` (written before the evening run) reads as pre_open."""
+    from marketbrief.warehouse.company_history import forecast_history
+
+    ticker = next(iter(company_mockup()["india"]["pages"]))
+    write_kind(root, "ranges_evening", [{**published_range(ticker, AS_OF, 1, "2026-10-06T21:30:00Z", 0.0),
+                                         "run": "evening"}])
+    write_kind(root, "ranges", [{**published_range(ticker, AS_OF, 1, "2026-10-07T02:30:00Z", 0.01),
+                                 "hi80": 1050.0}])
+    old = model_score(ticker, "2026-10-05", "2026-10-06T02:20:00Z", 0.55, (["a"], 0.05))
+    write_kind(root, "model_scores", [
+        {key: value for key, value in old.items() if key != "run"},
+        {**model_score(ticker, AS_OF, "2026-10-06T21:31:00Z", 0.52, (["a"], 0.05)), "run": "evening"},
+        {**model_score(ticker, AS_OF, "2026-10-07T02:21:00Z", 0.49, (["a", "b"], -0.25)), "run": "pre_open"}])
+    ctx = FixtureContext(load_market("india"), connect("india"), CUTOFF)
+    history = forecast_history(ctx, "2026-10-05", AS_OF)[ticker]
+    assert [(row["run"], row["made_at"]) for row in history["ranges"]] == [
+        ("evening", "2026-10-06T21:30:00Z"), ("pre_open", "2026-10-07T02:30:00Z")]
+    revision = history["ranges"][1]["change"]
+    assert (revision["from_made_at"], revision["target_pct"], revision["width80_pct"]) == (
+        "2026-10-06T21:30:00Z", 1.005, 12.5)
+    assert [(row["run"], row["prob_up"]) for row in history["scores"]] == [
+        ("pre_open", 0.55), ("evening", 0.52), ("pre_open", 0.49)]
+    assert history["scores"][2]["change"]["news_added"] == ["b"]
+    assert history["scores"][2]["change"]["prob_up"] == -0.03

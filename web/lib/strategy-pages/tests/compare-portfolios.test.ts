@@ -6,11 +6,11 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import {
-  familyLines, familyRow, notEnteredFor, matchTally, matchWinner, matches, perCompany, pickFor, tradeNet, viableLine, whoLeads,
+  familyLines, familyRow, notEnteredFor, reviewDueWords, matchTally, matchWinner, matches, perCompany, pickFor, tradeNet, viableLine, whoLeads,
   type RuleVsAiPayload, type SettledTrade,
 } from "../rule-vs-ai.ts";
 import {
-  groupOpenTrades, latestChecks, newIdempotencyKey, openSummary, positionsSummary, receiptState, tradeRequest,
+  groupOpenTrades, latestChecks, pricePending, newIdempotencyKey, openSummary, positionsSummary, receiptState, tradeRequest,
   type PaperPortfoliosPayload, type TradeForm,
 } from "../paper-portfolios.ts";
 
@@ -122,4 +122,29 @@ test("receipt states and the idempotency key's format", () => {
   assert.equal(receiptState(409), "refused");
   assert.match(newIdempotencyKey(), /^[A-Za-z0-9_-]{8,64}$/);
   assert.notEqual(newIdempotencyKey(), newIdempotencyKey());
+});
+
+test("the review-due line names the due date's own weekday", () => {
+  assert.equal(reviewDueWords({ date: "2026-10-16", iso_week: "2026-W42" }),
+    "No weekly review written by the cut-off. The next one (2026-W42) is due on Friday 16 Oct 2026, after the cut-off.");
+  assert.match(reviewDueWords({ date: "2026-10-10", iso_week: "2026-W41" }), /due on Saturday 10 Oct 2026/);
+  assert.equal(reviewDueWords(null), "No weekly review written by the cut-off.");
+});
+
+test("a price-pending open trade is counted as open but adds nothing to the unrealised sums", () => {
+  const p = structuredClone(mockup<PaperPortfoliosPayload>("07-paper-portfolios"));
+  const before = openSummary(p);
+  const first = p.open_trades[0];
+  const was = first.unrealised_pnl ?? 0;
+  Object.assign(first, { price_pending: true, entry_price: null, last_price: null, unrealised_pnl: null, unrealised_pct: null });
+  const after = openSummary(p);
+  assert.equal(after.open, before.open);
+  assert.equal(Math.round((after.unrealised ?? 0) * 100), Math.round(((before.unrealised ?? 0) - was) * 100));
+  const group = groupOpenTrades(p.open_trades, p.strategies, { family: null, view: null }).find((g) => g.trades.includes(first))!;
+  const others = group.trades.filter((t) => t !== first).reduce((total, t) => total + (t.unrealised_pnl ?? 0), 0);
+  assert.equal(Math.round(group.unrealised! * 100), Math.round(others * 100));
+  assert.equal(pricePending(first), true);
+  // a read model that leaves the flag out (rm.portfolio before B13 passes it through): the null entry price says so
+  assert.equal(pricePending({ ...first, price_pending: undefined }), true);
+  assert.equal(pricePending(p.open_trades[1]), false);
 });

@@ -47,14 +47,21 @@ changes the gaps.
 Post-close runs (`routine/POSTCLOSE_PROMPT.md`; docs/SPEC.md F6.1) and weekly research runs
 (`routine/WEEKLY_PROMPT.md`; F6.2), in exchange time (B17, Wave 5). The post-close run starts at least 120 minutes
 after the close (`BAR_SETTLE_MINUTES`), when the session's bar counts as final; on a holiday it stops at its
-session check. The weekly research run is separate from the weekly review (step 10a of the pre-open run).
+session check. The weekly research run is separate from the weekly review (step 10a of the pre-open run). It runs on
+Friday evening New York time for both markets (owner decision 2026-10-10), after the US post-close and evening runs.
+The evening forecast run (`routine/EVENING_PROMPT.md`; owner decision 2026-10-10) publishes preview ranges, model
+scores and rule-strategy predictions on the day's close, after the bar is final:
+- the previews go to `ranges_evening`, `strategy_predictions_evening` and `run: "evening"` model scores;
+- the next pre-open run writes the revision of record, and only that revision trades or is scored.
 
 | Run | Cron | UTC |
 |---|---|---|
 | India post-close | `CRON_TZ=Asia/Kolkata 45 17 * * 1-5` | 12:15 |
 | US post-close | `CRON_TZ=America/New_York 15 18 * * 1-5` | 22:15 in EDT, 23:15 in EST |
-| India weekly research | `CRON_TZ=Asia/Kolkata 51 9 * * 6` (SPEC's 10:00, moved off the hour) | Saturday 04:21 |
-| US weekly research | `CRON_TZ=America/New_York 51 9 * * 6` (SPEC's 10:00, moved off the hour) | Saturday 13:51 in EDT, 14:51 in EST |
+| India evening forecast | `30 21 * * 1-5` (UTC) | 21:30 |
+| US evening forecast | `CRON_TZ=America/New_York 30 18 * * 1-5` | 22:30 in EDT, 23:30 in EST |
+| India weekly research | `CRON_TZ=America/New_York 30 19 * * 5` (owner decisions 2026-10-10, Friday evening for both markets, and 2026-10-12, 19:30) | Friday 23:30 in EDT, Saturday 00:30 in EST |
+| US weekly research | `CRON_TZ=America/New_York 30 19 * * 5` (same) | Friday 23:30 in EDT, Saturday 00:30 in EST |
 
 **Open paper trades (B9, docs/ws/b9.md).** Each check also covers every open paper trade (F1) of every
 strategy and horizon, in both views: the price against the trade's entry, its target and its own range, on
@@ -1017,8 +1024,9 @@ always show the same numbers.
   Charts, each single-purpose and drawn as inline SVG: a price-and-fan chart per company (one
   % scale shared by every company), a range-per-company chart, a sector-move bar chart and a
   promised-vs-actual track-record chart once something was scored. `index.html` lists all days.
-- `reports/<market>/dashboard.html` (`dashboard.py`, after `html_report.py`; code in
-  `scripts/marketbrief/presentation/dashboard/`): the decision-support dashboard for the owner's two
+- `reports/<market>/dashboard.html` (`dashboard.py`; code in `scripts/marketbrief/presentation/dashboard/`). Retired
+  from the daily run on 2026-10-10 (owner decision): the routine no longer builds the file, and the website shows the
+  same data. The code stays because the warehouse read models are built from its `gather_dashboard`. As built: the decision-support dashboard for the owner's two
   questions (buy at the next open, sell at the close of D+1 or D+4). One self-contained light-theme
   file, phone and desktop, no network at view time: market overview (benchmark, volatility index,
   regime, cues), sector heatmap, sortable watchlist; per stock a TradingView Lightweight Charts
@@ -1933,6 +1941,18 @@ Decision 37: horizon k is N+k, buy at the open of D and sell at the close of the
   `config/settings.yaml` (the moment B10 reached main) separates old and new 5-day calls. The context pack's
   "Signal model" section shows N+k scores only (#95); the AI replay scores calls recorded before that moment on
   their old window as `legacy_cc`, apart (section 7, #96).
+- **Evening run** (B17's post-go-live batch, option C; B10's part). `ranges.py --evening` publishes the day's-close
+  ranges to the kind `ranges_evening`: the `ranges` columns plus `run: "evening"`, the same ids as the pre-open rows
+  they preview, once per id there. It applies no overnight cue (the day's stored quotes are its own pre-open cue, whose
+  session has closed) and no forecaster widening (the forecaster has not run). The pre-open rows in `ranges` stay
+  the revision of record: scoring, settlement, picks, trade checks and `ranges_asof` read only them. An evening
+  row may reuse the option snapshot collected that morning (US implied vol): stale, not look-ahead.
+  `ranges_asof(..., run="evening")` reads the evening rows for showing evening vs pre-open. Model scores stay in
+  `model_scores`: an evening row is followed by a pre-open row only when the probability changed, and readers take
+  the newest computed_at by their clock. New score rows carry `run` (`model_scores.py --evening` writes "evening",
+  otherwise "pre_open"; null on older rows = pre_open). `contracts/horizons.range_runs` and `score_runs` return
+  every run's N+k rows of a window of as-of dates known by the clock, each labelled with its run, for showing how
+  a forecast changed between the evening and the pre-open run.
 - **Backtest per horizon** (`model_backtest.py --out DIR` on stored data, open-to-close, after costs; model long at
   p >= 0.55, % per date, 95% block bootstrap; vs = mean difference per date; full run 37 s):
 
@@ -1965,8 +1985,8 @@ only through validated CLIs, from Slack or Claude Code now and from an append-on
 
 The warehouse copy is written by `scripts/warehouse_sync.py` (docs/ws/ws1.md): every table is rebuilt as
 of the run's clock with each view's own pick rule plus `<stored_at> <= cutoff`, so a replay with MB_NOW
-builds exactly what was known then; read models are the dashboard's own data sliced per page, so the app
-and `reports/<market>/dashboard.html` can never disagree.
+builds exactly what was known then; read models are the dashboard's own data (`gather_dashboard`) sliced per page,
+so the app and the dashboard data can never disagree (the static `dashboard.html` itself is retired, 2026-10-10).
 
 **Paper portfolio and tiers (WS4, built 2026-10-07).** Paper trades (`portfolio_trades`) and add-company requests
 (`watchlist_requests`) are append-only kinds written only by `scripts/portfolio.py` after validation against stored
@@ -1996,6 +2016,11 @@ is as of the run's clock (MB_NOW-aware): each lab kind by its time column, bars 
   (`registry.is_live`; null = not live). Settle never settles a prediction or pick whose strategy is not live on its
   D (also after the switch: D is fixed per row), pick lets only live strategies contend, and the forward summary
   counts only live settlements; predict runs regardless (a rehearsal before go-live).
+- **Evening preview.** `lab.py predict --evening` (after the close, option C with B17 and B10) writes the rows the
+  next pre-open predict will write (same D, same ids) from B10's evening ranges (`ranges_asof(..., run="evening")`)
+  to `strategy_predictions_evening` (`run` = "evening") only: no cost_views, abstentions or picks, and settle, pick,
+  scoring and the pages read only `strategy_predictions`, so a preview is never traded; the pre-open run appends
+  the revision of record (docs/ws/b2.md "Evening preview").
 - **Amount.** `contracts.watchlist.trade_amount` (B1): the `set_amount` override in force (higher or lower,
   decision 44), else the default (₹1,00,000 / $1,000), copied into each prediction at `made_at`.
 - **Quantity.** India `floor(amount / open)`; 0 gives `skipped_price_above_amount`. US `round(amount / open, 6)`.

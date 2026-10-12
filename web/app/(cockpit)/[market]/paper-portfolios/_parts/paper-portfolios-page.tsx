@@ -20,10 +20,12 @@ import type { GoLive, PageBase, TradeCheck as SharedCheck } from "../../../../..
 import { usePage } from "../../../../../lib/ui/use-api.ts";
 import { figure, tooFewToRank, type CostView } from "../../../../../lib/strategy-pages/scoreboard.ts";
 import {
-  familyH2hRow, groupOpenTrades, latestChecks, newIdempotencyKey, openSummary, pickRuleRow, positionsSummary,
+  familyH2hRow, groupOpenTrades, pricePending, latestChecks, newIdempotencyKey, openSummary, pickRuleRow, positionsSummary,
   receiptState, SOURCE, tradeRequest, type OpenFilter, type PaperPortfoliosPayload, type Receipt, type TradeForm,
 } from "../../../../../lib/strategy-pages/paper-portfolios.ts";
 import { CostSwitch, LuckBar } from "../../_b16/parts.tsx";
+import { openHeadline, perSession } from "../../../../../lib/strategy-pages/all-trades.ts";
+import { AllTradesCard } from "./all-trades-card.tsx";
 import "./paper-portfolios.css";
 
 type Payload = PageBase & PaperPortfoliosPayload & { go_live: GoLive | null };
@@ -50,14 +52,15 @@ function Portfolios({ p }: { p: Payload }) {
   const [sent, setSent] = useState<Sent[]>([]);
   return (
     <>
-      <PageHead page={p} title="Paper portfolios" subtitle={`head-to-head portfolios, open paper trades by strategy, and your own · ${p.name} · data as of the ${fmtDate(p.as_of, false)} close · research only, nothing is an order`} />
+      <PageHead page={p} title="Paper portfolios" subtitle={`every paper trade in one place, head-to-head portfolios, open paper trades by strategy, and your own · ${p.name} · data as of the ${fmtDate(p.as_of, false)} close · research only, nothing is an order`} />
       <SignalsBand page={p} goLive={p.go_live} strategies={Object.keys(p.strategies).length} />
       <div className="ctrls">
         <CostSwitch value={cost} onChange={setCost} help="Market cost: brokerage, taxes and fees (the ranking view). Your cost adds your own broker’s charges; the go-live bar uses it (decision 50). Open trades are before costs." />
       </div>
+      <div style={{ marginTop: 16 }}><AllTradesCard p={p} all={p.all_trades} /></div>
       <Kpis p={p} cost={cost} pending={sent.length} />
       <div style={{ marginTop: 16 }}><H2hCard p={p} cost={cost} /></div>
-      <div style={{ marginTop: 16 }}><OpenTradesCard p={p} /></div>
+      {p.all_trades && perSession(p.all_trades) ? null : <div style={{ marginTop: 16 }}><OpenTradesCard p={p} /></div>}
       <div style={{ marginTop: 16 }}><OwnerCard p={p} sent={sent} onSent={(s) => setSent((list) => [...list, s])} /></div>
       <div className="legend2" aria-label="Legend">
         <span>Legend (sample values): <span className="mb-delta up">+1.2%</span> up, <span className="mb-delta down">−1.2%</span> down, always with the sign</span>
@@ -71,13 +74,23 @@ function Portfolios({ p }: { p: Payload }) {
 }
 
 function Kpis({ p, cost, pending }: { p: Payload; cost: CostView; pending: number }) {
-  const cur = p.currency, d = moneyDecimals(cur), open = openSummary(p), own = positionsSummary(p.owner.positions);
+  const cur = p.currency, d = moneyDecimals(cur), own = positionsSummary(p.owner.positions);
+  const split = p.all_trades ? openHeadline(p.all_trades) : null;
   const R = familyH2hRow(p.h2h_rows, "rule"), A = familyH2hRow(p.h2h_rows, "ai");
+  let openKpi;
+  if (split) {
+    openKpi = <Kpi icon="account_balance_wallet" tone="paper" label="Open paper trades" value={String(split.open)}
+      tip="The accuracy view’s paper trades that have entered and not yet exited, all strategies and horizons; unrealised against the latest stored price, before costs; flagged by their latest intraday check. Head-to-head trades are a separate view, counted apart."
+      sub={<span>unrealised <MoneyDelta currency={cur} value={split.unrealised} decimals={d} /> before costs · {split.flagged} flagged{split.h2hOpen === null ? "" : ` · head-to-head ${split.h2hOpen} open`}</span>} />;
+  } else {
+    const open = openSummary(p);
+    openKpi = <Kpi icon="account_balance_wallet" tone="paper" label="Open paper trades" value={String(open.open)}
+      tip="Every paper trade that has entered and not yet exited, all strategies and horizons, both views; unrealised against the latest stored close."
+      sub={<span>unrealised <MoneyDelta currency={cur} value={open.unrealised} decimals={d} /> before costs{p.trade_checks.length ? ` · ${open.flagged} flagged` : ""}</span>} />;
+  }
   return (
     <KpiRow>
-      <Kpi icon="account_balance_wallet" tone="paper" label="Open paper trades" value={String(open.open)}
-        tip="Every paper trade that has entered and not yet exited, all strategies and horizons, both views; unrealised against the latest stored close."
-        sub={<span>unrealised <MoneyDelta currency={cur} value={open.unrealised} decimals={d} /> before costs{p.trade_checks.length ? ` · ${open.flagged} flagged` : ""}</span>} />
+      {openKpi}
       <Kpi icon="layers" tone="info" label="Head-to-head rule portfolio" value={R ? <MoneyDelta currency={cur} value={figure(R, "net_pnl", cost)} decimals={d} /> : "No trades yet"}
         tip="The two family portfolios of the head-to-head view: the strongest rule strategy vs the strongest AI trader on identical company-days (decisions 41-42)."
         sub={<span>AI portfolio {A ? <MoneyDelta currency={cur} value={figure(A, "net_pnl", cost)} decimals={d} /> : DASH}{` · after ${cost} cost · ${(R?.trades ?? 0) + (A?.trades ?? 0)} settled`}</span>} />
@@ -180,7 +193,7 @@ function OpenTradesCard({ p }: { p: Payload }) {
                       <td><span className="h-lab">{`N+${t.horizon_days}`}</span><small className="muted cw" style={{ whiteSpace: "nowrap" }}>{` ${fmtDate(t.entry_date, false)} → ${fmtDate(t.exit_date, false)}`}</small></td>
                       <td className="num cw">{price(cur, t.entry_price)}</td>
                       <td className="num cw" data-tip={t.last_price_date ? `Latest stored close (${fmtDate(t.last_price_date)}).` : "No stored close yet."}>{price(cur, t.last_price)}</td>
-                      <td className="num"><MoneyDelta currency={cur} value={t.unrealised_pnl} decimals={d} /><span className="cw"> <Delta value={t.unrealised_pct} /></span></td>
+                      <td className="num">{pricePending(t) ? <span className="muted" data-tip="Entered at the open of its entry session; no price is stored or checked yet, so there is no result so far.">price pending</span> : <><MoneyDelta currency={cur} value={t.unrealised_pnl} decimals={d} /><span className="cw"> <Delta value={t.unrealised_pct} /></span></>}</td>
                       <td className="cm"><RangeBar currency={cur} bands={{ lo80: t.lo80, lo50: t.lo50, hi50: t.hi50, hi80: t.hi80, target_price: t.target_price }} last={t.last_price} entry={t.entry_price} /></td>
                       <td className="num c3"><span data-tip={t.to_target_pct === null ? "No target distance stored." : t.to_target_pct < 0 ? `Already past the target ${price(cur, t.target_price)}.` : `${signed(t.to_target_pct)} to the target ${price(cur, t.target_price)}.`}>{t.to_target_pct === null ? DASH : t.to_target_pct < 0 ? "past target" : signed(t.to_target_pct)}</span></td>
                       <td><TradeCheckStatus check={checks.get(t.trade_id) as unknown as SharedCheck | undefined} status={p.status} currency={cur} /></td>

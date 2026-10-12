@@ -37,10 +37,10 @@
         4,
         5
       ],
-      "live_from": null,
+      "live_from": "2026-10-12",
       "live": false,
       "settled_trades": 16,
-      "status_note": "not live yet: switched on in Wave 5"
+      "status_note": "not live at the examples' cut-off; live from 2026-10-12"
     },
     {
       "id": "rule.model_news_half.v1",
@@ -73,10 +73,10 @@
         4,
         5
       ],
-      "live_from": null,
+      "live_from": "2026-10-12",
       "live": false,
       "settled_trades": 0,
-      "status_note": "not live yet: switched on in Wave 5"
+      "status_note": "not live at the examples' cut-off; live from 2026-10-12"
     },
     {
       "id": "rule.model_news_double.v1",
@@ -109,10 +109,10 @@
         4,
         5
       ],
-      "live_from": null,
+      "live_from": "2026-10-12",
       "live": false,
       "settled_trades": 0,
-      "status_note": "not live yet: switched on in Wave 5"
+      "status_note": "not live at the examples' cut-off; live from 2026-10-12"
     },
     {
       "id": "rule.model_news_confirmed.v1",
@@ -144,10 +144,10 @@
         4,
         5
       ],
-      "live_from": null,
+      "live_from": "2026-10-12",
       "live": false,
       "settled_trades": 0,
-      "status_note": "not live yet: switched on in Wave 5"
+      "status_note": "not live at the examples' cut-off; live from 2026-10-12"
     },
     {
       "id": "rule.model_news_high.v1",
@@ -178,10 +178,10 @@
         4,
         5
       ],
-      "live_from": null,
+      "live_from": "2026-10-12",
       "live": false,
       "settled_trades": 0,
-      "status_note": "not live yet: switched on in Wave 5"
+      "status_note": "not live at the examples' cut-off; live from 2026-10-12"
     },
     {
       "id": "rule.model_news_global.v1",
@@ -214,10 +214,10 @@
         4,
         5
       ],
-      "live_from": null,
+      "live_from": "2026-10-12",
       "live": false,
       "settled_trades": 0,
-      "status_note": "not live yet: switched on in Wave 5"
+      "status_note": "not live at the examples' cut-off; live from 2026-10-12"
     },
     {
       "id": "rule.model_news_calm.v1",
@@ -250,10 +250,10 @@
         4,
         5
       ],
-      "live_from": null,
+      "live_from": "2026-10-12",
       "live": false,
       "settled_trades": 0,
-      "status_note": "not live yet: switched on in Wave 5"
+      "status_note": "not live at the examples' cut-off; live from 2026-10-12"
     },
     {
       "id": "rule.model_news_strict.v1",
@@ -286,10 +286,10 @@
         4,
         5
       ],
-      "live_from": null,
+      "live_from": "2026-10-12",
       "live": false,
       "settled_trades": 0,
-      "status_note": "not live yet: switched on in Wave 5"
+      "status_note": "not live at the examples' cut-off; live from 2026-10-12"
     },
     {
       "id": "base.always_up.v1",
@@ -322,10 +322,10 @@
         4,
         5
       ],
-      "live_from": null,
+      "live_from": "2026-10-12",
       "live": false,
       "settled_trades": 18,
-      "status_note": "not live yet: switched on in Wave 5"
+      "status_note": "not live at the examples' cut-off; live from 2026-10-12"
     },
     {
       "id": "base.momentum.v1",
@@ -358,10 +358,10 @@
         4,
         5
       ],
-      "live_from": null,
+      "live_from": "2026-10-12",
       "live": false,
       "settled_trades": 0,
-      "status_note": "not live yet: switched on in Wave 5"
+      "status_note": "not live at the examples' cut-off; live from 2026-10-12"
     },
     {
       "id": "base.model_only.v1",
@@ -394,10 +394,10 @@
         4,
         5
       ],
-      "live_from": null,
+      "live_from": "2026-10-12",
       "live": false,
       "settled_trades": 6,
-      "status_note": "not live yet: switched on in Wave 5"
+      "status_note": "not live at the examples' cut-off; live from 2026-10-12"
     },
     {
       "id": "ai.news_results.sonnet.v1",
@@ -422,10 +422,10 @@
         3,
         5
       ],
-      "live_from": null,
+      "live_from": "2026-10-12",
       "live": false,
       "settled_trades": 10,
-      "status_note": "not live yet: switched on in Wave 5"
+      "status_note": "not live at the examples' cut-off; live from 2026-10-12"
     },
     {
       "id": "ai.pattern_mood.sonnet.v1",
@@ -451,10 +451,10 @@
         3,
         5
       ],
-      "live_from": null,
+      "live_from": "2026-10-12",
       "live": false,
       "settled_trades": 0,
-      "status_note": "not live yet: switched on in Wave 5"
+      "status_note": "not live at the examples' cut-off; live from 2026-10-12"
     },
     {
       "id": "ai.combined.sonnet.v1",
@@ -485,10 +485,10 @@
         3,
         5
       ],
-      "live_from": null,
+      "live_from": "2026-10-12",
       "live": false,
       "settled_trades": 0,
-      "status_note": "not live yet: switched on in Wave 5"
+      "status_note": "not live at the examples' cut-off; live from 2026-10-12"
     },
     {
       "id": "ai.combined.opus.v1",
@@ -519,10 +519,10 @@
         3,
         5
       ],
-      "live_from": null,
+      "live_from": "2026-10-12",
       "live": false,
       "settled_trades": 10,
-      "status_note": "not live yet: switched on in Wave 5"
+      "status_note": "not live at the examples' cut-off; live from 2026-10-12"
     }
   ]
 }

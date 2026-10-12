@@ -308,7 +308,8 @@ def test_catalogue_has_every_entity():
             "news_item", "results_digest", "trade_check", "lifecycle_event", "market_status", "portfolio",
             "agreement", "open_trade", "abstention", "command_log", "eod_analysis", "news_impact",
             "research_review", "calendar_event", "bar", "scoreboard_backtest_row", "heatmap_cell",
-            "cumulative_line", "track_record", "assistant_answer", "intraday_alert"} <= names
+            "cumulative_line", "track_record", "assistant_answer", "intraday_alert",
+            "evening_prediction"} <= names
 
 
 @pytest.mark.parametrize("path", catalogue_files(), ids=lambda p: p.name)
@@ -446,6 +447,25 @@ def test_catalogue_trade_checks_use_the_real_check_ids_and_carry_the_b9_columns(
         assert r["id"] == f"{r['check_id']}-{r['trade_id']}" and r["check_row_id"] == f"{r['check_id']}-{r['ticker']}"
         assert r["quality"] == "ok" and r["entry_adj"] == r["entry_price"] * r["basis_factor"]
         assert r["sessions_held"] == pytest.approx(r["session_number"] - 1 + r["elapsed_fraction"], abs=0.0002)
+
+
+def test_catalogue_evening_previews_match_their_pre_open_rows():
+    """B2's evening preview: the pre-open row's columns and id plus run "evening", made before that row."""
+    pre_open = {p["id"]: p for p in load("prediction.json")}
+    evening = load("evening_prediction.json")
+    assert evening and {p["ticker"] for p in evening} == {"NVDA", "RELIANCE"}
+    for row in evening:
+        before = pre_open[row["id"]]
+        assert row["run"] == "evening" and row["made_at"] < before["made_at"]
+        assert row["made_at"][:10] == before["as_of_date"]   # after the as-of close, before D's pre-open run
+        assert {k: v for k, v in row.items() if k not in ("made_at", "run")} == \
+            {k: v for k, v in before.items() if k != "made_at"}
+
+
+def test_catalogue_strategies_are_live_only_from_live_from():
+    for s in load("strategy.json"):
+        assert s["live"] == (s["live_from"] is not None and s["live_from"] <= "2026-10-07")
+        assert s["live_from"] is None or re.fullmatch(r"\d{4}-\d{2}-\d{2}", s["live_from"])
 
 
 def test_catalogue_intraday_alerts_follow_b9_feed_rules():

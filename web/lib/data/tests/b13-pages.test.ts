@@ -4,7 +4,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { MARKET_PAGE_KEY } from "../constants.ts";
 import { readPage } from "../handler.ts";
-import { PAPER_PORTFOLIOS_PAGE } from "../paper-portfolios.ts";
+import { PAPER_PORTFOLIOS_PAGE, PORTFOLIO_SESSION_PAGE, portfolioSessionResponse } from "../paper-portfolios.ts";
 import { REVIEW_PAGE } from "../review.ts";
 import { RULE_VS_AI_PAGE } from "../rule-vs-ai.ts";
 import { STRATEGY_LAB_PAGE } from "../strategy-lab.ts";
@@ -32,3 +32,15 @@ for (const [spec, table] of [
     assert.equal(response.status, 404);
   });
 }
+
+test("portfolio sessions: the page `trades:<date>` of rm.portfolio, verbatim; a bad or unstored date is a 404", async () => {
+  const store = new MemoryRowStore().put("portfolio", row({ page_key: "trades:2026-10-12", payload: { market: "us", session_date: "2026-10-12" } }));
+  const deps = { store, now: () => NOW };
+  const ok = await portfolioSessionResponse(new Request("http://x"), "us", "2026-10-12", deps);
+  assert.equal(ok.status, 200);
+  assert.equal((await ok.json()).page_key, "trades:2026-10-12");
+  assert.equal((await portfolioSessionResponse(new Request("http://x"), "us", "2026-10-09", deps)).status, 404);
+  assert.equal((await portfolioSessionResponse(new Request("http://x"), "us", "12 Oct", deps)).status, 404);
+  assert.deepEqual(store.reads, ["portfolio|us|trades:2026-10-12", "portfolio|us|trades:2026-10-09"]);
+  assert.equal(PORTFOLIO_SESSION_PAGE.table, "portfolio");
+});
