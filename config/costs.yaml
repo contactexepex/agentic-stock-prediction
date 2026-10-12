@@ -68,9 +68,9 @@ broker:
     # split Groww's page still shows); the total did not change. IPFT is therefore included; never add it again.
     nri_reporting_per_trade_date: 0.0  # your_view. owner, 2026-10-12: no bank or NRI reporting charge beyond Groww's
     # your_view. Groww: DP charge per sell transaction Rs 3.5 depository (Rs 3.25 for women; the owner's rate
-    # assumed Rs 3.5) + Rs 16.5 Groww = Rs 20, plus GST 18%; Groww's Rs 16.5 is waived on a sale under Rs 100
-    # (not modelled: no paper trade sells that little)
-    # (Groww lists DP among the charges GST applies to): Rs 23.60 per scrip sold.
+    # assumed Rs 3.5) + Rs 16.5 Groww = Rs 20, plus GST 18% (Groww lists DP among the charges GST applies to):
+    # Rs 23.60 per sell transaction. Groww's Rs 16.5 is waived on a sale under Rs 100 (not modelled: no paper
+    # trade sells that little).
     dp_charge_min: 20.0
     dp_charge_rate: 0.0
     dp_charge_gst: true                # GST at `gst_rate` on the DP charge

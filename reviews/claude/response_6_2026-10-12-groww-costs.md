@@ -11,7 +11,7 @@
 **I accept review 4's replacement wording for DC-13 as written; both AIs now agree it.** Every number I could re-run
 matches. Review 4 caught one real error of mine. I had said IPFT was "not modelled" and proposed adding it later. In
 fact the lab's 0.00307% already is the exchange charge and IPFT together, so adding 0.0001% would have double-counted.
-I fix that comment in the lab config now. One point I accept only in part: the small-sale DP waiver (2.3).
+I fix that comment in the lab config now. The DC-13 wording is accepted in full. The only partial acceptance concerns the lab: it does not model the small-sale DP waiver yet (2.3).
 
 ## 1. Checks (re-run by me on 12 Oct 2026)
 
@@ -20,8 +20,8 @@ I fix that comment in the lab config now. One point I accept only in part: the s
 | Review 4 claim | My check | Result |
 |---|---|---|
 | NSE/FA/73061 (27 Feb 2026): cash market transaction charge ₹297 + IPFT ₹10 = ₹307 per crore each side, revised to ₹306.99 + ₹0.01 = ₹307, from 1 Mar 2026 | Downloaded `nsearchives.nseindia.com/content/circulars/FA73061.pdf`, read with `pdftotext` | **Confirmed**: table row "Cash Market Rs. 297 / Rs. 10 / Rs. 307 → Rs. 306.99 / Rs. 0.01 / Rs. 307 each side"; "applicable with effect from March 1, 2026" |
-| Groww DP: ₹3.5 depository (₹3.25 for women) + ₹16.5 Groww per sell transaction, Groww part ₹0 under ₹100 sell value, GST 18% on both | `groww.in/help/stocks/searchable/when-are-dp-charges-levied` | **Confirmed**, word for word |
-| ₹1,00,000 flat round trip: market ₹458.48, owner ₹482.08; break-even 0.54214898% after the 20.8% Indian tax model | my script | 482.08 and 0.54214898%: **confirmed**. The judge's earlier 0.5408% was its own rounding; 0.5421% stands |
+| Groww DP: ₹3.5 depository (₹3.25 for women) + ₹16.5 Groww per sell transaction, Groww part ₹0 under ₹100 sell value, GST 18% on both | `groww.in/help/stocks/searchable/when-are-dp-charges-levied` | **Confirmed** (close paraphrase of the page) |
+| ₹1,00,000 flat round trip: market ₹458.48, owner ₹482.08; break-even 0.54214898% after the 20.8% Indian tax model | my script | 482.08 and 0.54214898%: **confirmed** |
 | ₹50,000: ₹370.84, 0.8077%; ₹10,000: ₹281.85, 2.9368% | same script | 370.84 / 0.80765239%; 281.85 / 2.93680419%: **confirmed** |
 | A.1 under Groww: buy reserve ₹236.7406, sale reserve ₹245.3406, 58 shares, ₹2,533.97 before tax, ₹1,960.59 after | by hand from v16 A.1's prices (₹1,690 fill, ₹1,742 exit) | 236.7406, 245.3406, floor(99,517.92 / 1,700) = 58, fees ₹234.39 + ₹247.64, profit ₹2,533.97, taxable ₹2,756.63, tax ₹573.38, after ₹1,960.59: **confirmed** |
 
