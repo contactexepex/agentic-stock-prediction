@@ -8,10 +8,11 @@ import pandas as pd
 
 from marketbrief.warehouse.rm_registry import BuildContext
 
-# each trade's newest intraday check stored by the cut-off (B9's trade_checks: D's open and the latest price)
-CHECKS_SQL = """SELECT DISTINCT ON (trade_id) trade_id, session_date, entry_price, last_price, last_time
+# each trade's newest intraday check stored by the cut-off that carries the column (B9's trade_checks: a check
+# without a fresh quote is stored with its prices null and never hides an earlier price)
+CHECKS_SQL = """SELECT DISTINCT ON (trade_id) trade_id, session_date, {column}, last_time
 FROM trade_check_rows WHERE check_at <= ?::TIMESTAMPTZ AND computed_at <= ?::TIMESTAMPTZ AND list_contains(?, trade_id)
-ORDER BY trade_id, check_at DESC, id"""
+AND {column} IS NOT NULL ORDER BY trade_id, check_at DESC, id"""
 SOURCE_BAR, SOURCE_CHECK, SOURCE_CLOSE = "daily_bar", "intraday_check", "daily_close"
 
 
@@ -26,12 +27,20 @@ def iso_time(value) -> str | None:
 
 
 def latest_checks(ctx: BuildContext, trade_ids: list[str]) -> dict[str, dict]:
-    """trade_id -> its newest intraday check stored by the cut-off: session_date, entry_price (D's open on D's basis),
-    last_price (raw, that session's basis) and last_time."""
-    if not trade_ids:
-        return {}
-    frame = ctx.con.execute(CHECKS_SQL, [ctx.cutoff_time, ctx.cutoff_time, trade_ids]).df()
-    return {row["trade_id"]: row for row in frame.to_dict("records")}
+    """trade_id -> {entry_price: from its newest check stored by the cut-off with an entry price (D's open on D's
+    basis), last_price, session_date, last_time: from its newest such check with a price (raw, that session's
+    basis)}; a check without a price (no or stale quote) is skipped."""
+    out: dict[str, dict] = {}
+    for column in ("entry_price", "last_price"):
+        if not trade_ids:
+            break
+        sql = CHECKS_SQL.format(column=column)
+        for row in ctx.con.execute(sql, [ctx.cutoff_time, ctx.cutoff_time, trade_ids]).df().to_dict("records"):
+            found = out.setdefault(row["trade_id"], {"entry_price": None, "last_price": None})
+            found[column] = row[column]
+            if column == "last_price":
+                found.update(session_date=row["session_date"], last_time=row["last_time"])
+    return out
 
 
 def trade_prices(trade: dict, open_price, close: tuple, check: dict | None) -> dict | None:

@@ -15,7 +15,8 @@ computed once per build through BuildContext.shared, as of the cut-off. rm_commo
                     open: entry = D's stored open, else the open of D from the trade's newest intraday check (B9's
                     trade_checks) by the cut-off; last price = the newest of the last stored close and that check's
                     price (`entry_price_source`, `last_price_source`, `last_price_time`). Unrealised profit before
-                    costs on today's price basis (splits and bonuses since D).
+                    costs on today's price basis (splits and bonuses since D). Past D's open with neither, the trade
+                    is listed with `price_pending` true and its prices, quantity and measures null.
   companies(ctx)    the Company records, active and inactive (never deleted), active first, then by ticker: B1's
                     accessor, the newest two raw closes collected by the cut-off, agreement_n1 (active companies) and
                     the open-trade count (exactly the records of open_trades).
@@ -35,6 +36,7 @@ from datetime import date
 import pandas as pd
 
 from marketbrief.contracts.strategies import FAMILIES
+from marketbrief.core import calendar
 from marketbrief.intraday import trades as intraday_trades
 from marketbrief.intraday.settings import load_intraday_config
 from marketbrief.lab import registry
@@ -66,6 +68,16 @@ AS n FROM ({RAW_BARS}) WHERE close IS NOT NULL) WHERE n <= 2 ORDER BY ticker, n"
 OPENS_SQL = f"SELECT ticker, date, open FROM ({RAW_BARS}) WHERE open IS NOT NULL"
 OPEN_TRADE_KEYS = ("trade_id", "view", "prediction_id", "strategy_id", "family", "ticker", "horizon_days")
 PREDICTED_KEYS = ("target_price", "lo80", "lo50", "hi50", "hi80")
+PENDING_NULL_KEYS = (
+    "entry_price_source",
+    "last_price",
+    "last_price_date",
+    "last_price_source",
+    "last_price_time",
+    "unrealised_pnl",
+    "unrealised_pct",
+    "to_target_pct",
+)
 COMPANY_KEYS = (
     "market",
     "ticker",
@@ -186,6 +198,25 @@ def agreement(ctx: BuildContext) -> dict[str, list[dict]]:
 
 
 # ---------- open trades ----------
+def pending_record(trade: dict, market: str, currency: str) -> dict:
+    """The Open-trade record of a trade past D's open whose price is not known yet (no stored open of D, no intraday
+    check): `price_pending`, every price, the quantity and the measures null."""
+    return {
+        **{key: trade[key] for key in OPEN_TRADE_KEYS},
+        "market": market,
+        "entry_date": trade["entry_date"].isoformat(),
+        "exit_date": trade["exit_date"].isoformat(),
+        "entry_price": None,
+        "quantity": None,
+        "amount": json_safe_float(trade["amount"]),
+        "currency": currency,
+        **{key: json_safe_float(trade[key]) for key in PREDICTED_KEYS},
+        **dict.fromkeys(PENDING_NULL_KEYS),
+        "price_pending": True,
+        "paper": True,
+    }
+
+
 def open_trade_record(trade: dict, market: str, currency: str, prices: dict) -> dict | None:
     """One Open-trade record from B9's trade and `prices` = {entry, last, last_date, factor, target_factor,
     entry_source, last_source, last_time}:
@@ -214,6 +245,7 @@ def open_trade_record(trade: dict, market: str, currency: str, prices: dict) -> 
         "unrealised_pnl": round(shares * (last / factor - entry), MONEY),
         "unrealised_pct": round((last / (entry * factor) - 1) * 100, PCT),
         "to_target_pct": None if target is None else round((target * prices["target_factor"] / last - 1) * 100, PCT),
+        "price_pending": False,
         "paper": True,
     }
 
@@ -251,8 +283,10 @@ def open_trades(ctx: BuildContext) -> list[dict]:
                 closes.get(trade["ticker"], (None, None)),
                 checks.get(trade["trade_id"]),
             )
-            if prices is None:
-                continue  # not entered yet: neither D's stored open nor an intraday check of D by the cut-off
+            if prices is None:  # neither D's stored open nor an intraday check of D by the cut-off
+                if ctx.cutoff_time >= calendar.session_open_utc(ctx.cfg, trade["entry_date"]):
+                    out.append(pending_record(trade, ctx.market, ctx.cfg["currency"]))  # entered, price pending
+                continue
             known = [(ex, f) for ex, f in factors.get(trade["ticker"], []) if ex.isoformat() <= prices["last_date"]]
             prices.update(
                 factor=intraday_trades.factor_after(known, trade["entry_date"]),

@@ -144,8 +144,9 @@ def stored(tmp_path_factory):
     append(root, "us", "strategy_predictions", "2026-10-07", [future])
     # TCS: D = 7 Oct (India), made before the open; D's bar is stored only on 8 Oct, after the cut-off, so the trade
     # is open from D's open through B9's intraday check of 05:44Z (entry = D's intraday open, last = the check's price)
-    append(root, "india", "strategy_predictions", "2026-10-07", [INTRADAY_PREDICTION])
-    append(root, "india", "trade_checks", "2026-10-07", [INTRADAY_CHECK])
+    # INFY: the same, with no check by the cut-off: past D's open (03:45Z), so listed with its price pending
+    append(root, "india", "strategy_predictions", "2026-10-07", [INTRADAY_PREDICTION, PENDING_PREDICTION])
+    append(root, "india", "trade_checks", "2026-10-07", [INTRADAY_CHECK, NO_QUOTE_CHECK])
     append(
         root,
         "us",
@@ -197,6 +198,16 @@ INTRADAY_PREDICTION = {
     "amount": 100000.0,
     "currency": "INR",
 }
+PENDING_PREDICTION = {
+    **INTRADAY_PREDICTION,
+    "id": "rule.model_news.v1:2026-10-06-INFY-1d",
+    "ticker": "INFY",
+    "target_price": 1500.0,
+    "lo80": 1440.0,
+    "lo50": 1470.0,
+    "hi50": 1530.0,
+    "hi80": 1560.0,
+}
 INTRADAY_CHECK = {
     "id": "ic-india-2026-10-07T05:44Z-acc:rule.model_news.v1:2026-10-06-TCS-1d",
     "check_id": "ic-india-2026-10-07T05:44Z",
@@ -223,6 +234,21 @@ INTRADAY_CHECK = {
     "basis_factor": 1.0,
     "last_time": "2026-10-07T05:35:00+00:00",
     "notes": [],
+}
+
+
+# a later check of TCS without a fresh quote (B9 stores it with its prices null): it never hides the earlier price
+NO_QUOTE_CHECK = {
+    **INTRADAY_CHECK,
+    "id": "ic-india-2026-10-07T07:44Z-acc:rule.model_news.v1:2026-10-06-TCS-1d",
+    "check_id": "ic-india-2026-10-07T07:44Z",
+    "check_row_id": "ic-india-2026-10-07T07:44Z-TCS",
+    "check_at": "2026-10-07T07:44:00+00:00",
+    "computed_at": "2026-10-07T07:44:20+00:00",
+    "entry_price": None,
+    "last_price": None,
+    "last_time": None,
+    "quality": "no_quote",
 }
 
 
@@ -308,8 +334,14 @@ def test_open_trades_match_the_catalogue(stored):
             assert {key: record[key] for key in trade} == trade, trade["trade_id"]
             sources = ("daily_bar", "daily_close", None)  # entered and valued on stored bars
             assert (record["entry_price_source"], record["last_price_source"], record["last_price_time"]) == sources
-        extra = {"acc:" + (SPLIT_PREDICTION if market == "us" else INTRADAY_PREDICTION)["id"]}
-        assert set(records) == {t["trade_id"] for t in expected} | extra  # nothing else is open
+        extras = [SPLIT_PREDICTION] if market == "us" else [INTRADAY_PREDICTION]
+        extra = {"acc:" + prediction["id"] for prediction in extras}
+        # India's open (03:45Z) is before the cut-off: today's trades (D = 7 Oct, made 02:10Z) are listed, their
+        # price pending (no bar, no check); the US opens at 13:30Z, after it, so its D = 7 Oct trades are not
+        pending = {key for key, record in records.items() if record["price_pending"]}
+        assert all(records[key]["entry_date"] == "2026-10-07" for key in pending)
+        assert bool(pending) == (market == "india")
+        assert set(records) == {t["trade_id"] for t in expected} | extra | pending  # nothing else is open
 
 
 def test_settled_late_and_future_predictions_are_not_open(stored):
@@ -547,7 +579,7 @@ def test_open_trades_and_settlements_of_a_strategy_not_live_are_dropped(stored, 
 # ---------- open from D's open: B9's intraday checks before D's bar is stored ----------
 def test_a_trade_is_open_from_ds_open_on_its_intraday_check(stored):
     """TCS entered on 7 Oct; its daily bar is stored only after the cut-off, so entry and last price come from the
-    newest intraday check (05:44Z), with the price source marked."""
+    newest intraday check with prices (05:44Z; the 07:44Z check had no quote), with the price source marked."""
     record = next(
         r for r in rm_common.open_trades(stored["india"]) if r["trade_id"] == "acc:" + INTRADAY_PREDICTION["id"]
     )
@@ -582,3 +614,28 @@ def test_trade_prices_pick_the_newest_price_and_the_stored_open_first():
     assert open_trade_prices.trade_prices(trade, None, (None, None), None) is None
     # a close from before D (no price on or after D) is not a price of the trade
     assert open_trade_prices.trade_prices(trade, 100.0, ("2026-10-06", 99.0), None) is None
+
+
+def test_a_trade_past_ds_open_without_any_price_is_listed_with_its_price_pending(stored):
+    """INFY entered on 7 Oct (India's open 03:45Z is before the cut-off) but has neither D's bar nor a check: listed,
+    price pending, every price, the quantity and the measures null; it counts as an open trade of its company."""
+    trades = rm_common.open_trades(stored["india"])
+    record = next(r for r in trades if r["trade_id"] == "acc:" + PENDING_PREDICTION["id"])
+    assert record["price_pending"] is True and record["entry_date"] == "2026-10-07"
+    nulls = (
+        "entry_price",
+        "entry_price_source",
+        "quantity",
+        "last_price",
+        "last_price_date",
+        "last_price_source",
+        "last_price_time",
+        "unrealised_pnl",
+        "unrealised_pct",
+        "to_target_pct",
+    )
+    assert all(record[key] is None for key in nulls)
+    assert record["target_price"] == 1500.0 and record["amount"] == 100000.0 and record["paper"] is True
+    assert all((r["entry_price"] is None) == r["price_pending"] for r in trades)  # pending exactly when unpriced
+    counts = {row["ticker"]: row["open_trades"] for row in rm_common.companies(stored["india"])}
+    assert counts["INFY"] == sum(r["ticker"] == "INFY" for r in trades) >= 1
