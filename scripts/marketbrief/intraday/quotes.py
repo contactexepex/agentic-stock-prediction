@@ -10,6 +10,7 @@ import pandas as pd
 
 from marketbrief.collectors.quotes import priced, snapshot
 from marketbrief.constants.quotes import INTRADAY_INTERVAL, INTRADAY_PERIOD, YAHOO_CLOSE_COLUMN
+from marketbrief.sources.yahoo_pacing import paced_yfinance
 
 YAHOO_OPEN_COLUMN = "Open"
 YAHOO_HIGH_COLUMN, YAHOO_LOW_COLUMN = "High", "Low"
@@ -33,9 +34,7 @@ class YahooIntraday:
 
     def __init__(self):
         """Import yfinance only when a live check runs."""
-        import yfinance
-
-        self._yf = yfinance
+        self._yf = paced_yfinance()
 
     def bars(self, symbol: str) -> pd.DataFrame:
         """The symbol's recent 5-minute bars (index = bar start, aware)."""

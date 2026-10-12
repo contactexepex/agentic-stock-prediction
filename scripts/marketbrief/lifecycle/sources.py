@@ -13,6 +13,7 @@ from pathlib import Path
 
 from marketbrief.constants.environment import ENV_SEC_USER_AGENT
 from marketbrief.constants.sources import FREE_SOURCE_USER_AGENT
+from marketbrief.sources.yahoo_pacing import paced_yfinance
 
 ENV_FIXTURES = "MB_LIFECYCLE_FIXTURES"
 SEC_EXCHANGE_MAP_URL = "https://www.sec.gov/files/company_tickers_exchange.json"
@@ -81,9 +82,7 @@ class LiveSources:
     def yahoo_meta(self, symbol: str) -> dict | None:
         """{instrument_type, exchange, currency, years}: Yahoo's history metadata and how many years of daily bars
         it serves (None when it serves nothing)."""
-        import yfinance
-
-        ticker = yfinance.Ticker(symbol)
+        ticker = paced_yfinance().Ticker(symbol)
         frame = ticker.history(period="max", interval="1d", auto_adjust=False)
         if frame is None or frame.empty:
             return None
@@ -95,16 +94,12 @@ class LiveSources:
 
     def yahoo_profile(self, symbol: str) -> list[str]:
         """Yahoo's sector and industry of the company (a second sector source; empty when Yahoo has none)."""
-        import yfinance
-
-        info = yfinance.Ticker(symbol).info or {}
+        info = paced_yfinance().Ticker(symbol).info or {}
         return [info[key] for key in ("industry", "sector") if info.get(key)]
 
     def yfinance(self):
-        """The yfinance module (the price backfill)."""
-        import yfinance
-
-        return yfinance
+        """The yfinance module behind the shared Yahoo pacer (the price backfill)."""
+        return paced_yfinance()
 
 
 class FixtureSources:
