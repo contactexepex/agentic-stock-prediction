@@ -129,11 +129,12 @@ Proposed minor bump (1.1.0), for WS2 to apply:
 
 ### Schedules (for the orchestrator's triggers)
 - India: `CRON_TZ=Asia/Kolkata 13 11 * * 1-5` (11:13 IST = 05:43 UTC) and `CRON_TZ=Asia/Kolkata 13 14 * * 1-5`
-  (14:13 IST = 08:43 UTC). NSE session 09:15-15:30 IST = 03:45-10:00 UTC. India news light runs are at 05:17
-  and 11:17 UTC, so the 05:43 check pushes 26 minutes after one; their folders differ (no same-file rebase).
+  (14:13 IST = 08:43 UTC). NSE session 09:15-15:30 IST = 03:45-10:00 UTC. India news light runs were at 05:17
+  and 11:17 UTC, so the 05:43 check pushed 26 minutes after one; their folders differ (no same-file rebase).
+  Superseded 2026-10-12: news now runs in combined india+us sessions (docs/DESIGN.md section 2).
 - US: `CRON_TZ=America/New_York 27 12 * * 1-5` (12:27 ET = 16:27 UTC in EDT, 17:27 UTC in EST) and
   `CRON_TZ=America/New_York 57 14 * * 1-5` (14:57 ET = 18:57 / 19:57 UTC). Session 09:30-16:00 ET. The US news
-  light runs are at 15:47 and 21:47 UTC.
+  light runs were at 15:47 and 21:47 UTC (superseded 2026-10-12, as above).
 - Holidays and early closes come from the market calendar (`core/calendar.py`): a check outside the session
   (open + one bar to close + one bar) writes only its `market_closed` run row. Each trigger runs
   `routine/INTRADAY_PROMPT.md` with `MARKET=<india|us>` in a fresh session.
