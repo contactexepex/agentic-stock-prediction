@@ -211,9 +211,10 @@ AllTradesSummaryRow:
     currency: {type: ['string', 'null']}
 AllTradesRow:
   type: object
-  required: [id, scope, view, strategy_id, family, pick_rule, ticker, horizon_days, entry_date, exit_date, state,
-             outcome, entry_price, entry_source, exit_or_last_price, last_source, last_price_date, price_pending,
-             quantity, amount, currency, pnl_market, pnl_your, return_pct_market, return_pct_your, settled_at, paper]
+  required: [id, scope, view, strategy_id, family, pick_rule, side, ticker, horizon_days, entry_date, exit_date, state,
+             not_entered_reason, outcome, entry_price, entry_price_source, exit_or_last_price, last_price_source,
+             last_price_date, last_price_time, price_pending, quantity, amount, currency, unrealised_pnl,
+             unrealised_pct, pnl_market, pnl_your, return_pct_market, return_pct_your, settled_at, paper]
   properties:
     id: {type: string, description: The trade id (strategy trades) or the portfolio trade id (mine)}
     scope: {type: string, enum: [all, head_to_head, mine]}
@@ -221,23 +222,28 @@ AllTradesRow:
     strategy_id: {type: ['string', 'null']}
     family: {type: string, enum: [rule, ai, baseline, mine]}
     pick_rule: {type: ['string', 'null']}
+    side: {type: ['string', 'null'], enum: [buy, sell, null], description: 'Mine only: buy = an open lot, sell = a closed sale over the FIFO lots it closes'}
     ticker: {$ref: '#/components/schemas/Ticker'}
     horizon_days: {type: ['integer', 'null']}
     entry_date: {type: ['string', 'null'], format: date}
-    exit_date: {type: ['string', 'null'], format: date}
+    exit_date: {type: ['string', 'null'], format: date, description: The actual exit on closed rows; the planned exit on open rows}
     state: {type: string, enum: [open, closed, not_entered]}
-    outcome: {type: ['string', 'null'], enum: [win, loss, flat, null]}
+    not_entered_reason: {type: ['string', 'null'], enum: [no_entry, skipped_price_above_amount, null]}
+    outcome: {type: ['string', 'null'], enum: [win, loss, flat, null], description: Closed rows only}
     entry_price: {type: ['number', 'null']}
-    entry_source: {type: ['string', 'null'], enum: [daily_bar, intraday_check, null]}
+    entry_price_source: {type: ['string', 'null'], enum: [daily_bar, intraday_check, null]}
     exit_or_last_price: {type: ['number', 'null'], description: The exit price (closed) or the last price (open)}
-    last_source: {type: ['string', 'null'], enum: [daily_bar, intraday_check, null]}
+    last_price_source: {type: ['string', 'null'], enum: [daily_close, intraday_check, null]}
     last_price_date: {type: ['string', 'null'], format: date}
+    last_price_time: {type: ['string', 'null'], format: date-time, description: The intraday check's time; null for a daily close}
     price_pending: {type: boolean, description: Entered at D's open but no price stored or checked yet}
     quantity: {type: ['number', 'null']}
     amount: {type: ['number', 'null']}
     currency: {type: ['string', 'null']}
-    pnl_market: {type: ['number', 'null'], description: Net after market cost (open trades - unrealised); null for mine}
-    pnl_your: {type: ['number', 'null'], description: Net after your cost (strategy trades - closed only)}
+    unrealised_pnl: {type: ['number', 'null'], description: Open rows only, before costs}
+    unrealised_pct: {type: ['number', 'null'], description: Open rows only, before costs}
+    pnl_market: {type: ['number', 'null'], description: Closed strategy rows, net after market cost; null for mine}
+    pnl_your: {type: ['number', 'null'], description: Closed rows, net after your cost}
     return_pct_market: {type: ['number', 'null']}
     return_pct_your: {type: ['number', 'null']}
     settled_at: {type: ['string', 'null'], format: date-time}

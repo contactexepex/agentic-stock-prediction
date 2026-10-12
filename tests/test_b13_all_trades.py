@@ -46,9 +46,10 @@ def block(monkeypatch):
         settled("h1", "head_to_head", "ai", 7.0, None),
     ]
     opens = [
-        opened("o1", "accuracy", "rule", entry_source="intraday_check", last_source="intraday_check"),
+        opened("o1", "accuracy", "rule", entry_price_source="intraday_check", last_price_source="intraday_check",
+               last_price_time="2026-10-12T05:00:00Z"),
         opened("o2", "head_to_head", "rule", price_pending=True, entry_price=None, last_price=None, quantity=None,
-               unrealised_pnl=None, unrealised_pct=None, entry_source=None, last_source=None),
+               unrealised_pnl=None, unrealised_pct=None, entry_price_source=None, last_price_source=None),
         opened("a1", "accuracy", "rule"),  # settled by the cut-off: listed once, as closed
     ]  # fmt: skip
     ledger = {
@@ -58,7 +59,8 @@ def block(monkeypatch):
             {"id": "m2", "ticker": "AAPL", "side": "sell", "trade_date": "2026-10-09", "quantity": 5, "price": 95.0,
              "realised_net": 20.0},
             {"id": "m3", "ticker": "AAPL", "side": "buy", "trade_date": "2026-10-09", "quantity": 2, "price": 95.0,
-             "open_quantity": 2.0, "mark": 96.0, "mark_date": "2026-10-09", "unrealised_net": 1.5},
+             "open_quantity": 2.0, "mark": 96.0, "mark_date": "2026-10-09", "unrealised_gross": 2.0,
+             "unrealised_net": 1.5},
             {"id": "m4", "ticker": "GONE", "side": "sell", "trade_date": "2026-10-09", "quantity": 1, "price": 9.0,
              "realised_net": -2.0},
         ]
@@ -90,6 +92,7 @@ def test_outcomes_on_market_cost_and_not_entered_never_counted(block):
     assert rows["a1"]["outcome"] == "win" and rows["a2"]["outcome"] == "loss" and rows["a3"]["outcome"] == "flat"
     assert rows["a3"]["pnl_your"] == -1.0  # flat on market cost, a loss on your cost: the market cost decides
     assert rows["a4"]["state"] == "not_entered" and rows["a4"]["outcome"] is None
+    assert rows["a4"]["not_entered_reason"] == "no_entry" and rows["a1"]["not_entered_reason"] is None
     everything = summary_of(block, "all", "all")
     assert (everything["open"], everything["closed"]) == (1, 4)  # a1 a2 a3 a5; a4 not entered
     assert (everything["wins"], everything["losses"], everything["flat"]) == (2, 1, 1)
@@ -114,16 +117,27 @@ def test_window_period_counts_exits_in_the_window_only(block):
 
 def test_open_trade_price_sources_and_pending(block):
     rows = {t["id"]: t for t in block["trades"]}
-    assert rows["o1"]["entry_source"] == "intraday_check" and rows["o1"]["pnl_market"] == 18.0
+    assert rows["o1"]["entry_price_source"] == "intraday_check" and rows["o1"]["last_price_source"] == "intraday_check"
+    assert rows["o1"]["last_price_time"] == "2026-10-12T05:00:00Z"
+    assert rows["o1"]["unrealised_pnl"] == 18.0 and rows["o1"]["pnl_market"] is None and rows["o1"]["outcome"] is None
     assert rows["o2"]["price_pending"] is True and rows["o2"]["entry_price"] is None
-    assert rows["o2"]["pnl_market"] is None
+    assert rows["o2"]["unrealised_pnl"] is None
+    closed = rows["a1"]
+    assert (closed["entry_price_source"], closed["last_price_source"], closed["exit_date"]) == (
+        "daily_bar",
+        "daily_close",
+        "2026-10-09",
+    )
 
 
 def test_owner_trades_on_your_cost_collected_only(block):
     rows = {t["id"]: t for t in block["trades"]}
     assert "m1" not in rows and "m4" not in rows  # a fully sold buy; a deleted company
     assert rows["m2"]["state"] == "closed" and rows["m2"]["outcome"] == "win" and rows["m2"]["pnl_market"] is None
-    assert rows["m3"]["state"] == "open" and rows["m3"]["quantity"] == 2.0 and rows["m3"]["pnl_your"] == 1.5
+    assert (rows["m2"]["side"], rows["m2"]["entry_date"], rows["m2"]["strategy_id"]) == ("sell", None, None)
+    assert rows["m3"]["state"] == "open" and rows["m3"]["side"] == "buy" and rows["m3"]["quantity"] == 2.0
+    assert rows["m3"]["unrealised_pnl"] == 2.0 and rows["m3"]["unrealised_pct"] == 1.05  # 2.0 / (95 x 2), before costs
+    assert rows["m3"]["pnl_your"] is None
     mine = summary_of(block, "mine", "mine")
     assert (mine["open"], mine["closed"], mine["wins"], mine["net_pnl_your"]) == (1, 1, 1, 20.0)
 

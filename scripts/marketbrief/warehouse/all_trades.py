@@ -6,10 +6,13 @@ block, as of the cut-off. Research only: a paper trade is a record, never an ord
   Open-trade records (rm_common.open_trades, entered from D's open, priced from the daily bar or the intraday check).
   Closed: the newest settlement of each trade (rm_common.settled_trades, with its your-cost view); win / loss / flat
   on the net P&L after market cost (the scoreboard's basis), the your-cost figures beside it. A settlement that never
-  entered (no_entry, skipped_price_above_amount) is listed as not_entered and left out of every count.
-- The owner's own trades (scope and family `mine`; WS4's FIFO ledger, on your cost only): each buy with an open
-  quantity is an open trade, each sell a closed one with its realised net after your cost (pnl_market null; win /
-  loss on pnl_your).
+  entered (no_entry, skipped_price_above_amount) is listed as not_entered (with that reason) and left out of every
+  count. A closed row's exit_date is the actual exit; an open row's the planned one.
+- The owner's own trades (scope and family `mine`; WS4's FIFO ledger of the active trades): an open row is a buy with
+  an open quantity (side buy, its open quantity), a closed row is a sell with its realised net after your cost over
+  the FIFO lots it closes (side sell, entry_date null; pnl_market null; win / loss on pnl_your). Strategy fields null.
+- Open rows carry unrealised_pnl / unrealised_pct before costs (pnl_* null, outcome null); closed rows pnl_* after
+  costs. The summary sums closed rows only.
 - Listed: every open trade, and the closed trades whose exit is in the last WINDOW_SESSIONS sessions to the as-of
   date. Summary: per scope and family, to date and in that window."""
 
@@ -30,7 +33,7 @@ STRATEGY_FAMILIES = ("rule", "ai", "baseline")
 STATE_OPEN, STATE_CLOSED, STATE_NOT_ENTERED = "open", "closed", "not_entered"
 OUTCOME_WIN, OUTCOME_LOSS, OUTCOME_FLAT = "win", "loss", "flat"
 PERIOD_TO_DATE, PERIOD_WINDOW = "to_date", "window"
-SOURCE_DAILY_BAR = "daily_bar"
+SOURCE_DAILY_BAR, SOURCE_DAILY_CLOSE = "daily_bar", "daily_close"  # B4's entry_price_source / last_price_source
 STATUS_SETTLED = "settled"
 SIDE_BUY, SIDE_SELL = "buy", "sell"
 MONEY_DIGITS, PCT_DIGITS = 2, 1
@@ -50,10 +53,11 @@ def money(value) -> float | None:
 def trade_row(**fields) -> dict:
     """One listed trade in the block's fields (every key present; null when it does not apply)."""
     keys = (
-        "id", "scope", "view", "strategy_id", "family", "pick_rule", "ticker", "horizon_days", "entry_date",
-        "exit_date", "state", "outcome", "entry_price", "entry_source", "exit_or_last_price", "last_source",
-        "last_price_date", "price_pending", "quantity", "amount", "currency", "pnl_market", "pnl_your",
-        "return_pct_market", "return_pct_your", "settled_at",
+        "id", "scope", "view", "strategy_id", "family", "pick_rule", "side", "ticker", "horizon_days", "entry_date",
+        "exit_date", "state", "not_entered_reason", "outcome", "entry_price", "entry_price_source",
+        "exit_or_last_price", "last_price_source", "last_price_date", "last_price_time", "price_pending", "quantity",
+        "amount", "currency", "unrealised_pnl", "unrealised_pct", "pnl_market", "pnl_your", "return_pct_market",
+        "return_pct_your", "settled_at",
     )  # fmt: skip
     return {**{key: fields.get(key) for key in keys}, "paper": True}
 
@@ -77,11 +81,13 @@ def closed_strategy_trades(ctx: BuildContext) -> list[dict]:
                 entry_date=iso_day(row["entry_date"]),
                 exit_date=iso_day(row.get("exit_date_actual") or row["exit_date"]),
                 state=STATE_CLOSED if entered else STATE_NOT_ENTERED,
+                not_entered_reason=None if entered else row["status"],
                 outcome=outcome(pnl),
                 entry_price=json_safe_float(row.get("entry_price")),
-                entry_source=SOURCE_DAILY_BAR if entered else None,
+                entry_price_source=SOURCE_DAILY_BAR if entered else None,
                 exit_or_last_price=json_safe_float(row.get("exit_price")),
-                last_source=SOURCE_DAILY_BAR if entered else None,
+                last_price_source=SOURCE_DAILY_CLOSE if entered else None,
+                last_price_date=iso_day(row.get("exit_date_actual")) if entered else None,
                 price_pending=False,
                 quantity=json_safe_float(row.get("quantity")),
                 amount=json_safe_float(row.get("amount")),
@@ -116,16 +122,17 @@ def open_strategy_trades(ctx: BuildContext, settled_ids: set[str]) -> list[dict]
                 exit_date=trade["exit_date"],
                 state=STATE_OPEN,
                 entry_price=trade.get("entry_price"),
-                entry_source=trade.get("entry_source", SOURCE_DAILY_BAR),
+                entry_price_source=trade.get("entry_price_source", SOURCE_DAILY_BAR),
                 exit_or_last_price=trade.get("last_price"),
-                last_source=trade.get("last_source", SOURCE_DAILY_BAR),
+                last_price_source=trade.get("last_price_source", SOURCE_DAILY_CLOSE),
                 last_price_date=trade.get("last_price_date"),
+                last_price_time=trade.get("last_price_time"),
                 price_pending=bool(trade.get("price_pending", False)),
                 quantity=trade.get("quantity"),
                 amount=trade.get("amount"),
                 currency=trade.get("currency"),
-                pnl_market=money(trade.get("unrealised_pnl")),
-                return_pct_market=trade.get("unrealised_pct"),
+                unrealised_pnl=money(trade.get("unrealised_pnl")),
+                unrealised_pct=trade.get("unrealised_pct"),
             )  # fmt: skip
         )
     return out
@@ -142,17 +149,21 @@ def owner_trades(ctx: BuildContext, context) -> list[dict]:
         common = {"id": row["id"], "scope": SCOPE_MINE, "family": FAMILY_MINE, "ticker": row["ticker"],
                   "currency": currency, "price_pending": False}  # fmt: skip
         if row["side"] == SIDE_BUY and (row.get("open_quantity") or 0) > 0:
+            gross = json_safe_float(row.get("unrealised_gross"))
+            basis = row["price"] * row["open_quantity"]
             out.append(
                 trade_row(
                     **common,
+                    side=SIDE_BUY,
                     entry_date=row["trade_date"],
                     state=STATE_OPEN,
                     entry_price=row["price"],
                     exit_or_last_price=row.get("mark"),
-                    last_source=SOURCE_DAILY_BAR if row.get("mark") is not None else None,
+                    last_price_source=SOURCE_DAILY_CLOSE if row.get("mark") is not None else None,
                     last_price_date=row.get("mark_date"),
                     quantity=row["open_quantity"],
-                    pnl_your=money(row.get("unrealised_net")),
+                    unrealised_pnl=money(gross),
+                    unrealised_pct=None if gross is None or not basis else round(gross / basis * 100, PCT_DIGITS + 1),
                 )  # fmt: skip
             )
         elif row["side"] == SIDE_SELL:
@@ -160,6 +171,7 @@ def owner_trades(ctx: BuildContext, context) -> list[dict]:
             out.append(
                 trade_row(
                     **common,
+                    side=SIDE_SELL,
                     exit_date=row["trade_date"],
                     state=STATE_CLOSED,
                     outcome=outcome(pnl),
