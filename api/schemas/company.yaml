@@ -229,6 +229,57 @@ LifecyclePage:
       type: array
       description: The AI reasons about those trades (by trade_id), newest session first
       items: {$ref: '#/components/schemas/AiReason'}
+    checks_attribution:
+      type: array
+      description: >-
+        UX3 "Full story" (warehouse/trade_why.lifecycle_additions) - every intraday check of the ticker stored by the
+        cut-off from the session to the page's latest planned exit, oldest first: the move since that session's open,
+        the benchmark's and the sector's move, the stock's beta and its own move (residual), in percent
+      items:
+        type: object
+        required: [check_at, session_date, move_pct, market_pct, market_pull_pct, sector_pct, own_pct, beta, sector_source]
+        properties:
+          check_at: {type: string, format: date-time}
+          session_date: {$ref: '#/components/schemas/IsoDate'}
+          move_pct: {type: ['number', 'null']}
+          market_pct: {type: ['number', 'null']}
+          market_pull_pct: {type: ['number', 'null'], description: "The market's part of the move: the benchmark's move times the stock's beta"}
+          sector_pct: {type: ['number', 'null']}
+          own_pct: {type: ['number', 'null']}
+          beta: {type: ['number', 'null']}
+          sector_source: {type: ['string', 'null']}
+    deviation_notes:
+      type: array
+      description: UX3 - the deviation-explainer's notes on those checks written by the cut-off, oldest first
+      items:
+        type: object
+        required: [check_at, session_date, text]
+        properties:
+          check_at: {type: string, format: date-time}
+          session_date: {$ref: '#/components/schemas/IsoDate'}
+          text: {type: string}
+    lessons:
+      type: array
+      description: "UX3 - the reflector's lessons on the page's AI forecaster (ai.combined.opus.v1) predictions, usable by the cut-off"
+      items:
+        type: object
+        required: [id, prediction_id, ticker, horizon_days, lesson, written_at]
+        properties:
+          id: {type: string}
+          prediction_id: {type: string}
+          ticker: {type: string}
+          horizon_days: {type: ['integer', 'null']}
+          lesson: {type: ['string', 'null']}
+          written_at: {type: ['string', 'null'], format: date-time}
+    prediction_reasons:
+      type: array
+      description: "UX3 - the AI traders' own words for the page's predictions (predictions without words are left out)"
+      items:
+        type: object
+        required: [prediction_id, reason]
+        properties:
+          prediction_id: {type: string}
+          reason: {type: string}
 
 # ---------- records ----------
 CompanyBar:

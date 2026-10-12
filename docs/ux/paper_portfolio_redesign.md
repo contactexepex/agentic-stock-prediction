@@ -1,6 +1,36 @@
 # Paper portfolio page: redesign proposal (UX3)
 
-Status: **v3, waiting for the owner's approval.** Nothing is built yet. v1 and v2 are kept below for reference.
+Status: **v3 approved by the owner on 2026-10-12 (light mode only; dark mode is a separate later change) and
+built.** The implementation notes follow; v1 and v2 are kept further down for reference.
+
+## Implementation (UX3 build)
+
+| Part | Code |
+|---|---|
+| The page: hero, side cards, the daily picks, your own trades, finished trades, hold blocks, what the system learns | `web/app/(cockpit)/[market]/paper-portfolios/_parts/paper-portfolios-page.tsx`, `hold-block.tsx`, `story-ui.tsx`, `paper-portfolios.css` |
+| Unchanged parts moved into their own files | `owner-card.tsx` (positions, euro view, the add-trade form), `h2h-card.tsx` (the Rule vs AI scoreboard with the luck test, now under "Scoreboard after fees") |
+| Plain words, going with or against, merged rows, the one-line reasons, the story link | `web/lib/strategy-pages/portfolio-v3.ts` (tests in `lib/strategy-pages/tests/portfolio-v3.test.ts`) |
+| "The full story" view | `web/app/(cockpit)/[market]/stocks/[ticker]/lifecycle/[date]/_parts/story.tsx`, opened by `#story=<prediction>&trade=<trade>` |
+| Routes | `GET /api/v1/markets/{market}/portfolios/open/{hold}` and `.../portfolios/finished/{date}` (`web/lib/data/paper-portfolios.ts`) |
+| Read model | `scripts/marketbrief/warehouse/trade_why.py` (each row's `why`, `direction`, `prob_up`, `reason`, `sessions`; the `learning` block; the lifecycle additions), `trade_pages.py` (`open:<k>`, `finished:<D>` and their indexes), wired in `all_trades.py`, `rm_portfolio.py`, `rm_company.py` |
+| Contract (additive) | `api/paths/paper-portfolios.yaml`, `api/schemas/paper-portfolios.yaml` (PortfolioHold, PortfolioFinished, OpenSplit, OpenHold, FinishedSession, TradeWhy, PortfolioLearning; new optional row fields), `api/schemas/company.yaml` (LifecyclePage: `checks_attribution`, `deviation_notes`, `lessons`, `prediction_reasons`) |
+| Tests | `tests/test_b13_all_trades.py`, `tests/test_ux3_trade_why.py`, `web/lib/data/tests/b13-pages.test.ts`, UI harness `web/tests/ui/cases/paper-portfolios.mjs` on the real stored pages in `web/tests/ui/ux3/` |
+
+Where the build differs from the mockup, and why:
+- **The hero gives no "% of the amount traded".** The payload carries no traded amount per side, and adding one only
+  for this line was not worth it. The hero shows the result so far, the open, finished, won and lost counts, the
+  win/lose bar and the first results line.
+- **"Price vs expected" uses the app's existing range bar** (the 50% and 80% bands, the target, a dotted buy line
+  and a dark "now" line; the header's tooltip explains it) rather than the mockup's dot, so it matches the company
+  pages.
+- **The progress bar towards the sale counts market sessions exactly.** A new row field, `sessions` (held of
+  k + 1), comes from the market calendar, so the bar never estimates.
+- **The finished-trades illustration is not on the page.** With nothing finished, the page shows the empty state
+  only. The UI harness checks the finished layout on a day made from the 1-day hold's trades.
+- **The lifecycle page carries `prediction_reasons`.** The AI trader's own words for each prediction are added
+  here, so the story can quote them; the page's prediction fields stay as they were.
+- **A read model built before UX3** shows "This page fills after the next data sync" in place of the new sections.
+  Your own trades and the add form still show.
 
 ## v3 (owner feedback of 2026-10-12, second round)
 

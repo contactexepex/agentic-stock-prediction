@@ -17,3 +17,20 @@ export function portfolioSessionResponse(request: Request, market: string, day: 
   if (!SESSION_DATE.test(day)) return Promise.resolve(notFound("Unknown session date"));
   return readPage(request, PORTFOLIO_SESSION_PAGE, market, `trades:${day}`, deps);
 }
+
+/** A hold k as the contract writes it (1-5). */
+const HOLD = /^[1-5]$/;
+
+/** GET /portfolios/open/{hold} (UX3): the open accuracy-view trades of hold k, page `open:<k>`; a hold without open
+ *  trades has no page, so 404. */
+export function portfolioHoldResponse(request: Request, market: string, hold: string, deps: ReadDeps): Promise<Response> {
+  if (!HOLD.test(hold)) return Promise.resolve(notFound("Unknown hold"));
+  return readPage(request, PORTFOLIO_SESSION_PAGE, market, `open:${hold}`, deps);
+}
+
+/** GET /portfolios/finished/{date} (UX3): the accuracy-view trades that exited on one session, page `finished:<date>`;
+ *  a session of the last 10 without such trades, or an older one, has no page, so 404. */
+export function portfolioFinishedResponse(request: Request, market: string, day: string, deps: ReadDeps): Promise<Response> {
+  if (!SESSION_DATE.test(day)) return Promise.resolve(notFound("Unknown session date"));
+  return readPage(request, PORTFOLIO_SESSION_PAGE, market, `finished:${day}`, deps);
+}

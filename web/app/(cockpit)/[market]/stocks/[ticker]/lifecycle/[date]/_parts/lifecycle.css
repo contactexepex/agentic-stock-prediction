@@ -11,3 +11,38 @@
 .path .step.on{border-style:solid;color:var(--md-sys-color-on-surface)}
 .path .step .ms{width:14px;height:14px}
 @media (max-width:760px){ .lcy .cm{display:none} .lcy th,.lcy td{padding:8px 6px;white-space:normal} .lcy .nm b{white-space:normal} .lcy .call{display:grid;gap:4px;justify-items:start} .lcy .call .mb-odds svg{width:40px} .path{display:grid;justify-items:start} .path .step{white-space:normal} }
+/* "The full story" of one paper trade (UX3): hero, what moved it, step by step, what the system learned. 8 px grid. */
+.story-card{border-radius:20px;padding:24px}
+.story-card h3{font:var(--md-sys-typescale-title-large);margin:40px 0 16px}
+.story-card .ok{color:var(--mb-color-up)} .story-card .bad{color:var(--mb-color-down)} .story-card .ms{width:18px;height:18px;vertical-align:-4px}
+.st-hero{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:32px;align-items:center}
+.st-kicker{font:var(--md-sys-typescale-label-large);color:var(--md-sys-color-on-surface-variant)}
+.st-big{font:600 44px/52px var(--md-ref-typeface-plain);letter-spacing:-.02em;margin:8px 0 4px;font-variant-numeric:tabular-nums}
+.st-sub{font:var(--md-sys-typescale-body-large);color:var(--md-sys-color-on-surface-variant)}
+.st-next{display:inline-flex;gap:8px;align-items:center;margin-top:16px;padding:8px 16px;border-radius:999px;background:var(--md-sys-color-surface-container);font:var(--md-sys-typescale-label-large)}
+.st-facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.st-facts b{display:block;font:600 24px/32px var(--md-ref-typeface-plain);font-variant-numeric:tabular-nums} .st-facts span{font:var(--md-sys-typescale-body-small);color:var(--md-sys-color-on-surface-variant)}
+.st-range{grid-column:1 / -1} .st-range .rng svg{width:100%;max-width:320px}
+.st-attr{display:grid;gap:16px;max-width:640px}
+.st-ar{display:grid;grid-template-columns:160px 1fr 72px;gap:16px;align-items:center;font:var(--md-sys-typescale-body-medium)}
+.st-ar b{text-align:right;font-variant-numeric:tabular-nums}
+.st-ab{height:10px;border-radius:999px;background:var(--md-sys-color-surface-container-high);overflow:hidden}
+.st-ab i{display:block;height:100%;border-radius:999px} .st-ab i.neg{background:var(--mb-color-down)} .st-ab i.pos{background:var(--mb-color-up)}
+.st-ar.tot{border-top:1px solid var(--md-sys-color-surface-container-high);padding-top:16px}
+.st-muted{color:var(--md-sys-color-on-surface-variant);font:var(--md-sys-typescale-body-medium);margin:16px 0 0}
+.st-tl{list-style:none;margin:0;padding:0}
+.st-tl li{display:grid;grid-template-columns:40px 1fr;gap:16px;padding-bottom:24px;position:relative}
+.st-tl li:not(:last-child)::before{content:"";position:absolute;left:19px;top:40px;bottom:0;width:2px;background:var(--md-sys-color-surface-container-high)}
+.st-dot{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:var(--md-sys-color-primary-container);color:var(--md-sys-color-on-primary-container)}
+.st-tl li.bad .st-dot{background:var(--mb-color-down-container);color:var(--mb-color-on-down-container)}
+.st-tl li.fut .st-dot{background:var(--md-sys-color-surface-container-high);color:var(--md-sys-color-on-surface-variant)}
+.st-when{font:var(--md-sys-typescale-label-medium);color:var(--md-sys-color-on-surface-variant)}
+.st-tl b{font:var(--md-sys-typescale-title-small)} .st-tl li.bad b{color:var(--mb-color-down)}
+.st-tb{font:var(--md-sys-typescale-body-medium);color:var(--md-sys-color-on-surface-variant);margin-top:4px}
+.story-card blockquote{margin:8px 0;padding:8px 16px;border-left:3px solid var(--md-sys-color-primary);color:var(--md-sys-color-on-surface);font:var(--md-sys-typescale-body-medium)}
+.st-learn{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px}
+.st-learn h4{display:flex;gap:8px;align-items:center;font:var(--md-sys-typescale-title-small);margin:0 0 8px} .st-learn h4 .ms{color:var(--md-sys-color-primary)}
+.st-learn .st-muted{margin:0 0 8px}
+.st-paper{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:32px 0 0;font:var(--md-sys-typescale-body-small);color:var(--md-sys-color-on-surface-variant)}
+@media (max-width:900px){ .st-hero{grid-template-columns:minmax(0,1fr);gap:24px} .st-learn{grid-template-columns:minmax(0,1fr)} }
+@media (max-width:640px){ .story-card{padding:16px} .st-big{font-size:36px;line-height:44px} .st-ar{grid-template-columns:104px 1fr 56px;gap:8px} .st-facts b{font-size:18px;line-height:24px} }
