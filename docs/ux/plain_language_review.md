@@ -336,7 +336,7 @@ Built **only from data the Home payload already carries**, unless a line is mark
 └──────────────────────────────────────────────────────────────────────────────────────┘
 ┌──────────────────────────────────────────────────────────────────────────────────────┐
 │  Today in 3 lines                                                                    │
-│  1. Market mood: calm. The index moved +0.4%; n of the stocks you follow rose, m fell.│
+│  1. Market mood: calm. The index moved +0.4%; n of the stocks you follow rose, m fell│
 │  2. 223 paper trades opened at 09:15; the 1-day ones finish at Tuesday's close.      │
 │  3. The story that mattered: "<top mover headline>" (confirmed)                      │
 │                                                           [See all paper trades ▸]   │
