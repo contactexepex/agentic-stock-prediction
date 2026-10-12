@@ -28,6 +28,10 @@ the config's `news.google_news.window` and 3 days); a Google News query that fil
 over a window longer than a day is asked again per day (`sliced_queries`). Each run appends one row
 to data/<market>/news_runs/ (ran_at, window, Google News queries and failures, ok) and the summary
 shows the `window` used.
+Request spacing and polite stop (marketbrief/collectors/news_fetch.py): at least `news.google_news.pause_seconds`
+(1.5 s) between two Google News requests and `news.outlet_pause_seconds` (0.5 s) between two outlet-feed requests;
+a Google answer of HTTP 429/503, a captcha page or HTML instead of RSS stops every later Google News request of
+the run (`google_stopped`, `google_skipped`), and such a run is not `ok`, so the next window reaches back over it.
 Exit code 1 only if every feed failed."""
 
 from __future__ import annotations
@@ -41,6 +45,7 @@ from urllib.parse import quote_plus
 
 from marketbrief.analytics.news_dedup import Sighting, load_outlet_keys
 from marketbrief.analytics.news_tags import TAG_VERSION, Tagger, article_id, company_queries, item_id, source_domain
+from marketbrief.collectors.news_fetch import NewsPacing, google_block
 from marketbrief.collectors.news_history import stored_index, update_record
 from marketbrief.collectors.news_window import parse_utc, run_ok, slice_days, window_for
 from marketbrief.constants.columns import COL_ID, COL_TITLE
@@ -139,12 +144,15 @@ def is_failed(parsed, status: int) -> bool:
     return status >= 400 or bool(parsed.bozo and not parsed.entries)
 
 
-def fetch_with_retry(url: str):
-    """(parsed feed, status) with one retry: Google News occasionally fails a single query."""
+def fetch_with_retry(url: str, before_attempt=None):
+    """(parsed feed, status) with one retry: Google News occasionally fails a single query. `before_attempt` (the
+    run's pacer) runs before each request; a rate-limit or captcha answer (news_fetch.google_block) is not retried."""
     for _attempt in range(FETCH_ATTEMPTS):
+        if before_attempt is not None:
+            before_attempt()
         parsed = fetch_feed(url)
         status = parsed.get("status", 200)
-        if not is_failed(parsed, status) or status in PERMANENT_STATUSES:
+        if not is_failed(parsed, status) or status in PERMANENT_STATUSES or google_block(parsed, status):
             break
         time.sleep(RETRY_PAUSE_SECONDS)
     return parsed, status
@@ -171,6 +179,7 @@ class NewsCollector:
         self.stale: list[dict] = []
         self.skipped_off_watchlist = 0
         self.google_queries = self.google_failed = self.sliced_queries = self.slices_skipped = 0
+        self.pacing = NewsPacing(self.feeds)
 
     def check_stale(self, job: dict, times: list) -> None:
         """Note an outlet feed that answers but has nothing recent (it has stopped updating)."""
@@ -243,12 +252,15 @@ class NewsCollector:
     def run_job(self, job: dict) -> None:
         """Fetch one feed and add its entries; a Google News query that fills the item cap over a window longer
         than a day is asked again per day."""
-        parsed, status = fetch_with_retry(job["url"])
         is_google = job["feed"].startswith(FEED_PREFIX_GNEWS)
+        if is_google and self.pacing.skip_if_stopped(job):
+            return  # Google News rate-limited this run: not asked (listed in google_skipped)
+        parsed, status = fetch_with_retry(job["url"], self.pacing.pacer(is_google).wait)
+        blocked = is_google and self.pacing.check(job, parsed, status)
         if is_google:
             self.sliced_queries += 1 if job.get("slice") else 0
             self.google_queries += 0 if job.get("slice") else 1
-        if is_failed(parsed, status):
+        if is_failed(parsed, status) or blocked:
             self.google_failed += 1 if is_google and not job.get("slice") else 0
             failure = {"feed": job["feed"], "status": status, "error": str(parsed.get("bozo_exception", ""))[:200]}
             self.failed.append({**failure, "slice": job["slice"]} if job.get("slice") else failure)
@@ -272,7 +284,9 @@ class NewsCollector:
         return {
             COL_ID: f"{self.market}-{self.now}",
             "ran_at": self.now,
-            "ok": run_ok(self.google_queries, self.google_failed, feeds, self.failed_feeds()),
+            # a run Google News stopped is never ok: the next window must reach back over the queries not asked
+            "ok": run_ok(self.google_queries, self.google_failed, feeds, self.failed_feeds())
+            and not self.pacing.stop.stopped,
             **self.window.summary(),
             "feeds": feeds,
             "failed": self.failed_feeds(),
@@ -280,6 +294,8 @@ class NewsCollector:
             "google_failed": self.google_failed,
             "sliced_queries": self.sliced_queries,
             "new_items": written,
+            "google_stopped": self.pacing.stop.reason,
+            "google_skipped": len(self.pacing.stop.skipped),
         }
 
     def collect(self) -> int:
@@ -310,6 +326,7 @@ class NewsCollector:
                     "google_failed": self.google_failed,
                     "sliced_queries": self.sliced_queries,
                     "slices_skipped": self.slices_skipped,
+                    **self.pacing.summary(),
                 },
                 indent=2,
             )

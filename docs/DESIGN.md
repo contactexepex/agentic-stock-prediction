@@ -283,6 +283,15 @@ run lost a day, and busy outlet feeds rolled weekend items off before Monday. No
   (Google's days end at midnight Pacific time: the slice `after:2026-10-03 before:2026-10-04` held items
   from 07:00 UTC to 07:00 UTC), at most 200 such re-asks per run (`sliced_queries`, `slices_skipped`);
   items older than the window are dropped as usual and duplicates are stored once.
+- Request spacing and polite stop (owner decision 2026-10-12: spacing fix only; schedules, frequency, window and
+  query lists unchanged; `marketbrief/collectors/news_fetch.py`). Two Google News requests of a run (queries, per-day
+  re-asks, the one retry) start at least `news.google_news.pause_seconds` (1.5 s) apart, two outlet-feed requests at
+  least `news.outlet_pause_seconds` (0.5 s). When Google answers HTTP 429 or 503, its `/sorry/` captcha page, or an
+  HTML page instead of RSS, that answer is a failed query (not retried) and no further Google News request is sent in
+  the run: the queries and re-asks not asked are listed in the summary's `google_skipped` and counted in the
+  `news_runs` row (`google_stopped` = why, `google_skipped` = how many; null on older rows). Outlet feeds (other
+  hosts) are still read. A stopped run is never `ok`, so the next run's window still starts at the last `ok` run and
+  asks again for the period the stopped run missed (within the 7-day cap); the news gate warns `NEWS_RUN_NOT_OK`.
 - News-only light runs (`scripts/collect_news_only.py`, saved prompt `routine/NEWS_PROMPT.md`, one per
   market, every 4 hours, every day including weekends and holidays): `collect_news`, for India
   `collect_nse_india.py --only announcements` (one market-wide call), `collect_articles`, `news_clusters`
@@ -1179,6 +1188,11 @@ Later (parked): options for India and US, paper first, only once stock ranges ar
   than the market's previous session, or 7 days for cues and factors), a stale or unpriced quote,
   a ticker with no option snapshot, an empty calendar, missing dividends where some are expected,
   and earnings dates when every method raised.
+  Every Yahoo call goes through `marketbrief/sources/yahoo_pacing.py` (owner decision 2026-10-12): two calls of a
+  process start at least `yahoo.pause_seconds` (config/settings.yaml, 0.5 s) apart, and after yfinance's
+  `YFRateLimitError` (HTTP 429) no further Yahoo call is made in that process: each symbol not asked fails with a
+  "stopped for this run" error in `failed` (no bar, quote, event or chain is written for it), and the summary adds
+  `yahoo_stopped` and `yahoo_skipped`.
 - India price fallback, added 2026-10-06: Yahoo had no 2026-10-05 bar for SBILIFE, HDFCLIFE,
   DRREDDY, MARUTI and ULTRACEMCO (it jumped from 10-01 to 10-06 although NSE traded on 10-05).
   `collect_prices.py` now fills a watchlist stock's missing bar for any of the last

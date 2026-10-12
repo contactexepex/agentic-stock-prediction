@@ -32,12 +32,14 @@ BASE_SCHEMAS: Schemas = {
     # since = the last successful collection the window reaches back to (null on a first run);
     # window_hours / google_when = the span asked from Google News; max_age_hours = oldest item kept;
     # reason = first_run | since_last_run | since_last_news | no_recent_success; ok = not every feed
-    # failed and at most half of the Google News queries failed (the next run's window starts here).
+    # failed and at most half of the Google News queries failed (the next run's window starts here);
+    # google_stopped = why Google News stopped the run (HTTP 429/503, captcha or HTML page; collectors/news_fetch.py),
+    # google_skipped = Google News jobs not asked after it (a stopped run is never ok). Both null on older rows.
     "news_runs": ("jsonl", {
         "id": "VARCHAR", "ran_at": "TIMESTAMPTZ", "ok": "BOOLEAN", "since": "TIMESTAMPTZ",
         "window_hours": "DOUBLE", "google_when": "VARCHAR", "max_age_hours": "DOUBLE", "reason": "VARCHAR",
         "feeds": "INTEGER", "failed": "INTEGER", "google_queries": "INTEGER", "google_failed": "INTEGER",
-        "sliced_queries": "INTEGER", "new_items": "INTEGER",
+        "sliced_queries": "INTEGER", "new_items": "INTEGER", "google_stopped": "VARCHAR", "google_skipped": "INTEGER",
     }),
     # A later headline of a stored news item (owner decision Q45; analytics/news_dedup.py): the same article link
     # (same outlet) seen again with another title. news_id = the stored item it updates (read through
