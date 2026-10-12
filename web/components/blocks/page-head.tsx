@@ -1,5 +1,6 @@
 // The page head every 2.0 page opens with (the mockups' pageHead): the title and subtitle, then the chips of the
-// shared status block: session (open now / opens at / closed / no session), regime, freshness of the page data with
+// shared status block: session (open now / opens at / closed / no session, decided at view time: session-chip.tsx),
+// market mood, freshness of the page data with
 // the cut-off, and the Paper tag. The signals band (go-live) and the footer are here too.
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -11,28 +12,15 @@ import { fmtDate, fmtLocal } from "../../lib/ui/format.ts";
 import { pagePath } from "../../lib/ui/routes.ts";
 import type { GoLive, PageBase, StatusBlock } from "../../lib/ui/types.ts";
 import { Icon } from "../ui/icon.tsx";
+import { SessionChip } from "./session-chip.tsx";
 import { PaperTag } from "../ui/primitives.tsx";
 
-/** The session chip's words from the status block (evaluated at the build's cut-off, not at request time). */
-export function sessionWords(status: StatusBlock): { open: boolean; text: ReactNode; tip: string } {
-  const s = status.session, m = status.market, lt = s.local_time;
-  const tip = `Session ${fmtLocal(s.session_open_utc, m, lt)}–${fmtLocal(s.session_close_utc, m, lt)}.`;
-  if (!s.trading_day) return { open: false, text: "No session today", tip };
-  if (s.in_session) return { open: true, text: <b>Open now</b>, tip };
-  if (s.late_run) return { open: false, text: "Closed for today", tip };
-  return { open: false, text: <span>Opens <b>{fmtLocal(s.session_open_utc, m, lt)}</b></span>, tip };
-}
-
 export function StatusChips({ status, cutoff }: { status: StatusBlock; cutoff?: string }) {
-  const session = sessionWords(status);
   const fr = status.freshness;
   const m = status.market, lt = status.session.local_time;
   return (
     <div className="chips">
-      <span className="md-chip" data-tip={session.tip}>
-        <span className={`dot${session.open ? " open" : ""}`} aria-hidden="true" />
-        {session.text}
-      </span>
+      <SessionChip status={status} cutoff={cutoff} />
       <span className="md-chip" data-tip={REGIME_TIP}>
         Market mood: <b>{regimeWords(status.regime)}</b>
       </span>
