@@ -570,6 +570,10 @@ orchestrating session itself (its own edits and merge-conflict resolutions inclu
     the merged commit is the evidence. A merge-conflict resolution is still judged.
   - Finished build sessions are archived. A new change (a batch counts as one change) starts one fresh
     session, which ends when the change is merged.
+  - This supersedes, for all work from 2026-10-12, docs/SPEC.md section 10's session workflow where it
+    differs: file ownership by session (the intro and step 5's shared-doc proposals) and step 3's
+    post-merge full-suite rerun. Step 3's merge-conflict rules (judged resolutions, main's log lines kept
+    first) still hold.
 - Daily runs are gated by `scripts/validate.py` (deterministic checks after each stage, settings
   in `config/validate.yaml`) and, for the reflector's lessons, by `scripts/lessons.py validate`, for the results-analyst's bullets by `scripts/results_digest.py validate`,
   for the deviation-explainer's notes by `scripts/intraday_check.py validate`, for the AI traders by
