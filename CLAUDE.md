@@ -211,13 +211,19 @@ root as `MB_NOW=2026-10-09T23:59:00Z PYTHONPATH=scripts python docs/plan_volatil
   `/api/v1/markets/{market}/stocks/{ticker}[/bars|/strategies|/lifecycle/{date}]` and `/trades[?ticker=]`
   (`api/paths|schemas/company.yaml`). `rm_company.trade_checks(ctx)` / `market_trade_checks(ctx)` give the latest
   check's rows to the market and portfolio pages.
-- Paper portfolio page v3 (UX3, docs/ux/paper_portfolio_redesign.md; owner approval 2026-10-12, light mode only): the
+- Paper portfolio page v3 (UX3, docs/ux/paper_portfolio_redesign.md; owner approval 2026-10-12; dark mode came app-wide with UX4): the
   reader's questions in order (up or down, which bets work, why, what the system learns). `warehouse/trade_why.py` adds
   each strategy row's `why` (open: the latest intraday check's market / sector / own move and deviation note; closed:
   B2's automatic reason and the end-of-day AI reason), `direction`, `prob_up`, `reason`, `sessions`, the `learning`
   block and rm.lifecycle's "Full story" fields; `warehouse/trade_pages.py` adds rm.portfolio `open:<k>` and
   `finished:<D>` (indexes `open_holds`, `finished_sessions`), served by `/api/v1/markets/{market}/portfolios/open/{hold}`
   and `.../finished/{date}`. The story view is the lifecycle page with `#story=<prediction>&trade=<trade>`.
+- Dark mode (UX4, owner approval 2026-10-12): the cockpit imports `web/styles/tokens-dark.css` (a copy of
+  `design/system/tokens-dark.css` by `web/tools/sync-design.mjs`) and follows the device's prefers-color-scheme; the top
+  bar's theme button (`components/shell/theme-toggle.tsx`, `lib/ui/theme.ts`) cycles System / Light / Dark, remembered
+  in localStorage `mb-theme` and applied by a head script before the first paint. The few app roles that differ in dark
+  (heatmap fills and its no-trade dot, alert links, round marks) are in `web/styles/app.css`. The UI harness's dark cases (`tests/ui/cases/dark.mjs`,
+  `--theme dark`, `--contrast`) fail on text below WCAG AA (`tests/ui/contrast.mjs`).
 - Strategy lab and lifecycle formats (W1, docs/SPEC.md sections 3-4 and 10; field guide `docs/DATA_CATALOGUE.md`,
   example data `design/catalogue/*.json`, rebuilt by `design/catalogue/make_examples.py` with B2's engine code; notes
   `docs/ws/w1.md`): `config/strategies.yaml` is the strategy registry. It holds the horizon list

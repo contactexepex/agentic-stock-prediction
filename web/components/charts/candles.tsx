@@ -4,6 +4,7 @@
 // uses). The script loads once per tab from the app's own origin. Colours come from the design tokens. The chart has an
 // accessible name and a text summary; the page keeps its numbers in tables, so the chart is never the only source.
 import { useEffect, useRef, useState } from "react";
+import { useShownTheme } from "../../lib/ui/use-theme.ts";
 import { LIGHTWEIGHT_CHARTS } from "../../lib/ui/vendor.ts";
 
 export interface Candle {
@@ -71,6 +72,8 @@ const token = (name: string) => getComputedStyle(document.documentElement).getPr
 export function Candles({ candles, lines = NO_LINES, label, summary, height = 300 }: { candles: readonly Candle[]; lines?: readonly PriceLine[]; label: string; summary?: string; height?: number }) {
   const box = useRef<HTMLDivElement>(null);
   const [failed, setFailed] = useState(false);
+  // The library paints into a canvas with colours copied from the tokens, so a theme change redraws the chart.
+  const theme = useShownTheme();
   useEffect(() => {
     let chart: LwcChart | null = null;
     let observer: ResizeObserver | null = null;
@@ -104,7 +107,7 @@ export function Candles({ candles, lines = NO_LINES, label, summary, height = 30
       observer?.disconnect();
       chart?.remove();
     };
-  }, [candles, lines, height]);
+  }, [candles, lines, height, theme]);
   return (
     <figure className="mb-candles">
       <div ref={box} role="img" aria-label={label} style={{ height }} />
