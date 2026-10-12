@@ -8,12 +8,12 @@ import type { ServeMode } from "../constants.ts";
 
 const fixture = JSON.parse(readFileSync(new URL("./serve.fixture.json", import.meta.url), "utf8")) as {
   now: string;
-  cases: { name: string; mode: ServeMode; row: StoredRow; expected: unknown }[];
+  cases: { name: string; mode: ServeMode; row: StoredRow; synced_at?: string; expected: unknown }[];
 };
 
 for (const item of fixture.cases) {
   test(`serve: ${item.name}`, () => {
-    assert.deepEqual(serve(item.row, item.mode, new Date(fixture.now)), item.expected);
+    assert.deepEqual(serve(item.row, item.mode, new Date(fixture.now), item.synced_at ?? null), item.expected);
   });
 }
 

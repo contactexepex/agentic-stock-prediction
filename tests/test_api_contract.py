@@ -40,7 +40,7 @@ MARKETS = ("india", "us")
 @pytest.mark.parametrize("case", json.loads(FIXTURE.read_text())["cases"], ids=lambda c: c["name"])
 def test_serve_matches_the_shared_fixture(case):
     now = datetime.fromisoformat(json.loads(FIXTURE.read_text())["now"].replace("Z", "+00:00"))
-    assert contract.serve(case["row"], case["mode"], now) == case["expected"]
+    assert contract.serve(case["row"], case["mode"], now, case.get("synced_at")) == case["expected"]
 
 
 # ---------- schema checker ----------

@@ -40,8 +40,11 @@ export function isoDate(value: string | Date | null | undefined): string | null 
   return value instanceof Date ? value.toISOString().slice(0, 10) : String(value).slice(0, 10);
 }
 
-export function freshness(builtAt: string | null, now: Date): Freshness {
-  const built = builtAt === null ? null : new Date(builtAt);
+/** How old a page is at `now`: since the later of its built_at and `syncedAt` (the market's last sync, rm.status
+ * built_at: an unchanged page keeps its built_at, but the sync still checked it). */
+export function freshness(builtAt: string | null, now: Date, syncedAt: string | null = null): Freshness {
+  const basis = syncedAt !== null && (builtAt === null || new Date(syncedAt) > new Date(builtAt)) ? syncedAt : builtAt;
+  const built = basis === null ? null : new Date(basis);
   if (built === null || Number.isNaN(built.getTime())) return { state: "unknown", built_at: null, age_minutes: null };
   const age = Math.max(Math.floor((now.getTime() - built.getTime()) / 60000), 0);
   return { state: age <= FRESH_MINUTES ? "fresh" : "stale", built_at: isoSecond(built), age_minutes: age };
@@ -51,18 +54,18 @@ function isObject(value: unknown): value is Json {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-export function servedPayload(row: StoredRow, mode: ServeMode, now: Date): unknown {
+export function servedPayload(row: StoredRow, mode: ServeMode, now: Date, syncedAt: string | null = null): unknown {
   const payload = typeof row.payload === "string" ? JSON.parse(row.payload) : row.payload;
   if (mode === "verbatim" || !isObject(payload)) return payload;
-  const fresh = freshness(row.built_at, now);
-  if (mode === "status") return { ...payload, freshness: fresh };
+  if (mode === "status") return { ...payload, freshness: freshness(row.built_at, now) };
+  const fresh = freshness(row.built_at, now, syncedAt);
   const out: Json = { ...payload, cutoff: isoSecond(row.cutoff), built_at: isoSecond(row.built_at) };
   if (isObject(out.status)) out.status = { ...out.status, freshness: fresh };
   return out;
 }
 
 /** The response body: the envelope (ReadModelMeta, times to the second) and the served payload. */
-export function serve(row: StoredRow, mode: ServeMode, now: Date): Json {
+export function serve(row: StoredRow, mode: ServeMode, now: Date, syncedAt: string | null = null): Json {
   return {
     market: row.market,
     page_key: row.page_key,
@@ -72,6 +75,6 @@ export function serve(row: StoredRow, mode: ServeMode, now: Date): Json {
     schema_version: row.schema_version,
     source_commit: row.source_commit,
     payload_sha256: row.payload_sha256,
-    payload: servedPayload(row, mode, now),
+    payload: servedPayload(row, mode, now, syncedAt),
   };
 }

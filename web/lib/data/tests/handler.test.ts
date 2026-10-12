@@ -81,3 +81,26 @@ test("a row of another major contract version is refused with 503", async () => 
 test("definePage refuses a table name that is not a plain identifier", () => {
   assert.throws(() => definePage({ table: "rm.x; drop", serve: "page" }));
 });
+
+test("a page's freshness counts from the market's last sync when it is later than the page's own built_at", async () => {
+  const store = new MemoryRowStore().put("example", row({ built_at: "2026-10-05T20:00:00Z" }));
+  const asked: string[] = [];
+  const syncedAt = async (market: string) => (asked.push(market), "2026-10-07T11:00:00Z");
+  const body = await (await readPage(request(), PAGE, "us", "_", { ...deps(store), syncedAt })).json();
+  assert.deepEqual(asked, ["us"]);
+  assert.equal(body.built_at, "2026-10-05T20:00:00Z"); // the envelope keeps the page's own build time
+  assert.deepEqual(body.payload.status.freshness, { state: "fresh", built_at: "2026-10-07T11:00:00Z", age_minutes: 60 });
+});
+
+test("a failing last-sync read leaves the page's own built_at; status-mode pages never ask for it", async () => {
+  const store = new MemoryRowStore().put("example", row({ built_at: "2026-10-05T20:00:00Z" }));
+  const failing = async () => { throw new Error("status read failed"); };
+  const body = await (await readPage(request(), PAGE, "us", "_", { ...deps(store), syncedAt: failing })).json();
+  assert.deepEqual(body.payload.status.freshness, { state: "stale", built_at: "2026-10-05T20:00:00Z", age_minutes: 2400 });
+  const status = definePage({ table: "example", serve: "status" });
+  let asked = 0;
+  const counting = async () => (asked++, "2026-10-07T11:00:00Z");
+  const served = await (await readPage(request(), status, "us", "_", { ...deps(store), syncedAt: counting })).json();
+  assert.equal(asked, 0);
+  assert.equal(served.payload.freshness.built_at, "2026-10-05T20:00:00Z");
+});
