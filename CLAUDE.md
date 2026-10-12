@@ -36,6 +36,9 @@ root as `MB_NOW=2026-10-09T23:59:00Z PYTHONPATH=scripts python docs/plan_volatil
   `earnings_estimates_asof(ts)`, context only), `collect_news` (catch-up window: Google News `when:` and the oldest item
   kept reach back to the market's last successful news run, +1 h, at most 7 days, never below 1 day / 3 days;
   a query filling Google News' 100-item answer is re-asked per day; one row per run in `data/<market>/news_runs/`;
+  requests spaced (`news.google_news.pause_seconds` 1.5 s, `news.outlet_pause_seconds` 0.5 s); a Google 429/503 or
+  captcha/HTML page stops Google News for the rest of the run (`google_stopped`, `google_skipped`; the run is not
+  `ok`, so the next window reaches back over it; `marketbrief/collectors/news_fetch.py`);
   `marketbrief/collectors/news_window.py`, DESIGN.md section 3 "News timing"; de-duplication, once per market:
   the same article link or the same normalised title from the same outlet (outlet key: host without www./m./amp.,
   allowlisted domain and its `same_as`, or a configured outlet name) within 9 days is not stored again, a new
@@ -43,7 +46,11 @@ root as `MB_NOW=2026-10-09T23:59:00Z PYTHONPATH=scripts python docs/plan_volatil
   on read via `news_id_map` (`news` view: one row per item with its latest headline by now, `news_asof(ts)`,
   `news_aliases`, `news_lookup` for any stored id; `marketbrief/analytics/news_dedup.py`, DESIGN.md section 3
   "News de-duplication")), `collect_filings`, `collect_options` (US option-chain
-  implied vol; India skips). Then `score_predictions` (calls and ranges; its summary adds the proper
+  implied vol; India skips). Every Yahoo call (prices, quotes, options, events, intraday checks, model_history,
+  onboarding) goes through `marketbrief/sources/yahoo_pacing.py` (`paced_yfinance`: `yahoo.pause_seconds` 0.5 s in
+  `config/settings.yaml`; after a rate limit no further Yahoo call in that process: summary `yahoo_stopped`,
+  `yahoo_skipped`, the symbols in `failed`); `tests/test_request_pacing.py` fails when a network library or an
+  unpaced request function is used outside the paced clients. Then `score_predictions` (calls and ranges; its summary adds the proper
   scores of `scoring.py`: Brier, log loss, reliability with Wilson intervals, interval and quantile
   scores, also in the context pack, weekly review and HTML track record), `lessons` (reflection log,
   pattern from TauricResearch/TradingAgents: `prepare` writes the deterministic facts of settled calls

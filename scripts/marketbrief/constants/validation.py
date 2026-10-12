@@ -73,7 +73,8 @@ MSG_IDS_NOT_FIRST_SEEN_IN_WINDOW = (
     "{count} ids are not news/announcements first seen since the last enrichment ({since}), e.g. {ids}"
 )
 MSG_NEWS_RUN_NOT_OK = (
-    "the news run at {ran_at} does not count as a successful collection (most Google News queries failed): "
+    "the news run at {ran_at} does not count as a successful collection (most Google News queries failed, or "
+    "Google News rate-limited the run: see google_stopped): "
     "the next run reaches back further"
 )
 MSG_IDS_ALREADY_ENRICHED = "{count} ids already in news_enriched, e.g. {ids}"

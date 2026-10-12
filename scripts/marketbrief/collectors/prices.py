@@ -128,6 +128,7 @@ from marketbrief.core.calendar import is_session, last_complete_session
 from marketbrief.core.cli import market_arg, require_market
 from marketbrief.core.clock import utc_now, utc_today
 from marketbrief.core.storage import append_jsonl, day_file
+from marketbrief.sources.yahoo_pacing import paced_yfinance, stop_report
 
 
 def uses_nse_fallback(cfg: dict) -> bool:
@@ -317,7 +318,7 @@ class PriceCollector:
             summary.update(apply_fallback(self.run, self.targets, self.failed, self.splits, recorded, set(self.held)))
         summary[SUMMARY_WARNINGS] = self.warnings
         summary[SUMMARY_FAILED] = self.failed
-        return summary
+        return {**summary, **stop_report()}
 
     def collect(self, yfinance) -> dict:
         """Process every symbol and return the summary."""
@@ -332,7 +333,7 @@ def main() -> int:
     parser.add_argument("--period", default=DEFAULT_PERIOD, help="yfinance period, e.g. 1mo, 3mo, 1y, 2y")
     args = parser.parse_args()
     cfg = require_market(args)
-    import yfinance  # imported here so the rest of the repo works without it
+    yfinance = paced_yfinance()  # imported there so the rest of the repo works without it
 
     collector = PriceCollector(cfg, args.period)
     summary = collector.collect(yfinance)

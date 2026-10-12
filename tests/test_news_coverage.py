@@ -251,7 +251,7 @@ def test_failed_google_queries_make_the_run_not_ok(monkeypatch, capsys):
     out, _ = run_collector(monkeypatch, capsys, now, lambda url: "<html>" if "HDFC" in url else feed_xml([]))
     assert out["google_failed"] == 1 and out["ok"]                         # 1 of 2 failed: still ok
     later = now + timedelta(hours=6)
-    monkeypatch.setattr(cn, "fetch_with_retry", lambda _url: (feedparser.parse("<html>"), 500))
+    monkeypatch.setattr(cn, "fetch_with_retry", lambda _url, *_pace: (feedparser.parse("<html>"), 500))
     monkeypatch.setattr(cn, "now_utc", lambda: later)
     monkeypatch.setenv("MB_NOW", later.isoformat())
     assert cn.NewsCollector(WATCHLIST).collect() == 1

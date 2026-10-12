@@ -39,6 +39,7 @@ from marketbrief.core import paths
 from marketbrief.core.calendar import extra_holidays, last_complete_session, special_sessions
 from marketbrief.core.cli import market_arg
 from marketbrief.core.market_config import load_market, market_names
+from marketbrief.sources.yahoo_pacing import paced_yfinance, stop_report
 
 OHLC = ["open", "high", "low", "close"]
 
@@ -193,12 +194,13 @@ def main() -> int:
     parser = market_arg(__doc__)
     parser.add_argument("--start", default=HISTORY_DEFAULT_START, help="first date to fetch (YYYY-MM-DD)")
     args = parser.parse_args()
-    import yfinance  # imported here so the rest of the repo works without it
+    yfinance = paced_yfinance()  # imported there so the rest of the repo works without it
 
     out = {}
     for market in [args.market] if args.market else market_names():
         manifest = fetch_market(load_market(market), date.fromisoformat(args.start), yfinance)
         out[market] = {k: manifest[k] for k in ("fetched_at", "start", "rows", "bytes", "failed")}
         out[market]["path"] = str(cache_dir(market))
+        out[market].update(stop_report())  # a stop holds for the rest of the process
     print(json.dumps(out, indent=1))
     return 0
