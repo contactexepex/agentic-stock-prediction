@@ -48,7 +48,8 @@ Contents:
 - Strategies and predictions: [Strategy](#strategy), [Prediction](#prediction),
   [Abstention](#abstention), [Agreement](#agreement)
 - Trades: [Head-to-head pick](#head-to-head-pick), [Paper trade](#paper-trade) (with its
-  [automatic reason](#automatic-reason)), [Cost view](#cost-view), [Open trade](#open-trade), [Intraday trade check](#trade-check),
+  [automatic reason](#automatic-reason)), [Cost view](#cost-view), [Evening prediction](#evening-prediction),
+  [Open trade](#open-trade), [Intraday trade check](#trade-check),
   [Intraday alert](#intraday-alert)
 - Explanations and scores: [AI reason](#ai-reason), [End-of-day analysis](#eod-analysis),
   [Scoreboard row](#scoreboard-row), [Heatmap cell](#heatmap-cell), [Cumulative line](#cumulative-line),
@@ -221,8 +222,8 @@ traders. Example file: `strategy.json` (the registry entries plus counts).
 | parameters | Its settings (rule: signal, news weight, which news statuses and materiality count, global cues, regime filter; AI: model, inputs, whether it sees the model score) | registry | settings | `news_weight: 2.0` |
 | threshold | Lowest probability of a rise that still makes a trade (empty for always-up and momentum) | registry | 0-1 | `0.55`, `0.60` |
 | horizons | Horizons it predicts (decision 38) | registry | list of k | rule `[1,2,3,4,5]`, AI `[1,3,5]` |
-| live_from | First session it trades for real; empty until Wave 5 switches paper trading on | registry | date | empty |
-| live | Whether it is live | derived | yes/no | `false` |
+| live_from | First session it paper-trades (B2's settle, pick and forward summary skip earlier rows); Wave 5 (B19) set 2026-10-12 for all 15, a strategy added later gets its own; empty = not live yet | registry | date | `2026-10-12` |
+| live, status_note | Whether it is live by the clock (`live_from` on or before that day), with a short note; the examples are as of 7 Oct, so none is live yet | derived | yes/no, text | `false`, "not live at the examples' cut-off; live from 2026-10-12" |
 | settled_trades | Its settled trades so far | [Paper trade](#paper-trade) | count | `16` |
 
 The initial set has 15 strategies:
@@ -426,6 +427,27 @@ None of the example predictions or picks is cost-viable: a round trip at your co
 | holding_days | Calendar days from D to the exit (the US portfolio fee) | calendar | days | `5` |
 | eurusd_entry, eurusd_exit | The EUR/USD closes used for the US order fee and FX markup | `EURUSD=X` (B2) | rate | `1.17` (example rate) |
 | computed_at, method_version | When it was computed; engine version | B2 | time, text | `engine-v1` |
+
+<a id="evening-prediction"></a>
+## Evening prediction (preview)
+
+The evening run's preview of the next pre-open [predictions](#prediction) (option C of the evening run, agreed by
+B17, B10 and B2; docs/ws/b2.md "Evening preview"). After the close, `lab.py predict --evening` computes the rows the
+next pre-open `predict` will write, for the same D and with the same ids, on the day's close: B10's evening ranges
+(`ranges_asof(..., run="evening")`, no overnight cue, no forecaster widening) and the model scores as of the
+evening clock. A preview is never traded: settlement, picks, the scoreboard, trade checks, scoring and the warehouse
+pages read only `strategy_predictions`, and no cost views, abstentions or picks are written for it. The pre-open row
+with the same id stays the revision of record, so a page can show how a forecast changed between the two
+runs. Status: kind `strategy_predictions_evening`; session **B2** writes it (`core/schema_b2.py`,
+`lab/run.py` `write_evening_predictions`); ids already stored there are skipped. Example file:
+`evening_prediction.json` (the 10 rule.model_news.v1 previews of NVDA and RELIANCE; their numbers are the pre-open
+example's, and the evening times are examples, since the evening run's schedule is B17's).
+
+| Field | Meaning | Source | Unit | Example |
+|---|---|---|---|---|
+| every [Prediction](#prediction) field | The same columns as `strategy_predictions` (derived from its schema), with the same id as the pre-open row it previews | B2 | as there | `rule.model_news.v1:2026-10-06-NVDA-1d`, D `2026-10-07` |
+| made_at | When the evening run made it (after the as-of close, before the next pre-open run) | B2 | time | `2026-10-06T22:30:00Z` (example: 18:30 New York) |
+| run | Always `evening` | B2 | text | `evening` |
 
 <a id="open-trade"></a>
 ## Open trade
