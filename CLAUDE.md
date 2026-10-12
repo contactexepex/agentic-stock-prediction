@@ -545,9 +545,20 @@ orchestrating session itself (its own edits and merge-conflict resolutions inclu
   push and PR, except `test_every_logged_commit_exists` (CI cannot see local, unpushed build branches).
   A reviewer may cite the passing CI run for the reviewed commit as evidence of the full suite instead
   of rerunning it, but still runs the tests specific to the change and `tests/test_judgments.py`
-  locally. A merge review reruns tests when a conflict touched code, and the orchestrator always runs
-  the full suite after any merge that brings in code changes (CI also runs on push). New end-to-end
-  tests go in `SLOW` in `tests/conftest.py`.
+  locally. A merge review reruns tests when a conflict touched code. After a merge, the green CI run on
+  main is the full-suite evidence; nobody reruns the full suite locally just because main moved. New
+  end-to-end tests go in `SLOW` in `tests/conftest.py`.
+- Lean process (owner decision 2026-10-12, to cut token cost):
+  - One builder per change: a single session makes the whole change, across every file it needs,
+    whoever built those files first. File ownership by session no longer splits a change.
+  - Small changes (docs, wording, config values, a contained fix of one feature): the judge reviews the
+    diff only and runs the tests specific to it; the green CI run replaces a local full-suite run, before
+    and after the merge. A merge whose only conflict is the append-only `judgments/log.jsonl` (main's
+    lines kept, the branch's appended) needs no new judge round.
+  - The local full suite (and the end-to-end run where the scope rule above asks for it) stays for real
+    code changes across modules.
+  - Finished build sessions are archived. A new change starts one fresh session, which ends when the
+    change is merged.
 - Daily runs are gated by `scripts/validate.py` (deterministic checks after each stage, settings
   in `config/validate.yaml`) and, for the reflector's lessons, by `scripts/lessons.py validate`, for the results-analyst's bullets by `scripts/results_digest.py validate`,
   for the deviation-explainer's notes by `scripts/intraday_check.py validate`, for the AI traders by
