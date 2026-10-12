@@ -11,9 +11,11 @@ computed once per build through BuildContext.shared, as of the cut-off. rm_commo
   open_trades(ctx)  the Open-trade records: B9's open trades as of the cut-off (intraday/trades.open_trades: every
                     qualifying prediction and picked head-to-head pick made before D's open, without a settlement row
                     by the cut-off, for at most `trades.max_sessions_past_exit` sessions past its exit) of a strategy
-                    live on D (B2's live_from), that have entered (D's open stored by the cut-off) and buy at least
-                    one share (F1.4), valued at the newest stored close: unrealised profit before costs on today's
-                    price basis (splits and bonuses since D).
+                    live on D (B2's live_from), that have entered and buy at least one share (F1.4). Open from D's
+                    open: entry = D's stored open, else the open of D from the trade's newest intraday check (B9's
+                    trade_checks) by the cut-off; last price = the newest of the last stored close and that check's
+                    price (`entry_price_source`, `last_price_source`, `last_price_time`). Unrealised profit before
+                    costs on today's price basis (splits and bonuses since D).
   companies(ctx)    the Company records, active and inactive (never deleted), active first, then by ticker: B1's
                     accessor, the newest two raw closes collected by the cut-off, agreement_n1 (active companies) and
                     the open-trade count (exactly the records of open_trades).
@@ -38,6 +40,14 @@ from marketbrief.intraday.settings import load_intraday_config
 from marketbrief.lab import registry
 from marketbrief.lab.sizing import quantity as trade_quantity
 from marketbrief.utils.numbers import json_safe_float
+from marketbrief.warehouse.open_trade_prices import (  # iso_day and iso_time are re-exported for the page modules
+    SOURCE_BAR,
+    SOURCE_CLOSE,
+    iso_day,
+    iso_time,
+    latest_checks,
+    trade_prices,
+)
 from marketbrief.warehouse.rm_registry import BuildContext
 
 STATE_ACTIVE = "active"
@@ -72,20 +82,6 @@ COMPANY_KEYS = (
     "nse_symbol",
     "cik",
 )
-
-
-def iso_day(value) -> str | None:
-    """A stored date or time as YYYY-MM-DD, or None."""
-    return None if value is None or pd.isna(value) else pd.Timestamp(value).date().isoformat()
-
-
-def iso_time(value) -> str | None:
-    """An aware time as ISO UTC with a Z, or None."""
-    return (
-        None
-        if value is None or pd.isna(value)
-        else pd.Timestamp(value).tz_convert("UTC").strftime("%Y-%m-%dT%H:%M:%SZ")
-    )
 
 
 # ---------- live strategies (Wave 5 go-live; lab/registry.is_live) ----------
@@ -191,7 +187,8 @@ def agreement(ctx: BuildContext) -> dict[str, list[dict]]:
 
 # ---------- open trades ----------
 def open_trade_record(trade: dict, market: str, currency: str, prices: dict) -> dict | None:
-    """One Open-trade record from B9's trade and `prices` = {entry, last, last_date, factor, target_factor}:
+    """One Open-trade record from B9's trade and `prices` = {entry, last, last_date, factor, target_factor,
+    entry_source, last_source, last_time}:
     `factor` turns a price of D (the entry) into today's basis and `target_factor` a price of the as-of date (the
     target), as intraday/trade_rows does (intraday/trades.factor_after). None when no whole share is bought (F1.4)."""
     entry, last, factor = prices["entry"], prices["last"], prices["factor"]
@@ -209,8 +206,11 @@ def open_trade_record(trade: dict, market: str, currency: str, prices: dict) -> 
         "amount": json_safe_float(trade["amount"]),
         "currency": currency,
         **{key: json_safe_float(trade[key]) for key in PREDICTED_KEYS},
+        "entry_price_source": prices.get("entry_source", SOURCE_BAR),
         "last_price": json_safe_float(last),
         "last_price_date": prices["last_date"],
+        "last_price_source": prices.get("last_source", SOURCE_CLOSE),
+        "last_price_time": prices.get("last_time"),
         "unrealised_pnl": round(shares * (last / factor - entry), MONEY),
         "unrealised_pct": round((last / (entry * factor) - 1) * 100, PCT),
         "to_target_pct": None if target is None else round((target * prices["target_factor"] / last - 1) * 100, PCT),
@@ -242,20 +242,22 @@ def open_trades(ctx: BuildContext) -> list[dict]:
         for ticker, day, close in raw_bars(ctx, CLOSES_SQL, tickers):
             closes.setdefault(ticker, (iso_day(day), close))
         factors = intraday_trades.adjustment_factors(ctx.con, tickers, session, ctx.cutoff_time)
+        checks = latest_checks(ctx, sorted(trade["trade_id"] for trade in trades))
         out = []
         for trade in sorted(trades, key=lambda t: t["trade_id"]):
-            entry = opens.get((trade["ticker"], trade["entry_date"].isoformat()))
-            last_date, last = closes.get(trade["ticker"], (None, None))
-            if entry is None or last is None or last_date < trade["entry_date"].isoformat():
-                continue  # not entered yet: D's open is not stored by the cut-off
-            known = [(ex, f) for ex, f in factors.get(trade["ticker"], []) if ex.isoformat() <= last_date]
-            prices = {
-                "entry": float(entry),
-                "last": float(last),
-                "last_date": last_date,
-                "factor": intraday_trades.factor_after(known, trade["entry_date"]),
-                "target_factor": intraday_trades.factor_after(known, trade["as_of_date"]),
-            }
+            prices = trade_prices(
+                trade,
+                opens.get((trade["ticker"], trade["entry_date"].isoformat())),
+                closes.get(trade["ticker"], (None, None)),
+                checks.get(trade["trade_id"]),
+            )
+            if prices is None:
+                continue  # not entered yet: neither D's stored open nor an intraday check of D by the cut-off
+            known = [(ex, f) for ex, f in factors.get(trade["ticker"], []) if ex.isoformat() <= prices["last_date"]]
+            prices.update(
+                factor=intraday_trades.factor_after(known, trade["entry_date"]),
+                target_factor=intraday_trades.factor_after(known, trade["as_of_date"]),
+            )
             record = open_trade_record(trade, ctx.market, ctx.cfg["currency"], prices)
             if record is not None:
                 out.append(record)

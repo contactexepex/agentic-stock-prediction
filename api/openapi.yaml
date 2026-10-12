@@ -633,7 +633,9 @@ components:
       x-source: warehouse/rm_entities.open_trades
       description: >-
         A paper trade that has entered and not yet settled (catalogue entity Open trade; intraday/trades.open_trades
-        as of the cut-off), valued at the newest stored close before costs on today's price basis. Paper only
+        as of the cut-off), open from D's open: entered at D's stored open, else at the intraday check's open of D
+        (B9's trade_checks), valued before costs on today's price basis at the newest of the last stored close and the
+        latest intraday check's price. Paper only
       required: [trade_id, view, prediction_id, strategy_id, family, market, ticker, horizon_days, entry_date,
                  exit_date, entry_price, quantity, amount, currency, last_price, last_price_date, unrealised_pnl,
                  unrealised_pct, paper]
@@ -649,6 +651,10 @@ components:
         entry_date: {$ref: '#/components/schemas/IsoDate'}
         exit_date: {$ref: '#/components/schemas/IsoDate'}
         entry_price: {type: number}
+        entry_price_source:
+          type: string
+          enum: [daily_bar, intraday_check]
+          description: daily_bar = D's stored open; intraday_check = the open of D from the newest intraday check
         quantity: {type: number, exclusiveMinimum: 0}
         amount: {type: number}
         currency: {type: string, enum: [INR, USD]}
@@ -659,6 +665,13 @@ components:
         hi80: {$ref: '#/components/schemas/NullableNumber'}
         last_price: {type: number}
         last_price_date: {$ref: '#/components/schemas/IsoDate'}
+        last_price_source:
+          type: string
+          enum: [daily_close, intraday_check]
+          description: daily_close = the newest stored close; intraday_check = the newest check's price (a later session)
+        last_price_time:
+          type: ['string', 'null']
+          description: The intraday check's price time (ISO UTC); null for a stored close
         unrealised_pnl: {type: number}
         unrealised_pct: {type: number}
         to_target_pct: {$ref: '#/components/schemas/NullableNumber'}
