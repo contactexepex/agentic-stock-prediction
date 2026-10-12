@@ -396,6 +396,18 @@ components:
               oneOf:
                 - {$ref: '#/components/schemas/NewsRun'}
                 - {type: 'null'}
+            invalid_pages:
+              type: array
+              description: >-
+                The pages of this market that failed validation in the sync that wrote this page (their old rows are
+                served). Their freshness never counts from the sync time (web/lib/data/deps.ts)
+              x-source: warehouse/read_models.build_rows
+              items:
+                type: object
+                required: [table, page_key]
+                properties:
+                  table: {type: string}
+                  page_key: {type: string}
             last_build:
               x-status: planned
               x-owner: B4

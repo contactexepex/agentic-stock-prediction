@@ -3,14 +3,14 @@
 import { defaultStore } from "./cache.ts";
 import { MARKET_PAGE_KEY } from "./constants.ts";
 import type { ReadDeps } from "./handler.ts";
-import { isoSecond } from "./serve.ts";
+import { syncTimeFor } from "./serve.ts";
 
 export function defaultDeps(): ReadDeps {
   const store = defaultStore();
   return {
     store,
     now: () => new Date(),
-    // rm.status is rewritten by every sync (scripts/marketbrief/warehouse/rm_writer.py), so its built_at is the sync
-    syncedAt: async (market) => isoSecond((await store.read("status", market, MARKET_PAGE_KEY))?.built_at ?? null),
+    syncedAt: async (market, table, pageKey) =>
+      syncTimeFor(await store.read("status", market, MARKET_PAGE_KEY), table, pageKey),
   };
 }

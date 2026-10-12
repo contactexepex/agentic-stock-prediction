@@ -12,7 +12,8 @@
 // row is of another major contract version, 304 when If-None-Match equals the row's ETag, and otherwise the envelope plus the
 // served payload (serve.ts) with ETag = "<payload_sha256>", Last-Modified = built_at, Cache-Control private, no-cache.
 // A page-mode page's freshness counts from the market's last sync (deps.syncedAt: rm.status built_at, rewritten by
-// every sync) when that is later than its own built_at, since an unchanged page keeps its built_at.
+// every sync) when that is later than its own built_at, since an unchanged page keeps its built_at; never for a page
+// that failed validation in that sync (rm.status invalid_pages: its old row is served).
 import { CONTRACT_MAJOR, MARKETS, PAGE_KEY_PATTERN, type ServeMode, TABLE_PATTERN, TICKER_PATTERN } from "./constants.ts";
 import { notFound, unavailable } from "./problem.ts";
 import { serve, type StoredRow } from "./serve.ts";
@@ -27,15 +28,16 @@ export interface PageSpec {
 export interface ReadDeps {
   store: RowStore;
   now: () => Date;
-  /** The market's last sync (rm.status built_at), or null; omitted, a page's freshness uses its own built_at. */
-  syncedAt?: (market: string) => Promise<string | null>;
+  /** The market's last sync (rm.status built_at) if it rebuilt this page, else null; omitted, a page's freshness
+   * uses its own built_at. */
+  syncedAt?: (market: string, table: string, pageKey: string) => Promise<string | null>;
 }
 
 /** The market's last sync for a page-mode read; any failure reads as unknown (the page's own built_at counts). */
-async function lastSync(spec: PageSpec, market: string, deps: ReadDeps): Promise<string | null> {
+async function lastSync(spec: PageSpec, market: string, pageKey: string, deps: ReadDeps): Promise<string | null> {
   if (spec.serve !== "page" || !deps.syncedAt) return null;
   try {
-    return await deps.syncedAt(market);
+    return await deps.syncedAt(market, spec.table, pageKey);
   } catch {
     return null;
   }
@@ -101,7 +103,7 @@ export async function readPage(
 ): Promise<Response> {
   const row = await readRow(spec, market, pageKey, deps);
   if (row instanceof Response) return row;
-  return respond(request, spec, row, deps.now(), await lastSync(spec, market, deps));
+  return respond(request, spec, row, deps.now(), await lastSync(spec, market, pageKey, deps));
 }
 
 /** A per-ticker page: the ticker must look like one (a missing page is a 404 either way). */

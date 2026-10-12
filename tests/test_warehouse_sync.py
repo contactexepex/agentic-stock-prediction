@@ -343,6 +343,9 @@ def test_invalid_page_keeps_its_old_row(synced, monkeypatch):
     assert stored_pages(root, "track_record")["_"][3:] == ("old", '{"old": 1}')  # neither replaced nor deleted
     last = query(root, "SELECT ok, error FROM rm.builds ORDER BY started_at DESC LIMIT 1")[0]
     assert last == (False, "track_record/_: $: missing 'not_built_yet'")
+    # the status page names it, so the route never counts its freshness from this sync (web/lib/data/serve.ts)
+    status = json.loads(query(root, "SELECT payload FROM rm.status WHERE market = 'us'")[0][0])
+    assert status["invalid_pages"] == [{"table": "track_record", "page_key": "_"}]
 
 
 def test_kill_switch_skips_without_writing(synced, monkeypatch, tmp_path):

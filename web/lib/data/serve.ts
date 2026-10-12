@@ -78,3 +78,14 @@ export function serve(row: StoredRow, mode: ServeMode, now: Date, syncedAt: stri
     payload: servedPayload(row, mode, now, syncedAt),
   };
 }
+
+/** The sync time a page may count its freshness from: rm.status built_at (rewritten by every sync,
+ * scripts/marketbrief/warehouse/rm_writer.py), unless the page is in that sync's invalid_pages (its old row is
+ * served, so only its own built_at counts). */
+export function syncTimeFor(status: StoredRow | null, table: string, pageKey: string): string | null {
+  if (status === null) return null;
+  const payload = status.payload as { invalid_pages?: unknown } | null;
+  const invalid = Array.isArray(payload?.invalid_pages) ? payload.invalid_pages : [];
+  const failed = invalid.some((page) => page?.table === table && page?.page_key === pageKey);
+  return failed ? null : isoSecond(status.built_at);
+}

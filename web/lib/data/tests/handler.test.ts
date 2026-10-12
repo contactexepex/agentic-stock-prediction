@@ -85,9 +85,10 @@ test("definePage refuses a table name that is not a plain identifier", () => {
 test("a page's freshness counts from the market's last sync when it is later than the page's own built_at", async () => {
   const store = new MemoryRowStore().put("example", row({ built_at: "2026-10-05T20:00:00Z" }));
   const asked: string[] = [];
-  const syncedAt = async (market: string) => (asked.push(market), "2026-10-07T11:00:00Z");
+  const syncedAt = async (market: string, table: string, key: string) => (
+    asked.push(`${table}|${market}|${key}`), "2026-10-07T11:00:00Z");
   const body = await (await readPage(request(), PAGE, "us", "_", { ...deps(store), syncedAt })).json();
-  assert.deepEqual(asked, ["us"]);
+  assert.deepEqual(asked, ["example|us|_"]);
   assert.equal(body.built_at, "2026-10-05T20:00:00Z"); // the envelope keeps the page's own build time
   assert.deepEqual(body.payload.status.freshness, { state: "fresh", built_at: "2026-10-07T11:00:00Z", age_minutes: 60 });
 });
