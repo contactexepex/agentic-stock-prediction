@@ -249,7 +249,8 @@ root as `MB_NOW=2026-10-09T23:59:00Z PYTHONPATH=scripts python docs/plan_volatil
   `director-validate|add` (config diffs that apply to a copy, never applied) -> `research_reviews`,
   `reports/<market>/research-<week>.md`.
 - Tools and channels (B5, SPEC F10; docs/ws/b5.md): the `web/` Next.js project (App Router; `package.json`, lockfile,
-  `tsconfig.json`, `next.config.ts` owned by B5; later sessions only add dependency lines). The governed tool layer
+  `tsconfig.json`, `next.config.ts` owned by B5; later sessions only add dependency lines; the 2026-10-12 one-builder rule
+  below lets the builder of a change edit them). The governed tool layer
   `web/lib/tools/` implements `mcp/tools.yaml`; `mcp/build_registry.py` generates `registry.generated.ts` from it and
   `mcp/agents/*.yaml` (allowed tools, day budgets, kill switch per agent; `assistant` has read tools only), checked by
   `tests/test_b5_tools.py`. Identity comes only from the channel's auth, never from arguments. Every write needs an
@@ -525,8 +526,8 @@ orchestrating session itself (its own edits and merge-conflict resolutions inclu
 - Batches: plan work as a few batches (a feature, a refactor chunk, or a group of related fixes with
   the cosmetic issues that touch the same files), build the whole batch, then one review per batch;
   never a review cycle per small item. The reviewer lists every finding in one pass.
-- Build workflow (keep it fast): the builder runs the fast tier while iterating and the full suite
-  once at the end; live network checks only when a collector or fetcher changed (otherwise saved
+- Build workflow (keep it fast): the builder runs the fast tier while iterating and, for a real code
+  change, the full suite once at the end (see "Lean process" below); live network checks only when a collector or fetcher changed (otherwise saved
   fixtures); the golden harness (`tests/golden/golden.py`) once at the end for refactors. Every number
   in a build report (test counts, row counts, timings) is pasted from command output, never retyped.
   Mechanical work (moves, renames, refactor steps proven by the golden harness) runs on Sonnet with
@@ -541,7 +542,7 @@ orchestrating session itself (its own edits and merge-conflict resolutions inclu
 - Tests (offline; a guard in `tests/conftest.py` fails any test whose Python code reaches the network;
   it sees Python sockets only, not C libraries or node): the fast tier
   `python -m pytest -m "not slow" -n auto` on each edit, the full suite `python -m pytest -n auto`
-  before review or merge. GitHub Actions (`.github/workflows/tests.yml`) runs the full suite on every
+  before review or merge of a real code change (a small change relies on CI; see "Lean process" below). GitHub Actions (`.github/workflows/tests.yml`) runs the full suite on every
   push and PR, except `test_every_logged_commit_exists` (CI cannot see local, unpushed build branches).
   A reviewer may cite the passing CI run for the reviewed commit as evidence of the full suite instead
   of rerunning it, but still runs the tests specific to the change and `tests/test_judgments.py`
@@ -551,14 +552,16 @@ orchestrating session itself (its own edits and merge-conflict resolutions inclu
 - Lean process (owner decision 2026-10-12, to cut token cost):
   - One builder per change: a single session makes the whole change, across every file it needs,
     whoever built those files first. File ownership by session no longer splits a change.
-  - Small changes (docs, wording, config values, a contained fix of one feature): the judge reviews the
-    diff only and runs the tests specific to it; the green CI run replaces a local full-suite run, before
-    and after the merge. A merge whose only conflict is the append-only `judgments/log.jsonl` (main's
-    lines kept, the branch's appended) needs no new judge round.
-  - The local full suite (and the end-to-end run where the scope rule above asks for it) stays for real
-    code changes across modules.
-  - Finished build sessions are archived. A new change starts one fresh session, which ends when the
-    change is merged.
+  - Small changes (docs, wording, agent instructions, page text): the judge reviews the diff only; the
+    reviewer still runs `tests/test_judgments.py` locally, and the green CI run replaces a local
+    full-suite run, before and after the merge.
+  - Real code changes (scripts, SQL views, schemas, config, web code) keep the full checks: the full
+    suite before review (the green CI run for the reviewed commit counts, as above) and the end-to-end
+    run where the scope rule asks for it.
+  - Nobody reruns the full suite locally only because main moved under a merge; the green CI run on
+    the merged commit is the evidence. A merge-conflict resolution is still judged.
+  - Finished build sessions are archived. A new change (a batch counts as one change) starts one fresh
+    session, which ends when the change is merged.
 - Daily runs are gated by `scripts/validate.py` (deterministic checks after each stage, settings
   in `config/validate.yaml`) and, for the reflector's lessons, by `scripts/lessons.py validate`, for the results-analyst's bullets by `scripts/results_digest.py validate`,
   for the deviation-explainer's notes by `scripts/intraday_check.py validate`, for the AI traders by
