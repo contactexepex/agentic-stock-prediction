@@ -581,9 +581,24 @@ orchestrating session itself (its own edits and merge-conflict resolutions inclu
   - This supersedes, for all work from 2026-10-12, docs/SPEC.md section 10's session workflow where it
     differs: file ownership by session (the intro and step 5's shared-doc proposals), the full-suite runs
     of step 1 (for small changes), step 3 and the "Rule change" paragraph, and step 3's exemption of
-    `judgments/log.jsonl` conflicts from judging. Step 3's log-merge rule (main's lines kept as they are,
-    the branch's appended after them) still holds; every merge-conflict resolution, including one in
-    `judgments/log.jsonl`, is judged.
+    `judgments/log.jsonl` conflicts from judging. Every merge-conflict resolution is judged; the log's
+    merges follow the union rule below.
+- Delivery strategy (owner decision 2026-10-12, to avoid stale branches and repeated reviews):
+  - One build lane per area: the web app and its read models (`web/`, `api/`, `scripts/marketbrief/warehouse/`)
+    are one area, with at most one batch in flight there. Work in other areas runs in parallel only when
+    its files do not overlap; the orchestrator checks this before starting a session.
+  - One batch = one approved design or fix, built end to end (data, API, page, tests) by one builder,
+    with one judge review; a re-check covers only the blockers.
+  - Just before the judge review, the builder merges the latest main into the branch; the orchestrator
+    holds other merges into that area until the batch is merged, so what was judged is what lands.
+  - `judgments/log.jsonl` merges with git's union driver (`.gitattributes`): both sides' lines are kept
+    unchanged, so a log-only merge never conflicts and needs no judging; lines from the two sides may
+    interleave by side (no line is lost, edited or duplicated), and `tests/test_judgments.py` still checks
+    every line. Where GitHub's merge button reports a conflict anyway, merge locally with git.
+  - Merging main into a branch is not judged again when it has no conflict (for example only daily-run
+    `data/` commits came in); the green CI run on the merged commit is the evidence. A conflict in code
+    is judged.
+  - Owner-requested trivial changes (an icon, a wording fix) may skip the judge when the owner says so.
 - Daily runs are gated by `scripts/validate.py` (deterministic checks after each stage, settings
   in `config/validate.yaml`) and, for the reflector's lessons, by `scripts/lessons.py validate`, for the results-analyst's bullets by `scripts/results_digest.py validate`,
   for the deviation-explainer's notes by `scripts/intraday_check.py validate`, for the AI traders by
