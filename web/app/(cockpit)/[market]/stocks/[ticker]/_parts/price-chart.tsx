@@ -46,6 +46,8 @@ export function PriceChart({ p, ctx, horizon }: { p: CompanyPayload; ctx: PageCt
   const [hostRef, width] = useWidth<HTMLDivElement>();
   const [hover, setHover] = useState<number | null>(null);
   const reference = useMemo(() => publishedRanges(p), [p]);
+  // Horizons whose published range is B17's evening preview (on the day's close, never traded).
+  const eveningAt = useMemo(() => new Set(reference.filter((r) => r.run === "evening").map((r) => r.horizon_days)), [reference]);
   const atHorizon = useMemo(() => p.predictions.filter((r) => r.horizon_days === horizon && r.target_price != null), [p.predictions, horizon]);
   const lastClose = p.bars.length ? p.bars[p.bars.length - 1].close : null;
   const tagText = price(cur, lastClose);
@@ -129,7 +131,7 @@ export function PriceChart({ p, ctx, horizon }: { p: CompanyPayload; ctx: PageCt
               <polyline className="tl" points={g.targetLine ?? ""} />
               {g.spread ? <line className="spread" x1={g.spread.x} x2={g.spread.x} y1={g.spread.y1} y2={g.spread.y2} tabIndex={0}
                 data-tip={`${g.spread.count} strategies’ targets at N+${horizon}: ${price(cur, g.spread.min)} to ${price(cur, g.spread.max)}.`} /> : null}
-              {g.targets.map((t) => <circle key={t.k} className={"tg" + (t.on ? " on" : "")} cx={t.x} cy={t.y} r={t.on ? 5 : 3.5} />)}
+              {g.targets.map((t) => <circle key={t.k} className={"tg" + (t.on ? " on" : "") + (eveningAt.has(t.k) ? " eve" : "")} cx={t.x} cy={t.y} r={t.on ? 5 : 3.5} />)}
             </g>
           ) : null}
           {selected ? <line className="vl on" x1={selected.x} x2={selected.x} y1={T} y2={PB} /> : null}
@@ -147,7 +149,7 @@ export function PriceChart({ p, ctx, horizon }: { p: CompanyPayload; ctx: PageCt
           <g className="mk">{markEls}</g>
           {selPred && selected && g.targetTagY != null && selPred.target_price != null ? (
             <g className="ttag">
-              <title>{`N+${horizon} target ${price(cur, selPred.target_price)}`}</title>
+              <title>{`N+${horizon} target ${price(cur, selPred.target_price)}${selPred.run === "evening" ? " (evening preview, never traded)" : ""}`}</title>
               <line x1={selected.x} x2={W - R + 2} y1={selected.y} y2={g.targetTagY} />
               <rect x={W - R + 2} y={g.targetTagY - 9} width={tagW} height={18} rx={4} />
               <text x={W - R + 2 + tagW / 2} y={g.targetTagY + 4} textAnchor="middle">{price(cur, selPred.target_price)}</text>
@@ -194,6 +196,7 @@ export function PriceChart({ p, ctx, horizon }: { p: CompanyPayload; ctx: PageCt
             <span><i className="b8" />80% range</span>
             <span><i className="b5" />50% range</span>
             <span><i className="tg" />published target per horizon (the tag on the axis = the selected one)</span>
+            {eveningAt.size ? <span><i className="tg eve" />evening preview: on the day’s close, never traded; the pre-open run replaces it</span> : null}
             {g.spread ? <span><i className="sp" />all strategies’ targets at the selected horizon</span> : null}
           </>
         ) : null}
