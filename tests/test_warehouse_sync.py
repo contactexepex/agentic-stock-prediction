@@ -74,6 +74,7 @@ def expected_keys(tickers: list[str]) -> dict[str, list[str]]:
 US_TICKERS = [f"T{i}" for i in range(20)]  # only the count matters for the totals (20 US companies)
 PAGES = {table: len(keys) for table, keys in expected_keys(US_TICKERS).items()}
 TOTAL_PAGES = sum(PAGES.values())
+STATUS_PAGES = PAGES["status"]  # rewritten every sync: its built_at is the status route's freshness
 SPEC = REPO / "api" / "openapi.yaml"
 
 
@@ -185,10 +186,24 @@ def test_sync_is_idempotent(synced):
     assert synced["first"]["ok"] and synced["second"]["ok"]
     assert synced["first"]["tables"] == synced["second"]["tables"]
     assert set(synced["first"]["tables"]) == MIRRORED
-    assert synced["snap1"] == synced["snap2"]  # built_at and cutoff of the unchanged pages included
+    unchanged = {key: rows for key, rows in synced["snap1"].items() if key != "rm.status"}
+    assert unchanged == {key: rows for key, rows in synced["snap2"].items() if key != "rm.status"}  # built_at kept
     assert synced["first"]["pages_written"] == TOTAL_PAGES and synced["first"]["pages_unchanged"] == 0
-    assert synced["second"]["pages_written"] == 0 and synced["second"]["pages_unchanged"] == TOTAL_PAGES
+    assert synced["second"]["pages_written"] == STATUS_PAGES
+    assert synced["second"]["pages_unchanged"] == TOTAL_PAGES - STATUS_PAGES
     assert synced["first"]["tables"]["bars"] > 1000 and synced["first"]["tables"]["tickers"] == 20
+
+
+def test_status_page_records_the_last_sync_even_when_nothing_changed(synced):
+    """rm.status is rewritten by every sync with the sync's start as built_at, so the route's freshness follows the
+    last sync; its payload stays the same, and every other page keeps its first built_at (test above)."""
+    built_at = list(READ_MODEL_COLUMNS).index("built_at")
+    starts = dict(query(synced["root"], "SELECT run_id, started_at FROM meta.sync_runs"))
+    for snap, run in (("snap1", "first"), ("snap2", "second")):
+        rows = synced[snap]["rm.status"]
+        assert rows and {row[built_at] for row in rows} == {str(starts[synced[run]["run_id"]])}
+    same = [tuple(v for n, v in enumerate(row) if n != built_at) for row in synced["snap1"]["rm.status"]]
+    assert same == [tuple(v for n, v in enumerate(row) if n != built_at) for row in synced["snap2"]["rm.status"]]
 
 
 def test_dry_run_writes_nothing_and_counts_the_same_rows(synced):
@@ -227,7 +242,7 @@ def test_sync_runs_are_recorded(synced):
     assert [b[0] for b in builds[:2]] == [r[0] for r in rows[:2]]
     assert [b[1:7] for b in builds[:2]] == [
         ("us", "daily", True, TOTAL_PAGES, 0, None),
-        ("us", "daily", True, 0, TOTAL_PAGES, None),
+        ("us", "daily", True, STATUS_PAGES, TOTAL_PAGES - STATUS_PAGES, None),
     ]
     assert builds[0][7] == "unknown"  # the copied root is no git checkout
     assert builds[0][8] == datetime.fromisoformat(CUTOFF)
@@ -299,7 +314,7 @@ def test_replace_deletes_departed_pages_and_full_rebuilds(synced):
     con.execute("INSERT INTO rm.stock SELECT * REPLACE ('OLD' AS page_key) FROM rm.stock WHERE page_key = 'JPM'")
     con.close()
     res = sync.sync_market(cfg, force_local=True)
-    assert res["pages_deleted"] == 1 and res["pages_written"] == 0  # a ticker that left the watchlist
+    assert res["pages_deleted"] == 1 and res["pages_written"] == STATUS_PAGES  # a ticker that left the watchlist
     assert query(root, "SELECT count(*) FROM rm.stock WHERE page_key = 'OLD'") == [(0,)]
     assert query(root, "SELECT count(*) FROM information_schema.tables WHERE table_name = 'stale_table'") == [(1,)]
     full = sync.sync_market(cfg, full=True, force_local=True)

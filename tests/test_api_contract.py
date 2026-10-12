@@ -361,8 +361,11 @@ def test_a_sync_revalidates_written_and_deleted_pages_in_both_modes(warehouse, m
             assert url == "https://omenix.vercel.app"
             assert gone in keys
             written = summary["pages_written"]
-            assert len(keys) == written + 1  # incremental: nothing else changed; full: every page is written anew
-            assert (written == 0) if not full else (written == sum(summary["read_model_pages"].values()))
+            assert len(keys) == written + 1  # incremental: only rm.status (rewritten every sync); full: every page
+            status = {"table": "status", "market": "us", "page_key": "_"}
+            assert status in keys  # its built_at is the freshness, so its cache is refreshed every sync
+            pages = summary["read_model_pages"]
+            assert (written == pages["status"]) if not full else (written == sum(pages.values()))
     finally:
         common.ROOT = saved_root
         mp.undo()
