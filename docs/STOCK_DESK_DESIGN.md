@@ -82,7 +82,7 @@ patterns finds lucky ones. So the team works under strict evidence rules (sectio
 
 | Lesson | What happened in F&O | What it means here |
 |---|---|---|
-| Building is not discovering | Review rounds 2-6 went into making one diagnostic correct; no strategy was found; the owner: "you and ChatGPT are not fulfilling the roles" | Since 8 Oct this project has spent nearly all effort on the app, pipeline and pages. The only research was the research director's weekly review (W41) and the 15-year backtest of 10 Oct; there has been **no desk meeting**. The same drift. The first deliverable of this design is research (desk meeting 1), not code |
+| Building is not discovering | Five review rounds, then a sixth, went mostly into correcting diagnostics (the backtest replay and the capacity screen); no strategy was found; the owner: "you and ChatGPT are not fulfilling the roles" | Since 8 Oct this project has spent nearly all effort on the app, pipeline and pages. The only research was the research director's weekly review (W41) and the 15-year backtest of 10 Oct; there has been **no desk meeting**. The same drift. The first deliverable of this design is research (desk meeting 1), not code |
 | Many weak rules agreeing is not evidence | 19 chart rules voting; 4 of 30 coin-toss runs did worse (about the 13th percentile): no positive edge was established, and neither was equality with chance | Our 8 "rule" strategies are one signal model, each changing one parameter (news weight, statuses, materiality, cross-market, regime filter or threshold). The morning Slack post ranks companies by how many of all 15 strategies buy at N+1, so the 8 near-identical rule strategies can supply 8 of those votes. Agreement must count independent sources only |
 | Start from the data, not from a strategy | The owner: "not to check existing strategies" | Desk meetings start from questions about the data. The current 15 strategies are one input, not the agenda |
 | Controls on every test | Coin toss, always up, always down; all 219 entries in every control | Keep the v16 comparators (cash, simple momentum, model-only) and add the coin-toss distribution for every discovery test |
@@ -116,9 +116,9 @@ From PLAN_v16 sections 2.4-2.5 and the stored data:
    earned.
 8. **The universe is small.** 20 companies per market limits any cross-sectional idea (ranking stocks against each
    other) and the number of independent observations.
-9. **Costs.** At the owner's India costs, a trade must move several tenths of a percent before it breaks even, and
-   more under the Axis Direct NRI scenario than under a zero-brokerage broker (open question 12.4). N+1 in India is
-   the hardest case.
+9. **Costs.** Under the Axis Direct NRI costs, India always-up N+1 averaged -1.98% per trade (market cost) and -2.42%
+   (owner's cost) over 15 years (PLAN_v16 2.5). A zero-brokerage broker would cost far less (open question 12.4).
+   N+1 in India is the hardest case.
 10. **Independence is weak:**
     - the judge and the forecaster both run on Opus 5.5;
     - the bull and bear researchers read the same context pack;
@@ -273,7 +273,8 @@ The two types agreed in the F&O design, mapped onto v16:
   - abstentions count, and each role is judged only where it applies.
 
   v16 already contains such pairs: `acct.ai.v1` against `acct.noai.v1` measures the whole AI pipeline (news
-  scoring plus the trader); `acct.ai.v1` against `acct.news.v1` isolates the trader. New roles
+  scoring, claim checking and the Sonnet trader; H3); `acct.ai.v1` against the exploratory `acct.news.v1` isolates
+  the trader. New roles
   are measured the same way, as challengers.
 - **Mandatory control roles** (data, risk, cost, the judge's hard checks): scored on correctness and caught violations.
   They are never removed because no disaster happened lately.
@@ -290,9 +291,11 @@ The two types agreed in the F&O design, mapped onto v16:
   - post-close settlement and reasons.
 
   AI roles take part daily only as frozen parts of a registered policy.
-- **Fixed policy, dynamic decisions:** a strategy is never invented and traded the same day. v16 11.5 allows only
-  learned combination weights (shrunk toward equal weights, tested against the frozen equal-weight policy) and **no
-  automatic adaptation of decision rules in the first phase**. Any other change is a new version.
+- **Fixed policy, dynamic decisions:** a strategy is never invented and traded the same day. v16 11.5 (step 6,
+  deferred): combination weights may be learned, shrunk toward equal weights and tested against the frozen
+  equal-weight policy; no automatic adaptation of decision rules in the first phase. The update rules registered
+  with a policy (the monthly model refit, the pick's strongest-strategy ranking, `model_news_update` if applied;
+  v16 8.10) keep running. Any other change is a new version.
 
 ## 8. Evidence rules
 
