@@ -4,7 +4,7 @@
   get:
     tags: [portfolio]
     operationId: getPaperPortfolios
-    summary: The head-to-head portfolios, the open head-to-head trades with their latest intraday check, every paper trade in one place (the accuracy view indexed per entry session) and the owner's own paper portfolio
+    summary: The head-to-head portfolios, the open paper trades with their latest intraday check, every paper trade in one place (the accuracy view indexed per entry session) and the owner's own paper portfolio
     x-read-model: rm.portfolio
     parameters:
       - $ref: '#/components/parameters/Market'

@@ -216,17 +216,17 @@ def test_block_and_pages_validate_against_the_contract(block, pages):
     assert schema_errors(list(pages.values()), "PaperPortfoliosTable") == []
 
 
-def test_market_page_open_trades_and_checks_are_head_to_head_only(monkeypatch):
+def test_market_page_open_trades_and_checks_stay_whole_and_pass_price_pending(monkeypatch):
     from marketbrief.warehouse import rm_portfolio
 
     opens = [opened("o1", "accuracy", "rule"), opened("o2", "head_to_head", "rule")]
+    opens.append(opened("o3", "head_to_head", "rule", price_pending=True, entry_price_source=None))
     checks = [{"trade_id": "o1", "view": "accuracy"}, {"trade_id": "o2", "view": "head_to_head"}]
     monkeypatch.setattr(rm_portfolio.rm_common, "open_trades", lambda _ctx: opens)
     monkeypatch.setattr(rm_portfolio.rm_company, "market_trade_checks", lambda _ctx: checks)
     ctx = lab_context("us")
-    assert [t["trade_id"] for t in rm_portfolio.open_trades(ctx)] == ["o2"]
-    pending = opened("o3", "head_to_head", "rule", price_pending=True, entry_price_source=None)
-    opens.append(pending)
-    passed = rm_portfolio.open_trades(ctx)[-1]
-    assert (passed["price_pending"], passed["entry_price_source"], passed["last_price_time"]) == (True, None, None)
-    assert [t["trade_id"] for t in rm_portfolio.trade_checks(ctx)] == ["o2"]
+    listed = rm_portfolio.open_trades(ctx)
+    assert [t["trade_id"] for t in listed] == ["o1", "o2", "o3"]  # B16's live page counts this list
+    assert [t["trade_id"] for t in rm_portfolio.trade_checks(ctx)] == ["o1", "o2"]
+    pending = listed[2]
+    assert (pending["price_pending"], pending["entry_price_source"], pending["last_price_time"]) == (True, None, None)

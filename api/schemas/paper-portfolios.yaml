@@ -65,8 +65,8 @@ PaperPortfolios:
   x-source: warehouse/rm_portfolio.portfolio_pages
   description: >-
     One market's Paper portfolios page as of the cut-off: the head-to-head portfolios (scoreboard rows of scopes
-    strategy and pick_rule, forward basis), the open head-to-head trades (B4's open-trade derivation) and their rows of
-    the latest intraday trade check (B12's), and the owner's own paper trades and FIFO positions with the EUR view of US
+    strategy and pick_rule, forward basis), every open paper trade (B4's open-trade derivation) and the rows of the
+    latest intraday trade check (B12's), and the owner's own paper trades and FIFO positions with the EUR view of US
     positions, and every paper trade in one place (all_trades). Research only: a paper trade is a record, never an
     order. Paper only.
   allOf:
