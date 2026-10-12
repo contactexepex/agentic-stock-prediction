@@ -88,3 +88,46 @@ def test_ranges_asof_reads_the_evening_rows_only_when_asked(market, monkeypatch)
     assert all(pre_open[rid]["center"] > 0 == evening[rid]["center"] for rid in ALL)   # the cue is the revision
     with pytest.raises(SystemExit):
         contract.ranges_asof(MARKET, "2026-10-05T12:00:00+00:00", run="noon")
+
+
+def test_range_runs_label_each_run_of_a_window(market, monkeypatch):  # noqa: F811 (test_guard's fixture)
+    root, cfg_dir, _, _ = market
+    monkeypatch.setattr(common, "CONFIG", cfg_dir)
+    snapshot(root, "2026-10-02T21:00:00+00:00")
+    assert run("ranges.py", root, cfg_dir, "--evening", "--now", EVENING).returncode == 0
+    snapshot(root, "2026-10-05T11:00:00+00:00")
+    assert run("ranges.py", root, cfg_dir, "--now", PRE_OPEN).returncode == 0
+    rows = contract.range_runs(MARKET, "2026-10-05T12:00:00+00:00", "2026-09-28", "2026-10-02")
+    assert [(r["id"], r["run"]) for r in rows] == [(rid, name) for rid in ALL for name in ("evening", "pre_open")]
+    assert all(r["horizon_label"] == "n_plus_k" and r["exit_date"] == r["target_date"] for r in rows)
+    assert {r["run"] for r in contract.range_runs(MARKET, "2026-10-03T00:00:00+00:00", "2026-10-02",
+                                                  "2026-10-02")} == {"evening"}           # the clock: no look-ahead
+    assert contract.range_runs(MARKET, "2026-10-05T12:00:00+00:00", "2026-10-03", "2026-10-09") == []   # the window
+
+
+def score_row(rid_day: str, computed_at: str, prob: float, **extra) -> dict:
+    return {"id": f"{rid_day}-AAPL-1d", "as_of_date": rid_day, "ticker": "AAPL", "horizon_days": 1,
+            "label_convention": "open_to_close", "prob_up": prob, "prob_model": prob, "calibrated": False,
+            "base_rate": 0.5, "news_score": 0.0, "news_logit": 0.0, "contributions": {"up": [], "down": []},
+            "model_version": "v", "model_id": "m", "trained_until": "2026-09-01", "computed_at": computed_at,
+            **extra}
+
+
+def test_score_runs_label_each_run_and_keep_old_rows_pre_open(market, monkeypatch):  # noqa: F811
+    root, cfg_dir, _, _ = market
+    monkeypatch.setattr(common, "CONFIG", cfg_dir)
+    path = root / "data" / MARKET / "model_scores" / "2026" / "10" / "2026-10-02.jsonl"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    new = {"horizon_label": "n_plus_k", "entry_date": "2026-10-05", "exit_date": "2026-10-06"}
+    rows = [score_row("2026-10-01", "2026-10-02T11:00:00+00:00", 0.51),                    # before the evening run
+            score_row("2026-10-02", EVENING, 0.55, run="evening", **new),
+            score_row("2026-10-02", "2026-10-05T11:00:00+00:00", 0.58, run="pre_open", **new),
+            {**score_row("2026-10-02", EVENING, 0.6), "id": "2026-10-02-AAPL-5d", "horizon_days": 5}]   # legacy
+    path.write_text("".join(json.dumps(r) + "\n" for r in rows))
+    got = contract.score_runs(MARKET, "2026-10-05T12:00:00+00:00", "2026-10-01", "2026-10-02")
+    assert [(r["id"], r["run"], r["prob_up"]) for r in got] == [
+        ("2026-10-01-AAPL-1d", "pre_open", 0.51), ("2026-10-02-AAPL-1d", "evening", 0.55),
+        ("2026-10-02-AAPL-1d", "pre_open", 0.58)]                          # the legacy 5-day (D+4) row never appears
+    assert [r["run"] for r in contract.score_runs(MARKET, "2026-10-03T00:00:00+00:00", "2026-10-02",
+                                                  "2026-10-02")] == ["evening"]         # the clock: no look-ahead
+    assert isinstance(got[1]["contributions"], dict) and str(got[0]["exit_date"]) == "2026-10-05"  # Thu: Mon

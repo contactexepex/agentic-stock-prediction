@@ -49,6 +49,7 @@ class HorizonScore(TypedDict):
     entry_date: date          # new: D
     exit_date: date           # new: the k-th session after D
     model_variant: str | None  # new (B10): base (null on older rows) or cross_market
+    run: str | None           # new (B10, evening run): evening or pre_open (null on older rows = pre_open)
 
 
 class HorizonRange(TypedDict):
@@ -108,3 +109,19 @@ def ranges_asof(market: str, as_of: datetime, horizon_days: int | None = None,
     rows, the revision of record; run="evening": the evening run's preview of the same ids (ranges_evening), for
     showing evening vs pre-open; never traded."""
     return records.ranges_asof(market, as_of, horizon_days, run=run)
+
+
+def range_runs(market: str, as_of: datetime, first_day: date, last_day: date) -> list[dict]:
+    """Every run's N+k range of the as-of dates first_day..last_day known by `as_of`: HorizonRange records plus
+    `run` ("pre_open" from `ranges`, the revision of record; "evening" from `ranges_evening`), the first row per id of
+    each, ordered by as-of date, ticker, horizon and made_at (B12's forecast history: evening vs pre-open per id)."""
+    return records.range_runs(market, as_of, first_day, last_day)
+
+
+def score_runs(market: str, as_of: datetime, first_day: date, last_day: date,
+               variant: str = "base") -> list[HorizonScore]:
+    """Every stored N+k model score of the as-of dates first_day..last_day computed by `as_of`, with `run` ("evening"
+    or "pre_open"; null on older rows = pre_open), oldest first per id. A run writes a row only when the probability
+    changed, so an id without a pre-open row was unchanged at the pre-open run."""
+    return records.score_runs(market, as_of, first_day, last_day, variant=variant)
+

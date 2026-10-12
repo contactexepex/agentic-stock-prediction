@@ -1925,7 +1925,10 @@ Decision 37: horizon k is N+k, buy at the open of D and sell at the close of the
   the revision of record: scoring, settlement, picks, trade checks and `ranges_asof` read only them.
   `ranges_asof(..., run="evening")` reads the evening rows for showing evening vs pre-open. Model scores stay in
   `model_scores`: an evening row is followed by a pre-open row only when the probability changed, and readers take
-  the newest computed_at by their clock.
+  the newest computed_at by their clock. New score rows carry `run` (`model_scores.py --evening` writes "evening",
+  otherwise "pre_open"; null on older rows = pre_open). `contracts/horizons.range_runs` and `score_runs` return
+  every run's N+k rows of a window of as-of dates known by the clock, each labelled with its run, for showing how
+  a forecast changed between the evening and the pre-open run.
 - **Backtest per horizon** (`model_backtest.py --out DIR` on stored data, open-to-close, after costs; model long at
   p >= 0.55, % per date, 95% block bootstrap; vs = mean difference per date; full run 37 s):
 
