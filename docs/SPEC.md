@@ -674,7 +674,7 @@ sessions a week for both markets (owner decision 2026-10-12) and 1 weekly resear
 | Post-close (new) | 17:45 IST | 18:15 New York | close bars, settlement, EOD analyst, sync, Slack close results |
 | Evening forecast (owner decision 2026-10-10) | 21:30 UTC Mon-Fri | 18:30 New York Mon-Fri | preview ranges, model scores and rule predictions on the close (never traded), sync |
 | News (combined india+us session; owner decision 2026-10-12) | 10:45 IST daily, 13:45 IST weekdays | 11:27 and 17:27 New York daily, 14:27 New York weekdays | news, articles, clusters, sync |
-| Weekly research (new; Friday evening since owner decision 2026-10-10; 19:30 pending the owner's answer to 19:00 vs 19:30) | Friday 19:30 New York | Friday 19:30 New York | news-impact study, research director, weekly post |
+| Weekly research (new; Friday 19:30 New York since the owner's decisions of 2026-10-10 and 2026-10-12) | Friday 19:30 New York | Friday 19:30 New York | news-impact study, research director, weekly post |
 
 ## 8. How the UI connects to the backend
 

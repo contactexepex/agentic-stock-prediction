@@ -60,7 +60,7 @@ scores and rule-strategy predictions on the day's close, after the bar is final:
 | US post-close | `CRON_TZ=America/New_York 15 18 * * 1-5` | 22:15 in EDT, 23:15 in EST |
 | India evening forecast | `30 21 * * 1-5` (UTC) | 21:30 |
 | US evening forecast | `CRON_TZ=America/New_York 30 18 * * 1-5` | 22:30 in EDT, 23:30 in EST |
-| India weekly research | `CRON_TZ=America/New_York 30 19 * * 5` (owner decision 2026-10-10: Friday evening, both markets; the owner said 19:00; 19:30 until the owner answers B17's request for 19:30) | Friday 23:30 in EDT, Saturday 00:30 in EST |
+| India weekly research | `CRON_TZ=America/New_York 30 19 * * 5` (owner decisions 2026-10-10, Friday evening for both markets, and 2026-10-12, 19:30) | Friday 23:30 in EDT, Saturday 00:30 in EST |
 | US weekly research | `CRON_TZ=America/New_York 30 19 * * 5` (same) | Friday 23:30 in EDT, Saturday 00:30 in EST |
 
 **Open paper trades (B9, docs/ws/b9.md).** Each check also covers every open paper trade (F1) of every
