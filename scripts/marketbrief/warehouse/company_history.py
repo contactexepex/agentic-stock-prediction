@@ -3,44 +3,35 @@ the signal model's scores of the last FORECAST_HISTORY_SESSIONS as-of dates, per
 (owner, 2026-10-10: see how each forecast was calculated and what changed between runs). A run's change is taken
 against the previous stored run of the same company and horizon: the target and 80% width moves, P(up) and the points
 per feature group, the news items added or dropped and the inputs that changed (model, calibration, regime, range
-inputs). Ranges and scores are published for every company whatever a strategy's live_from."""
+inputs). Each run carries `run`: "evening" (B17's evening run on the day's close, a preview never traded) or
+"pre_open" (the revision of record), so the change from the evening to the pre-open run shows directly. The runs come
+from B10's window readers (contracts.horizons.range_runs / score_runs: its N+k label rule, the first range per id of
+each run, every stored score). Ranges and scores are published for every company whatever a strategy's live_from."""
 from __future__ import annotations
 
-import json
+from datetime import date
 
-from marketbrief.analytics.horizon_records import with_window
-from marketbrief.constants.horizons import LABEL_N_PLUS_K, SQL_LABEL_MODEL_SCORES, SQL_LABEL_RANGES
+from marketbrief.analytics.horizon_records import range_runs, score_runs
 from marketbrief.constants.rm_company import (HISTORY_RANGE_CHANGED, HISTORY_RANGE_FIELDS, HISTORY_SCORE_CHANGED,
                                               HISTORY_SCORE_FIELDS)
 from marketbrief.lab.strategies import target_price
 from marketbrief.warehouse.news_items import iso
 from marketbrief.warehouse.rm_registry import BuildContext
 
-# every stored run (each id once per made_at / computed_at) of the window's N+k rows, stored by the cut-off; the
-# horizon label is B10's rule (old open-to-close 1-day scores count as N+1, analytics/horizon_records.py)
-RANGES_SQL = f"""
-WITH runs AS (
-    SELECT DISTINCT ON (id, made_at) * REPLACE ({SQL_LABEL_RANGES} AS horizon_label) FROM ranges
-    WHERE made_at <= $cutoff::TIMESTAMPTZ AND as_of_date BETWEEN $first::DATE AND $as_of::DATE
-    ORDER BY id, made_at, lo80, hi80
-)
-SELECT * FROM runs WHERE horizon_label = '{LABEL_N_PLUS_K}' ORDER BY id, made_at"""
-SCORES_SQL = f"""
-WITH runs AS (
-    SELECT DISTINCT ON (id, computed_at) * REPLACE ({SQL_LABEL_MODEL_SCORES} AS horizon_label) FROM model_scores
-    WHERE computed_at <= $cutoff::TIMESTAMPTZ AND as_of_date BETWEEN $first::DATE AND $as_of::DATE
-    ORDER BY id, computed_at, prob_up, model_id
-)
-SELECT * FROM runs WHERE horizon_label = '{LABEL_N_PLUS_K}' ORDER BY id, computed_at"""
 PCT = 100.0
 DIGITS = 4
 
 
-def records(con, sql: str, params: dict) -> list[dict]:
-    """The query's rows as dicts of plain Python values (lists, dates, None; no pandas types)."""
-    cursor = con.execute(sql, params)
-    names = [column[0] for column in cursor.description]
-    return [dict(zip(names, values, strict=True)) for values in cursor.fetchall()]
+def once(rows: list[dict], time_key: str) -> list[dict]:
+    """Each id once per run time (an exact repeat of a stored row is one run)."""
+    seen: set[tuple] = set()
+    kept = []
+    for row in rows:
+        key = (row["id"], row[time_key], row["run"])
+        if key not in seen:
+            seen.add(key)
+            kept.append(row)
+    return kept
 
 
 def day(value) -> str | None:
@@ -79,8 +70,7 @@ def range_change(row: dict, previous: dict | None) -> dict | None:
 def score_row(rec: dict) -> dict:
     """One stored score run: P(up), its model, the points per feature group, the strongest drivers each way and
     the news items it counted (the score's explanation, model/explain.py)."""
-    explain = rec.get("contributions")
-    explain = json.loads(explain) if isinstance(explain, str) else (explain or {})
+    explain = rec.get("contributions") or {}
     news = explain.get("news") or {}
     row = {name: rec.get(name) for name in HISTORY_SCORE_FIELDS}
     row.update(computed_at=iso(rec["computed_at"]), as_of_date=day(rec["as_of_date"]),
@@ -121,15 +111,14 @@ def with_changes(rows: list[dict], time_key: str, change) -> list[dict]:
 
 
 def forecast_history(ctx: BuildContext, first_day: str | None, as_of: str | None) -> dict[str, dict]:
-    """ticker -> {ranges, scores}: every stored run of the as-of dates first_day..as_of, by horizon then time, of
-    the collected companies; {} without a window."""
+    """ticker -> {ranges, scores}: every stored run of the as-of dates first_day..as_of known by the cut-off, by
+    horizon then time, of the collected companies; {} without a window."""
     if not (first_day and as_of):
         return {}
-    params = {"cutoff": ctx.cutoff, "first": first_day, "as_of": as_of}
-    ranges = [range_row(with_window(ctx.cfg, rec)) for rec in records(ctx.con, RANGES_SQL, params)
-              if rec["ticker"] in ctx.collected]
-    scores = [score_row(with_window(ctx.cfg, rec)) for rec in records(ctx.con, SCORES_SQL, params)
-              if rec["ticker"] in ctx.collected]
+    window = (ctx.cutoff_time, date.fromisoformat(first_day), date.fromisoformat(as_of))
+    ranges = [range_row(rec) for rec in range_runs(ctx.market, *window, con=ctx.con) if rec["ticker"] in ctx.collected]
+    scores = [score_row(rec) for rec in score_runs(ctx.market, *window, con=ctx.con) if rec["ticker"] in ctx.collected]
+    ranges, scores = once(ranges, "made_at"), once(scores, "computed_at")
     history: dict[str, dict] = {}
     for kind, rows in (("ranges", with_changes(ranges, "made_at", range_change)),
                        ("scores", with_changes(scores, "computed_at", score_change))):

@@ -289,6 +289,7 @@ HistoryRange:
     notes:
       type: array
       items: {type: string}
+    run: {$ref: '#/components/schemas/ForecastRun'}
     change:
       type: ['object', 'null']
       required: [from_id, from_made_at, target_pct, width80_pct, changed]
@@ -338,6 +339,7 @@ HistoryScore:
     news_ids:
       type: array
       items: {type: string}
+    run: {$ref: '#/components/schemas/ForecastRun'}
     change:
       type: ['object', 'null']
       required: [from_id, from_computed_at, prob_up, groups, news_added, news_dropped, changed]
@@ -365,6 +367,12 @@ ScoreDriver:
     feature: {type: string}
     points: {type: number}
     text: {type: ['string', 'null']}
+ForecastRun:
+  type: ['string', 'null']
+  enum: [evening, pre_open, null]
+  description: >-
+    The run that wrote a range or score: evening (B17's evening run on the day's close, a preview never traded) or
+    pre_open (the revision of record; null on older score rows reads as pre_open)
 PublishedRange:
   type: object
   description: >-
@@ -388,6 +396,7 @@ PublishedRange:
     lo80: {type: number}
     hi80: {type: number}
     regime: {type: ['string', 'null']}
+    run: {$ref: '#/components/schemas/ForecastRun'}
 StrategyPrediction:
   type: object
   description: >-
