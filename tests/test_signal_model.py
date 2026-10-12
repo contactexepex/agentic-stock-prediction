@@ -320,7 +320,7 @@ def test_daily_scores_end_to_end(tmp_path, monkeypatch, inputs):
     monkeypatch.setattr(paths, "ROOT", tmp_path)
     monkeypatch.setenv("MB_NOW", f"{DAYS[-1].date() + pd.Timedelta(days=1)}T12:00:00+00:00")
     monkeypatch.setattr(daily_scores, "load_model_config", lambda: SETTINGS)
-    first = daily_scores.run(CFG)
+    first = daily_scores.run(CFG, "evening")  # the evening run (B17's option C): rows marked run = evening
     count = 2 * len(horizons())               # N+1..N+5 (config/strategies.yaml) x the base and cross_market models
     assert first["scores"] == count * len(CFG["tickers"]) and len(first["new_model_versions"]) == count
     files = list((tmp_path / "data" / "us" / KIND_MODEL_SCORES).rglob("*.jsonl"))
@@ -331,6 +331,7 @@ def test_daily_scores_end_to_end(tmp_path, monkeypatch, inputs):
     assert all(0 < r["prob_up"] < 1 and r["label_convention"] == LABEL_OPEN_TO_CLOSE for r in rows)
     assert {r["horizon_days"] for r in rows} == set(horizons()) and {r["horizon_label"] for r in rows} == {"n_plus_k"}
     assert not any("cross_market" in r["id"] or "model_variant" in r for r in rows)   # base model only
+    assert {r["run"] for r in rows} == {"evening"}
     variant = [json.loads(x) for f in (tmp_path / "data" / "us" / "model_variant_scores").rglob("*.jsonl")
                for x in f.read_text().splitlines()]
     assert len(variant) == len(rows) and {r["model_variant"] for r in variant} == {"cross_market"}
@@ -349,6 +350,7 @@ def test_daily_scores_end_to_end(tmp_path, monkeypatch, inputs):
     cross = {v["horizon_days"]: set(v["model"]["features"]) for v in fits}
     assert sorted(cross) == sorted(base) == list(horizons())                 # the variant's own fits (issue #124)
     assert all(base[h] < cross[h] and all(x.startswith("x_") for x in cross[h] - base[h]) for h in base)
-    second = daily_scores.run(CFG)                                        # same day again: stored model reused
+    second = daily_scores.run(CFG)    # the pre-open run after the evening one: stored model reused, and an unchanged
+    # probability writes no row (the evening row stays the newest; B17's option C)
     assert second["scores"] == 0 and second["unchanged"] == count * len(CFG["tickers"])
     assert second["new_model_versions"] == []

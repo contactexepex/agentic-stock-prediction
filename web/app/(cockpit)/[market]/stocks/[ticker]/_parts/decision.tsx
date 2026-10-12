@@ -137,11 +137,14 @@ export function DecisionCard({ p, ctx, horizon, onHorizon }: { p: CompanyPayload
         <div className="cell">
           <div className="l">
             <Icon name="query_stats" />Published range at N+{horizon}
-            <button className="md-help" type="button" aria-label="Explain" data-tip={`The published range for this horizon, computed by ranges.py: the target is the expected exit close; the 50% and 80% ranges are where the close is expected to land that often. Drawn on the chart. The chance of a rise is the reference rule strategy’s (${reference.name}), when it has a prediction.`}>?</button>
+            <button className="md-help" type="button" aria-label="Explain" data-tip={`The published range for this horizon, computed by ranges.py: the target is the expected exit close; the 50% and 80% ranges are where the close is expected to land that often. Drawn on the chart. An evening preview is computed on the day’s close and never traded; the pre-open run replaces it. The chance of a rise is the reference rule strategy’s (${reference.name}), when it has a prediction.`}>?</button>
           </div>
           {range && bands ? (
             <>
-              <div className="v">{price(ctx.currency, range.target_price)}<small> target</small></div>
+              <div className="v">
+                {price(ctx.currency, range.target_price)}<small> target</small>
+                {range.run === "evening" ? <> <Label tone="info" icon="schedule" tip="Computed in the evening run on the day’s close: a preview, never traded. The pre-open run replaces it before the open.">evening preview · never traded</Label></> : null}
+              </div>
               <RangeBar currency={ctx.currency} bands={bands} last={co.last_close ?? null} />
               <div className="s">
                 80% range {price(ctx.currency, range.lo80)}–{price(ctx.currency, range.hi80)} · exit {fmtDate(range.exit_date)}

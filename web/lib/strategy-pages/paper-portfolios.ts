@@ -1,6 +1,7 @@
 // The Paper portfolios page's own presentation logic (B16; design/mockups/07-paper-portfolios, notes.md "Shown but
 // computed by the page"): the KPI sums, the open trades filtered and grouped by strategy, and the add-trade form's
 // request (body, Idempotency-Key, the receipt's words). A paper trade is a record, never an order. Pure.
+import type { AllTrades } from "./all-trades.ts";
 import { FAMILY_ORDER, type Family, type ScoreboardRow, type Strategy } from "./scoreboard.ts";
 
 export interface OpenTrade {
@@ -12,7 +13,8 @@ export interface OpenTrade {
   horizon_days: number;
   entry_date: string;
   exit_date: string;
-  entry_price: number;
+  /** Null while `price_pending` (entered at D's open, no price stored or checked yet; B4). */
+  entry_price: number | null;
   target_price: number;
   lo80: number;
   lo50: number;
@@ -23,6 +25,8 @@ export interface OpenTrade {
   unrealised_pnl: number | null;
   unrealised_pct: number | null;
   to_target_pct: number | null;
+  /** Entered at D's open but no price stored or checked yet: prices, quantity and unrealised figures are null (B4). */
+  price_pending?: boolean;
 }
 
 export interface TradeCheck {
@@ -100,6 +104,8 @@ export interface PaperPortfoliosPayload {
   open_trades: OpenTrade[];
   trade_checks: TradeCheck[];
   owner: { trades: OwnerTrade[]; positions: OwnerPosition[]; default_amount: number; paper: boolean };
+  /** Every paper trade in one place (B13, owner request 2026-10-12); absent from older read models. */
+  all_trades?: AllTrades | null;
 }
 
 export const SOURCE: Readonly<Record<string, string>> = {
@@ -111,6 +117,10 @@ function sumKnown(values: ReadonlyArray<number | null>): number | null {
   const known = values.filter((value): value is number => value !== null);
   return known.length ? known.reduce((total, value) => total + value, 0) : null;
 }
+
+/** An open trade with no price yet: B4's flag, or (when a read model leaves the flag out) a null entry price, which only a
+ * pending trade has. */
+export const pricePending = (trade: OpenTrade): boolean => trade.price_pending === true || trade.entry_price === null;
 
 export function openSummary(payload: PaperPortfoliosPayload): { open: number; unrealised: number | null; flagged: number } {
   return {
