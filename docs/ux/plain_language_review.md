@@ -115,7 +115,7 @@ text appears on hover or tap, "inline" means it is printed on the page.
 | `home:109` | `N+${horizon} = …the close of the ${ORDINAL[horizon]…} session after the open` | "Buy at today's open, sell at the close {k} trading days later." Say this once, inline, above the tabs. |
 | `home:140` | `buyers N+1 … N+5` | "Buyers for 1 to 5-day holds". |
 | `home:144` | `avg. chance of a rise` | Keep. Add "(50% = coin flip)" inline, not only in the tooltip at `home:143`. |
-| `home:162-165` | card `Today’s head-to-head paper trades`; help with `p × move − (1 − p) × loss − costs` and `decisions 41-42` | Title: **"Today's test trades: rule vs AI"**. Help: "Each side picks the holding period it thinks is best, in two ways: the best expected gain and the highest chance of rising. Each pick is a paper trade of {amount}. The formula is on the Help page." |
+| `home:162-165` | card `Today’s head-to-head paper trades`; help with `p × move − (1 − p) × loss − costs` and `Decisions 41-42` | Title: **"Today's test trades: rule vs AI"**. Help: "Each side picks the holding period it thinks is best, in two ways: the best expected gain and the highest chance of rising. Each pick is a paper trade of {amount}. The formula is on the Help page." |
 | `home:175` | `(expected gain after costs above zero; your cost = decision 51)` | "(worth it = the expected gain is bigger than all fees)". |
 | `home:234` | `to target ${…} · downside ${…} · costs ${…}%` | "If right: +{x}% · if wrong: −{y}% · fees {z}%". |
 | `home:276` | `No settled paper trade yet` | See section 4: "First results after Tuesday's close ({date}, {time})". |
@@ -281,8 +281,8 @@ invented. Two things a newcomer cannot know:
 | `tr:242` | `Ranges held` | **"Did the price land in the predicted range?"** |
 | `tr:304-305` | `Signal model back-test`; help `walk-forward test…` | **"Replay on past years (not real trades)"**. Help: "Each month the model was trained only on earlier data and then tested on the next month, as if in real time." |
 | `tr:329` | column `AUC`; tooltip `Area under the curve: 0.5 is no ranking ability…` | **"Picks risers better than chance?"** Show it as a meter centred on 0.5 (coin flip), with the word "no" / "slightly" / "yes". Keep "AUC" in small print. |
-| `tr:349` | `Paper long against the baselines` | **"If you had bought whenever the model said 'likely up', vs simple benchmarks"**. |
-| `tr:354` | columns `Bar`, `Positions`, `Days` | "Buy when chance ≥", "Times it would have bought", "Days tested". |
+| `tr:349` | `Paper long against the baselines` | **"A pretend purchase whenever the model said 'likely up', vs simple benchmarks"**. |
+| `tr:354` | columns `Bar`, `Positions`, `Days` | "Would buy when chance ≥", "Times it would have bought", "Days tested". |
 | `tr:355` | `The model’s paper long minus the baseline: the return over the whole window (1 or 5 sessions)…` | "Extra return per trade compared with the benchmark, for 1-day and 5-day holds. Positive = the model did better." |
 | `tr:361` | `the model’s paper long (buy when the chance clears the bar) against each baseline` | Same as `tr:349`. Define "paper long" once in the glossary: "a pretend purchase, held for the stated days". |
 | `tr:392` | `No rule-only replay stored by the cut-off.` | "No replay yet: it runs on request." |
@@ -336,7 +336,7 @@ Built **only from data the Home payload already carries**, unless a line is mark
 └──────────────────────────────────────────────────────────────────────────────────────┘
 ┌──────────────────────────────────────────────────────────────────────────────────────┐
 │  Today in 3 lines                                                                    │
-│  1. Market mood: calm. Most stocks you follow are up/down (n up, m down).            │
+│  1. Market mood: calm. The index moved +0.4%; n of the stocks you follow rose, m fell.│
 │  2. 223 paper trades opened at 09:15; the 1-day ones finish at Tuesday's close.      │
 │  3. The story that mattered: "<top mover headline>" (confirmed)                      │
 │                                                           [See all paper trades ▸]   │
@@ -359,7 +359,7 @@ The numbers in the wireframe are placeholders shaped like Day 1, not computed va
 | Paper trades so far: finished / won / lost | `settled_trades` (each with `net_pnl`): count, `net_pnl > 0` = won, `< 0` = lost | exists |
 | Running | `open_trades.length` (being fixed by B4/B13/B16) | exists |
 | First results | min `open_trades[].exit_date`, and `status.runs.post_close.next_at` | exists |
-| Today line 1 (mood, ups and downs) | `status.regime`; `companies[].change_pct` (count > 0, < 0) | exists. A benchmark move would need **new field D4**. |
+| Today line 1 (mood, ups and downs) | `status.regime`; `status.benchmark.change_pct` (`web/lib/ui/types.ts:78`); `companies[].change_pct` (count > 0, < 0) | exists |
 | Today line 2 | `open_trades` by `entry_date` = today; `status.runs.pre_open.at` | exists |
 | Today line 3 | `news` via the existing `movers()` (first item) and its `status` | exists |
 | Link to the trades | `pagePath(market, "portfolios")` (already used at `home:491`) | exists |
@@ -382,14 +382,14 @@ at `live_from`.
 | `home:328`, `rva:81` | `no settled trade yet` / `Nothing settled yet in the head-to-head view.` | "{n} running · first finishes {date}". |
 | `home:334`, `pp:110`, `rva:83` | `too few to rank` | "too early to tell: {n} of 20 finished trades". |
 | `home:296`, `rva:322` | `No end-of-day analysis stored yet.` / `No end-of-day analysis stored by the cut-off.` | "The evening write-up appears after the first trades finish ({date})." |
-| `home:356` | `No intraday check stored yet today…` | Add "First check around {time}". This needs the next intraday time: **new field D5** (`status.runs.intraday[].next_at`). |
+| `home:356` | `No intraday check stored yet today…` | Add "First check around {time}". This needs the next intraday time: **new field D4** (`status.runs.intraday[].next_at`). |
 | `lab:171` | `No back-test rows stored yet. …` | "No replay on past years yet. It is written by the weekly review (next: Saturday {date})." |
 | `lab:545` | `No settled trade in this view and basis yet.` | As at `home:276`. |
 | `lab:390` | `No forward accuracy row yet, so no position against the bar.` | "This strategy has no finished paper trade yet: its 2-month test started on {live_from}." |
 | `tr:128` | `No direction call has been scored yet.` | "No daily forecast has been checked yet. A 1-day forecast is checked after the next trading day's close." |
 | `tr:243` | `No range is scored yet: the first published range settles at its exit session.…` | Add the date: "…on {first exit date}". |
 | `trades:132` | `No settled paper trade yet.` | "None finished yet; the first on {name} finishes on {min exit_date}." |
-| `life:44` | `not settled yet` | "finishes {exit_date}". The row already has it (`life:56`). |
+| `life:44` | `not settled yet` | "finishes {exit_date}". The page already has the prediction's exit date (`life:56`, in the calls table). |
 | `cards:50` | `No analyst note on this company yet: notes are written for settled head-to-head trades…` | Add the date of this company's first head-to-head exit. |
 | `fh:86` | `…it arrives with the next page build.` | Name the time of the next morning run. |
 | `cos:182` | `No company command recorded for this market yet.` | Fine as it is: this one is caused by the user. |
@@ -475,8 +475,7 @@ Owners come from each file's git history (`git log -- <path>`), and agree with t
 | D1 | Home `go_live`: add `drawdown_within_limit` and `holds_in_calm_and_volatile` (already computed on the scoreboard rows) | `rm_common.go_live` (B4, used by B11's `rm_home`) | B4 / B11 | S |
 | D2 | `go_live_nearest`: the strategy closest to the bar, with its name, replacing or beside the reference strategy (Strategy lab already computes "Nearest to go-live" in the browser, `lab:126`) | `rm_common` / `rm_strategies` | B4 / B13 | M |
 | D3 | Home `skill`: `state` and `why` of the weekly review's `model_skill` (Track record already has `track.skill`) | `rm_home` | B11 | S |
-| D4 | Home: the benchmark's last move for "Today in 3 lines" | `rm_home` | B11 | S |
-| D5 | `status.runs.intraday[].next_at` (the next check time), like `post_close.next_at` | `rm_common.status_block` | B4 | S |
+| D4 | `status.runs.intraday[].next_at` (the next check time), like `post_close.next_at` | `rm_common.status_block` | B4 | S |
 
 ### Suggested order
 
@@ -500,4 +499,5 @@ grep -rnE 'decision [0-9]+|SPEC section|WS4|Wave 5|\(F[0-9]' "app/(cockpit)" com
 ```
 
 It printed `85` at `194133c`. The second grep drops lines that begin with `//`, but it can still count a few code
-comments that sit inside JSX, so treat 85 as approximate.
+comments that sit inside JSX, and being case-sensitive it misses capitalised ones such as `Decisions 41-42`
+(`home:165`), so treat 85 as approximate in both directions.
