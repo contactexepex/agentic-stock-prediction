@@ -257,3 +257,7 @@ BASE_SCHEMAS: Schemas = {
         "settings": "JSON", "detail": "JSON",
     }),
 }
+
+# The evening run's ranges (ranges.py --evening; B17's option C): the `ranges` columns plus run = "evening", the same
+# ids as the pre-open rows they preview; never scored or traded, read by ranges_asof only when asked (run="evening")
+BASE_SCHEMAS["ranges_evening"] = ("jsonl", {**BASE_SCHEMAS["ranges"][1], "run": "VARCHAR"})

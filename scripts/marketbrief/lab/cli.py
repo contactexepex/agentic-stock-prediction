@@ -1,6 +1,8 @@
 """scripts/lab.py: the strategy lab's command line (research only; a paper trade is a record, never an order).
 
   lab.py --market us predict          pre-open: rule strategies and baselines (needs B10's per-horizon scores)
+  lab.py --market us predict --evening   after the close: the same rows as a preview on the day's close, from B10's
+                                      evening ranges -> strategy_predictions_evening only (never traded)
   lab.py --market us pick [--session YYYY-MM-DD]   pre-open, after every family predicted: head-to-head picks
   lab.py --market us settle           post-close: settle every due trade of both views (re-settle on a split fix)
   lab.py --market us news-impact      weekly: the news-impact rows of the ISO week (F3)
@@ -26,7 +28,7 @@ from marketbrief.core.database import connect
 from marketbrief.core.market_config import load_market
 from marketbrief.lab import costs as lab_costs
 from marketbrief.lab import backtest_store, pick_study, predict_inputs, registry, reports, run, settle_run
-from marketbrief.lab.constants import MSG_NO_HORIZON_SCORES
+from marketbrief.lab.constants import MSG_NO_EVENING_RANGES, MSG_NO_HORIZON_SCORES, RUN_EVENING
 from marketbrief.lab.strategies import company_rows
 from marketbrief.model.settings import load_model_config
 
@@ -38,7 +40,9 @@ def parser():
     """The argument parser with every subcommand."""
     root = market_arg(__doc__.splitlines()[0])
     sub = root.add_subparsers(dest="command", required=True)
-    sub.add_parser("predict")
+    sub.add_parser("predict").add_argument(
+        "--evening", action="store_true",
+        help="after the close: preview rows to strategy_predictions_evening only (never traded; B10's evening ranges)")
     pick = sub.add_parser("pick")
     pick.add_argument("--session", type=date.fromisoformat, help="D (default: the next session after the clock)")
     sub.add_parser("settle")
@@ -54,20 +58,40 @@ def parser():
     return root
 
 
-def predict(cfg: dict) -> dict:
-    """The pre-open predictions of the rule strategies and baselines."""
-    now, con = clock(), connect(cfg["market"])
-    try:
-        scores, ranges, cross_scores = predict_inputs.horizon_rows(cfg["market"], now)
-    except NotImplementedError as error:
-        return {"ok": False, "message": MSG_NO_HORIZON_SCORES.format(error=error)}
+def strategy_rows(con, cfg: dict, now, horizon_rows: tuple) -> tuple[list[dict], list[dict]]:
+    """(predictions, abstentions) of the rule strategies and baselines on (scores, ranges, cross_scores)."""
+    scores, ranges, cross_scores = horizon_rows
     news_cfg = load_model_config()["news"]
     preds, skipped = [], []
     for inputs in predict_inputs.build_inputs(con, cfg, now, scores, ranges, news_cfg, cross_scores):
         rows, abstentions = company_rows(registry.rule_and_baselines(), inputs, news_cfg)
         preds += rows
         skipped += abstentions
+    return preds, skipped
+
+
+def predict(cfg: dict) -> dict:
+    """The pre-open predictions of the rule strategies and baselines."""
+    now, con = clock(), connect(cfg["market"])
+    try:
+        horizon_rows = predict_inputs.horizon_rows(cfg["market"], now)
+    except NotImplementedError as error:
+        return {"ok": False, "message": MSG_NO_HORIZON_SCORES.format(error=error)}
+    preds, skipped = strategy_rows(con, cfg, now, horizon_rows)
     return {"ok": True, **run.write_predictions(cfg, now, preds, skipped, con)}
+
+
+def predict_evening(cfg: dict) -> dict:
+    """The evening preview: the same strategies, rules and news window for the same D (the first session whose
+    open is after the clock), on B10's evening ranges and the scores as of the clock; appended to
+    strategy_predictions_evening only. Until B10's ranges_asof takes `run`, a clear refusal (nothing written)."""
+    now, con = clock(), connect(cfg["market"])
+    try:
+        horizon_rows = predict_inputs.horizon_rows(cfg["market"], now, run=RUN_EVENING)
+    except (TypeError, NotImplementedError) as error:
+        return {"ok": False, "run": RUN_EVENING, "message": MSG_NO_EVENING_RANGES.format(error=error)}
+    preds, skipped = strategy_rows(con, cfg, now, horizon_rows)
+    return {"ok": True, **run.write_evening_predictions(cfg, now, preds, len(skipped), con)}
 
 
 def pick_study_result() -> dict:
@@ -98,7 +122,7 @@ def dispatch(args) -> dict:
         return pick_study_result()
     cfg = require_market(args)
     if args.command == "predict":
-        return predict(cfg)
+        return predict_evening(cfg) if args.evening else predict(cfg)
     now, con = clock(), connect(cfg["market"])
     commands = {
         "pick": lambda: run.pick_day(con, cfg, now, registry.strategies(),

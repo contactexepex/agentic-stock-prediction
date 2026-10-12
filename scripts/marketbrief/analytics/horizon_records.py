@@ -13,7 +13,8 @@ import pandas as pd
 
 from marketbrief.constants.model import (KIND_MODEL_SCORES, KIND_MODEL_VARIANT_SCORES, MODEL_VARIANTS,
                                          MSG_UNKNOWN_VARIANT, VARIANT_BASE)
-from marketbrief.constants.horizons import LABEL_N_PLUS_K, SQL_LABEL_MODEL_SCORES, SQL_LABEL_RANGES
+from marketbrief.constants.horizons import (LABEL_N_PLUS_K, MSG_UNKNOWN_RUN, RUN_EVENING, RUN_KINDS, RUN_PRE_OPEN,
+                                           SQL_LABEL_MODEL_SCORES, SQL_LABEL_RANGES)
 from marketbrief.core.database import connect
 from marketbrief.core.horizons import entry_exit
 from marketbrief.core.market_config import load_market
@@ -33,8 +34,8 @@ ORDER BY ticker, horizon_days, as_of_date DESC"""
 # The first published range per id made by the time, of the newest as-of date with any N+k range by then.
 RANGES_SQL = f"""
 WITH known AS (
-    SELECT DISTINCT ON (id) * REPLACE ({SQL_LABEL_RANGES} AS horizon_label)
-    FROM ranges WHERE made_at <= ?::TIMESTAMPTZ ORDER BY id, made_at
+    SELECT DISTINCT ON (id) * {{exclude}}REPLACE ({SQL_LABEL_RANGES} AS horizon_label)
+    FROM {{table}} WHERE made_at <= ?::TIMESTAMPTZ ORDER BY id, made_at
 ), current AS (
     SELECT * FROM known WHERE horizon_label = '{LABEL_N_PLUS_K}'
 )
@@ -99,11 +100,72 @@ def scores_asof(market: str, as_of, horizon_days: int | None = None, con=None,
     return out
 
 
-def ranges_asof(market: str, as_of, horizon_days: int | None = None, con=None) -> list[dict]:
+def ranges_asof(market: str, as_of, horizon_days: int | None = None, con=None, run: str = RUN_PRE_OPEN) -> list[dict]:
     """The first published N+k range per ticker and horizon of the newest as-of date ranged by `as_of`
-    (HorizonRange records; the range a strategy prediction copies)."""
+    (HorizonRange records; the range a strategy prediction copies). run: RUN_PRE_OPEN (`ranges`, the revision of
+    record) or RUN_EVENING (`ranges_evening`, the evening run's preview with the same ids; its `run` column is
+    dropped so the records keep the HorizonRange fields)."""
+    if run not in RUN_KINDS:
+        raise SystemExit(MSG_UNKNOWN_RUN.format(run=run, runs=", ".join(RUN_KINDS)))
     con = con or connect(market)
     cfg = load_market(market)
-    frame = con.execute(RANGES_SQL, [as_timestamp(as_of), horizon_days, horizon_days]).df()
+    sql = RANGES_SQL.format(table=RUN_KINDS[run], exclude="EXCLUDE (run) " if run == RUN_EVENING else "")
+    frame = con.execute(sql, [as_timestamp(as_of), horizon_days, horizon_days]).df()
     return [with_window(cfg, {key: plain(value) for key, value in rec.items()}) for rec in frame.to_dict("records")]
+
+
+# Every run of a window of as-of dates (B12's forecast history; B17's evening run, option C): each stored N+k row known
+# by the clock, labelled with the run that wrote it. Ranges: the first row per id of each kind (`ranges` = pre_open,
+# `ranges_evening` = evening). Scores: every stored row (a run writes a row only when the probability changed);
+# `run` null on rows written before the evening run = pre_open.
+RANGE_RUNS_SQL = f"""
+SELECT * FROM (
+    (SELECT DISTINCT ON (id) * REPLACE ({SQL_LABEL_RANGES} AS horizon_label), '{RUN_PRE_OPEN}' AS run
+     FROM ranges WHERE made_at <= $clock ORDER BY id, made_at)
+    UNION ALL BY NAME
+    (SELECT DISTINCT ON (id) * REPLACE ({SQL_LABEL_RANGES} AS horizon_label, '{RUN_EVENING}' AS run)
+     FROM ranges_evening WHERE made_at <= $clock ORDER BY id, made_at)
+) WHERE horizon_label = '{LABEL_N_PLUS_K}' AND as_of_date BETWEEN $first AND $last
+ORDER BY as_of_date, ticker, horizon_days, made_at, run"""
+SCORE_RUNS_SQL = f"""
+SELECT * FROM (
+    SELECT * REPLACE ({SQL_LABEL_MODEL_SCORES} AS horizon_label, coalesce(run, '{RUN_PRE_OPEN}') AS run)
+    FROM {{source}} WHERE computed_at <= $clock
+) WHERE horizon_label = '{LABEL_N_PLUS_K}' AND as_of_date BETWEEN $first AND $last
+ORDER BY as_of_date, ticker, horizon_days, computed_at, id"""
+
+
+def window_params(as_of, first_day, last_day) -> dict:
+    """The clock and the first and last as-of dates of a runs query."""
+    return {"clock": as_timestamp(as_of), "first": pd.Timestamp(first_day).date(),
+            "last": pd.Timestamp(last_day).date()}
+
+
+def run_records(con, cfg: dict, sql: str, params: dict) -> list[dict]:
+    """The rows of a runs query as plain records with their N+k window."""
+    out = []
+    for rec in con.execute(sql, params).df().to_dict("records"):
+        rec = {key: plain(value) for key, value in rec.items()}
+        if isinstance(rec.get("contributions"), str):
+            rec["contributions"] = json.loads(rec["contributions"])
+        out.append(with_window(cfg, rec))
+    return out
+
+
+def range_runs(market: str, as_of, first_day, last_day, con=None) -> list[dict]:
+    """Every run's N+k range of the as-of dates first_day..last_day known by `as_of` (HorizonRange records plus
+    `run`: pre_open from `ranges`, evening from `ranges_evening`; the first row per id of each)."""
+    con = con or connect(market)
+    params = window_params(as_of, first_day, last_day)
+    return run_records(con, load_market(market), RANGE_RUNS_SQL, params)
+
+
+def score_runs(market: str, as_of, first_day, last_day, con=None, variant: str = VARIANT_BASE) -> list[dict]:
+    """Every stored N+k model score of the as-of dates first_day..last_day computed by `as_of` (HorizonScore records
+    plus `run`, pre_open where null), oldest first per id: a run writes a row only when the probability changed."""
+    con = con or connect(market)
+    source = KIND_MODEL_SCORES if variant == VARIANT_BASE else (
+        f"(SELECT * FROM {KIND_MODEL_VARIANT_SCORES} WHERE model_variant = '{variant_name(variant)}')")
+    params = window_params(as_of, first_day, last_day)
+    return run_records(con, load_market(market), SCORE_RUNS_SQL.format(source=source), params)
 
