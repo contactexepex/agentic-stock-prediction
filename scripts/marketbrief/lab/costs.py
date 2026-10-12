@@ -1,6 +1,7 @@
 """F1.6 costs of one paper trade in the market currency, in the two views of owner decision 50, from
 config/costs.yaml: the statutory rates (`india`, `us`) plus the broker charges (`broker`, owner-provided and
-confirmed final by the owner on 2026-10-08, docs/SPEC.md decision 53; India's broker Groww from 2026-10-12, decision 54).
+confirmed final by the owner on 2026-10-08, docs/SPEC.md decision 53; India's broker Groww from 2026-10-12,
+decision 54).
 
 market view (what any investor pays; strategies are ranked on it), on entry value B and exit value S:
   India: brokerage = max(rate x value, min per order) on each side; stt = rate x (B + S); exchange =
