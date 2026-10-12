@@ -2,8 +2,10 @@ Run the news-only light run for MARKET=<india|us> in this repository. Follow CLA
 repo root. Export `MB_MARKET=<market>` so every script uses this market. Research only: never place
 trades. This run collects news and nothing else: no prices, no agents (no news analyst, claim checker,
 researchers or forecaster), no report, no Slack message, no Neo4j sync (the one optional extra is the warehouse
-sync of step 3a). It runs every 4 hours, every
-day including weekends and exchange holidays, so the pre-open run (routine/PROMPT.md) finds every
+sync of step 3a). It runs in a combined news session for both markets: the session follows this prompt for
+India, then pulls main and follows it again for the US. Sessions run weekdays at 10:45 and 13:45 IST and at 11:27,
+14:27 and 17:27 New York time; weekends at 10:45 IST, 11:27 and 17:27 New York time; exchange holidays included
+(31 sessions a week; crons in docs/DESIGN.md section 2). So the pre-open run (routine/PROMPT.md) finds every
 headline stored since it last ran (docs/DESIGN.md section 3, "News timing").
 
 Data rules: files under `data/` are append-only (CLAUDE.md "Data rules"): never edit, reorder or delete

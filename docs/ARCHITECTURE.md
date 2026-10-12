@@ -180,14 +180,15 @@ and for building `rm` from MotherDuck when the local checkout is not at hand; th
 | Trigger | Work | Pages touched |
 |---|---|---|
 | Daily run (routine step after `dashboard`, non-blocking, consolidation wires it) | base incremental for all kinds; rebuild every `rm` page of the market | all 66 per market (+1 `rm.markets`), most change |
-| News run (every 4 hours, after its push) | base incremental for news kinds; rebuild `rm.news`, `rm.stock` (news section), `rm.status`, `rm.runs`, `rm.markets` | 43 per market (+1), most unchanged by hash |
+| News run (each market of a combined news session, after its push) | base incremental for news kinds; rebuild `rm.news`, `rm.stock` (news section), `rm.status`, `rm.runs`, `rm.markets` | 43 per market (+1), most unchanged by hash |
 | `--full` (manual) | drop and refill | all |
 
 Budget against the Lite cap of 10 compute-hours per month. Assumptions (A) and unknowns (U):
 
 - A1: ~22 sessions per market per month, so 44 daily syncs.
-- A2: news runs every 4 hours, 5 runs per market per day (live crons: India 06:17, 10:17, 14:17, 18:17, 22:17 UTC;
-  US 00:47, 04:47, 08:47, 16:47, 20:47 UTC) = 5 x 2 markets x 30 days = 300 news syncs.
+- A2: 31 combined news sessions a week, each syncing both markets (owner decision 2026-10-12; crons in DESIGN.md
+  section 2) = about 133 sessions x 2 markets = about 266 news syncs a month. Before, there were 5 runs per market
+  per day = 300 news syncs.
 - A3: an incremental daily sync runs ~60 s of MotherDuck compute (appends of a few hundred rows plus
   ~67 small upserts: 6 market-level pages + 3 x 20 per-ticker pages + `rm.markets`), a news sync ~15 s. To be measured in week 1.
 - A4: the app is used by one person; ~50 page views per day, of which, with tag-based caching, at most

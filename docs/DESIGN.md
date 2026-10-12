@@ -21,20 +21,23 @@ Two routines, scheduled in the exchange's own timezone so daylight saving never 
 | India (NSE) | `CRON_TZ=Asia/Kolkata 40 7 * * 1-5` (07:40 IST; 08:10 IST until 2026-10-07) | ~08:05 IST (measured 08:01 and 08:03 IST on 2026-10-08/09, B19), before the 08:45 block window and 09:00 pre-open | NIFTY 50 (`^NSEI`), India VIX (`^INDIAVIX`) |
 | US (NYSE/Nasdaq) | `CRON_TZ=America/New_York 45 7 * * 1-5` (07:45 ET; 08:15 ET until 2026-10-07) | ~08:15 ET (~14:15 Amsterdam; measured 08:10 and 08:12 ET on 2026-10-08/09, B19) | SPY, VIX (`^VIX`) |
 
-News-only light runs (`routine/NEWS_PROMPT.md`, section 3 "News timing"), every 4 hours, every day
-including weekends and holidays, in UTC and at least about 2.5 hours away from the same market's
-pre-open run (which starts 02:10 UTC for India; 11:45 UTC in US summer time, 12:45 UTC in winter), so
-their pushes rarely meet on the same day file:
+News-only light runs (`routine/NEWS_PROMPT.md`, section 3 "News timing"; owner decision 2026-10-12, replacing the
+per-market runs every 4 hours): one combined session for both markets runs the prompt for India, then for the US.
+There are 31 sessions a week, weekends and holidays included. Each is at least 2.5 hours after the pre-open runs
+(India 07:40 IST, US 07:45 New York time) have pushed, so their pushes rarely meet on the same day file:
 
-| Light run | Cron (UTC) |
-|---|---|
-| India | `17 6,10,14,18,22 * * *` (06:17, 10:17, 14:17, 18:17, 22:17 UTC) |
-| US | `47 0,4,8,16,20 * * *` (00:47, 04:47, 08:47, 16:47, 20:47 UTC) |
+| News session | Cron | UTC |
+|---|---|---|
+| Daily | `CRON_TZ=Asia/Kolkata 45 10 * * *` | 05:15 |
+| Weekdays | `CRON_TZ=Asia/Kolkata 45 13 * * 1-5` | 08:15 |
+| Daily | `CRON_TZ=America/New_York 27 11,17 * * *` | 15:27 and 21:27 in EDT, 16:27 and 22:27 in EST |
+| Weekdays | `CRON_TZ=America/New_York 27 14 * * 1-5` | 18:27 in EDT, 19:27 in EST |
 
 Intraday light runs (`routine/INTRADAY_PROMPT.md`, WS5): two checks per session, in exchange time so daylight
 saving never shifts them; on holidays the check writes only a `market_closed` row. The checks sit close to the news light runs but write other data folders, so their pushes rarely
-conflict: the nearest news run is 34 and 94 min after the India checks, and 20 min after and
-110 min after the US checks in EDT (40 min before and 50 min after in EST).
+conflict: the nearest news session starts 28 min before each India check (10:45 and 13:45 IST) and 60 and 30 min
+before the US checks (11:27 and 14:27 New York time); all of these are in exchange time, so daylight saving never
+changes the gaps.
 
 | Intraday run | Cron | UTC |
 |---|---|---|
@@ -283,8 +286,8 @@ run lost a day, and busy outlet feeds rolled weekend items off before Monday. No
   (Google's days end at midnight Pacific time: the slice `after:2026-10-03 before:2026-10-04` held items
   from 07:00 UTC to 07:00 UTC), at most 200 such re-asks per run (`sliced_queries`, `slices_skipped`);
   items older than the window are dropped as usual and duplicates are stored once.
-- News-only light runs (`scripts/collect_news_only.py`, saved prompt `routine/NEWS_PROMPT.md`, one per
-  market, every 4 hours, every day including weekends and holidays): `collect_news`, for India
+- News-only light runs (`scripts/collect_news_only.py`, saved prompt `routine/NEWS_PROMPT.md`, run for each
+  market in turn by one combined session, 31 sessions a week including weekends and holidays; section 2): `collect_news`, for India
   `collect_nse_india.py --only announcements` (one market-wide call), `collect_articles`, `news_clusters`
   and the gate `validate.py --stage news_collect` (files, schemas, duplicate ids and news sources of the
   news kinds `news`, `news_runs`, `news_updates`, `news_articles`, `news_clusters`, `announcements` written today, this
@@ -353,7 +356,7 @@ same story from different outlets is kept apart, because independent outlets fee
 - Match window: 9 days from the matched item's newest stored row (`DEDUP_WINDOW_DAYS`). Items are kept only
   when published within the catch-up cap (7 days), so a repeat sighting comes at most 7 days after the first;
   2 days of margin. The collector reads the newest 10 daily files (today and the 9 days before; one file per
-  UTC day, written every 4 hours by the light runs), which cover those 9 days from any time of today.
+  UTC day, written by the news sessions and the pre-open run), which cover those 9 days from any time of today.
 - Collector: an entry matching a stored item by link with a different headline (normalised) than the item's
   latest is appended to `data/<market>/news_updates/` (kind `news_updates`: `news_id` of the item, `title`,
   `seen_at`, `url`, `source`, `source_domain`, `published_at`, `feed`), never stored as a new item; any other

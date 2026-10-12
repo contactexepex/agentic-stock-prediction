@@ -663,16 +663,16 @@ trades to rank"), and keeps the best strategy overall beside the per-company bes
 | Anthropic API | dashboard chat and `/ask` | a dedicated workspace with a $20 monthly spend limit and a key in it |
 | Neo4j | relationship graph, optional | none |
 
-Routine schedule per market (per market per day: 1 pre-open + 2 intraday + 1 post-close + 5 news = 9
-sessions; plus 1 weekly research run):
+Routine schedule per market (per market per weekday: 1 pre-open + 2 intraday + 1 post-close; plus 31 combined news
+sessions a week for both markets (owner decision 2026-10-12) and 1 weekly research run):
 
 | Run | India | US | Contents |
 |---|---|---|---|
 | Pre-open (exists; moved 30 min earlier on 2026-10-07) | 07:40 IST | 07:45 New York | collect, features, model, rule strategies, 4 AI traders, gates, picks, sync, Slack morning picks; on the first trading day of the ISO week also the existing weekly review (step 10a); monthly the graph-builder |
 | Intraday x2 (WS5, extended) | 11:13, 14:13 IST | 12:27, 14:57 New York | trade checks, deviation explainer, alerts, sync |
 | Post-close (new) | 17:45 IST | 18:15 New York | close bars, settlement, EOD analyst, sync, Slack close results |
-| News (exists) | every 4 hours | every 4 hours | news, articles, clusters, sync |
-| Weekly research (new) | Saturday 10:00 IST | Saturday 10:00 New York | news-impact study, research director, weekly post |
+| News (combined india+us session; owner decision 2026-10-12) | 10:45 IST daily, 13:45 IST weekdays | 11:27 and 17:27 New York daily, 14:27 New York weekdays | news, articles, clusters, sync |
+| Weekly research (new) | Saturday 09:51 IST | Saturday 09:51 New York | news-impact study, research director, weekly post |
 
 ## 8. How the UI connects to the backend
 
