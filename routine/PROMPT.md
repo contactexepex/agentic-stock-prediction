@@ -362,13 +362,8 @@ Warnings never block: list them in `data_quality`.
     further check. If it fails, add the failure to the Slack draft's failures line, then run
     `python scripts/validate.py --stage report` again, so the draft that is posted is the one the gate
     checked (one retry, as for the report), and post anyway.
-    Then run `python scripts/dashboard.py`: it builds `reports/<market>/dashboard.html` (the
-    decision-support dashboard: watchlist and market overview, a candlestick chart per stock with
-    the published ranges, the signal model's P(up) with its reasons, bull vs bear, news with
-    verification status, track record; labelled "Paper only — no proven edge yet" until the weekly
-    review finds skill) from the stored data only, and adds it to `work/slack_<market>_files.json`.
-    It writes no data and adds no narrative, so it needs no further check; if it fails, note it on
-    the Slack draft's failures line as above and go on.
+    The static dashboard (`reports/<market>/dashboard.html`) is retired (owner decision 2026-10-10): do not run
+    `scripts/dashboard.py`. The website (the warehouse sync of step 12a) shows the same data.
 
 12. Save (only after the report gate passed, or each failed section was
     replaced as above and listed in `data_quality`): `git add data summaries reports && git commit -m "<market> daily run TODAY"` then
@@ -407,7 +402,7 @@ Warnings never block: list them in `data_quality`.
     `work/slack_<market>.md` as a reply in the thread step 13a's morning picks started, or as the first
     message of a new thread when none exists (once per day, recorded in `data/<market>/slack_posts/`),
     then the chart images as one reply,
-    then the HTML report file as a reply, then the dashboard file as a reply. Without the token it
+    then the HTML report file as a reply. Without the token it
     posts the summary text as ONE message through the incoming webhook in `SLACK_WEBHOOK_URL`. If it
     exits with code 2 (neither configured) and a Slack connector is available in this session, post
     the same text as one message to #market-brief with the connector instead. Nothing else is posted.
