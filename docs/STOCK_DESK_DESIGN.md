@@ -1,6 +1,6 @@
 # Stock desk design: a team of experts finding net profitable stock trades
 
-**Version 3 draft (12 Oct 2026), after ChatGPT review 1, for the owner and ChatGPT to review. Design only.** Nothing is built, run or
+**Version 4 draft (12 Oct 2026), after ChatGPT reviews 1 and 2, for the owner and ChatGPT to review. Design only.** Nothing is built, run or
 changed until both AIs agree every section and the owner approves (section 14).
 
 **Sources read for this version, in full:**
@@ -12,6 +12,17 @@ changed until both AIs agree every section and the owner approves (section 14).
 - this project's approved accounts and evaluation design, `docs/PLAN_v16.md`, and `CLAUDE.md`.
 
 ## 0. What changed, and why
+
+**Version 4 (after [ChatGPT review 2](../reviews/chatgpt/review_2_2026-10-12-stock-desk-design.md); Claude's checks
+in [response 3](../reviews/claude/response_3_2026-10-12-stock-desk-design.md)):**
+1. Amendment A: 242/241 is the event inventory, not testable trades. Stored daily prices start on 7 Oct 2024, so
+   only about 160 events per market have the entry and exit bars; meeting 1 first publishes a coverage table and
+   either uses a frozen long-history snapshot (DC-12 (7)) or keeps to the covered period. Release time and filing
+   acceptance time are kept apart (4, 11).
+2. Amendment B: the power sentence is an assumption-based estimate, not a finding (11).
+3. S9 details: the leader's news must be public before the pre-open cut-off; peers whose own results fall inside the
+   holding window are reported apart (11). New research family S10, price-pressure recovery (4).
+4. "No trade = 0" means incremental value against staying in cash (5.4).
 
 **Version 3 (after [ChatGPT review 1](../reviews/chatgpt/review_1_2026-10-12-stock-desk-design.md); Claude's
 checks and reasons in [response 2](../reviews/claude/response_2_2026-10-12-stock-desk-design.md)):**
@@ -185,7 +196,7 @@ as it was known at the time, which a fair test needs.
 
 | # | Edge family (hypothesis) | What might pay, and why | Proves it wrong | Owning roles | Point-in-time history |
 |---|---|---|---|---|---|
-| S1 | Results drift still left at the first legal entry | Prices may keep adjusting to results for days. The account cannot trade the announcement move: v16 blocks new entries from the day before results until the day after, so the first legal entry is usually the open of E+2 (E = results day; 11) | Entry-known release characteristics or completed price and volume reactions add no executable net value at N+1/N+3/N+5 from the first legal entry, after costs, against matched controls | Equity research, results analyst, statistician | Results dates only from 11 Oct 2023 (India) and 12 Oct 2023 (US) (DC-12 (3)): about 240 releases per market. Consensus only from 7 Oct 2026, so history uses labelled proxies (the reaction, reported numbers), never "consensus surprise" |
+| S1 | Results drift still left at the first legal entry | Prices may keep adjusting to results for days. The account cannot trade the announcement move: v16 blocks new entries from the day before results until the day after, so the first legal entry is usually the open of E+2 (E = results day; 11) | Entry-known release characteristics or completed price and volume reactions add no executable net value at N+1/N+3/N+5 from the first legal entry, after costs, against matched controls | Equity research, results analyst, statistician | Results dates only from 11 Oct 2023 (India) and 12 Oct 2023 (US) (DC-12 (3)): an inventory of 242 / 241 releases, not testable trades. Stored daily prices start on 7 Oct 2024, so about 161 / 160 have entry and exit bars (11). US dates and times are SEC filing acceptance, India's an NSE announcement or filing stamp: a filing-time proxy for the first public release unless checked against dated primary evidence. Consensus only from 7 Oct 2026, so history uses labelled proxies (the reaction, reported numbers), never "consensus surprise" |
 | S2 | Verified news reaction | Slow absorption of confirmed news; overreaction to rumours. Verification is a reliability input, not a profit signal by itself | Using verification status adds no forecast or net decision value (money kept after costs) on the same opportunities, given direction, materiality and timing | News analyst, claim checker, behavioural finance | Only from when news collection began (first seen 5 Oct 2026); **no history**, so forward only |
 | S3 | Forced and slow flows | Funds that must buy or sell (index changes, FII/DII flows, block deals) move prices for non-value reasons | No excess move after costs around the flow | Flows analyst, microstructure | India FII/DII, FPI, deals, delivery %: collected history limited. US 13F shows quarter-end holdings filed up to 45 days later: context only until its publication-timed value is shown; short interest |
 | S4 | Insider and promoter signals | Insiders know their company; a pledge rise signals stress | No excess return after costs following cluster buys or pledge rises | Corporate-actions analyst | SEBI PIT and Form 4 as collected; check depth |
@@ -193,7 +204,8 @@ as it was known at the time, which a fair test needs.
 | S6 | Sector and market context | Sector rotation and global cues move groups together | Cross-market features already showed no tradable skill in the 15-year test (DESIGN.md 15.1) | Sector analyst, macro economist | Prices, indices, FX, rates from 2011 |
 | S7 | Scheduled corporate events | Dividends, splits, buybacks, index inclusion on known dates | No excess total economic outcome after costs around the event, counted with DC-12 (1)-(2): an ex-date drop plus the dividend receivable, a split on the as-traded share count (stored prices are not dividend-adjusted) | Corporate-actions analyst, regulation | Events and adjustments as collected |
 | S8 | Cost and no-trade discipline | Not an edge alone: few trades, held longer, beat the cost drag that sinks frequent trading | — | Cost accountant, portfolio manager | Measured per trade |
-| S9 | Cross-company information transmission (ChatGPT review 1) | A verified event at one company (results, guidance, a supplier or customer shock) may change expectations for a related company before it fully reprices. The results blackout blocks only the reporting company: a peer that has not reported yet and is outside its own blackout can be traded at its next pre-open decision | No net value after costs against own-momentum and sector controls, in either direction (published work finds peer news can be overreacted to and reverse); or the effect is plain common sector movement | Sector analyst, equity research, statistician | Results dates from Oct 2023; pairs predeclared from the current watchlist's sectors (survivorship and mapping caveat stated). The connection map has no point-in-time history, so map-based pairs start forward |
+| S9 | Cross-company information transmission (ChatGPT review 1) | A verified event at one company (results, guidance, a supplier or customer shock) may change expectations for a related company before it fully reprices. The results blackout blocks only the reporting company: a peer that has not reported yet and is outside its own blackout can be traded at its next pre-open decision | No net value after costs against own-momentum and sector controls, in either direction (published work finds peer news can be overreacted to and reverse); or the effect is plain common sector movement | Sector analyst, equity research, statistician | Results dates from Oct 2023 (prices from Oct 2024, as S1); pairs predeclared from the current watchlist's sectors, a coarse proxy for business overlap (survivorship and mapping caveat stated). The connection map has no point-in-time history, so map-based pairs start forward |
+| S10 | Price-pressure recovery (ChatGPT review 2) | A stock sold off with broad market or sector selling, with no verified adverse company news, may recover once the selling stops: liquidity providers are paid for absorbing it | No net value after costs against ordinary short-term reversal and simple momentum, counting every scan; or real company deterioration drives the fall | Flows analyst, technical analyst, statistician | Prices allow a price-only development study; "no adverse company news" needs the news archive, so that filter starts forward (news from 5 Oct 2026) |
 
 **Out of scope at first** (a scope choice for our data, schedule and costs, not proof that no edge exists):
 - intraday trading;
@@ -285,7 +297,7 @@ order value. Every opportunity a thesis acts on carries one record:
 | Forecast | For N+1/N+3/N+5: the expected exit close (or a stated centre), intervals, the direction probability with its exact event, the uncertainty and the sample behind it |
 | Tradable action | Buy limit, v16 size, planned and fallback exit, or no new trade. A down forecast is never permission to short |
 | Decision value | The payoff of that order under the same entry, fills, exit, currency and costs, with fill and return kept together (never the average return times a fill probability); "unknown" when the data cannot support it, and an unknown value cannot justify a buy |
-| Account choice | The alternatives, always including no trade (value 0, cash), free cash, slots, sector cap, blackout, brake, and the reason for the choice or the abstention |
+| Account choice | The alternatives, always including no trade (value 0: the incremental value against staying in cash; v16's cash interest, fees and tax stay in the funded ledger), free cash, slots, sector cap, blackout, brake, and the reason for the choice or the abstention |
 | Evaluation | Forecast quality against simple baselines, calibration of the order value, and the account's money kept after all costs and declared taxes |
 
 - Horizons are v16's: a decision before Monday's open buys on Monday (D); N+1 sells at Tuesday's close, N+3 at
@@ -335,9 +347,13 @@ The two types agreed in the F&O design, mapped onto v16:
    and overlapping credits never summed as independent gains.
    - **Shared budget:** a role's calls can push other components into a lower budget tier (v16 5.3). The comparison
      states whether it ran under the common realised budget or simulated the budget without the role.
-   - **Proposed (open with ChatGPT, response 2):** attribution runs as an exploratory **shadow** pair inside the same
-     account engine: not registered, no α, never used for promotion. Registered pairs for every role would use v16
-     11.6's 3 challenger slots per market for years, and AI roles can only be paired forward (contaminated history).
+   - **Agreed with ChatGPT (review 2):** attribution runs as an exploratory **shadow** pair inside the same account
+     engine: not registered, no confirmation α, never used for promotion or a significance claim. Registered pairs for
+     every role would use v16 11.6's 3 challenger slots per market for years, and AI roles can only be paired forward
+     (contaminated history). Every shadow comparison is still counted in the ledger (versions, pairs, outcomes); its
+     extra calls are charged to the system budget, research cost kept apart from counterfactual deployment cost, and a
+     budget-tier change is reported. A shadow never alters a decision-producing policy's output; a favourable one only
+     suggests a candidate, and adding or removing a role from registered inputs needs a later frozen policy version.
    - A role without an attribution result is "unattributed": neither credited nor removed on profit grounds.
 
 ## 7. Two loops
@@ -457,13 +473,28 @@ prediction its own record, not a funded position) stay as the **measurement** of
      matched dates, companies and market or sector conditions. Raw returns explained by plain market exposure are not
      an edge.
    - **Also S9:** the read-through to a peer that has not reported yet and is outside its own blackout, on the same
-     events, reported separately.
-   - **Data limit, stated in the minutes:** results dates start on 11 Oct 2023 (India) and 12 Oct 2023 (US): about
-     240 releases per market over 12 quarters. With a spread of about 5% per event, the standard error of a plain
-     average is about 0.3%, larger once each results season is treated as one shock, against an after-tax break-even
-     of 0.49-0.83%. The meeting can find a large effect or end "inconclusive"; nothing is registered from it alone.
-     It lists what a results-date backfill would add (DC-12 (3) allows one from allowlisted sources; a later code
-     batch).
+     events, reported separately. Pair mapping, signal sign (continuation and reversal), horizons and eligibility
+     are fixed in the ledger before returns are read. The leader's news must be public before the pre-open cut-off;
+     a gap already priced into the peer's open is shown apart. Peers whose own results fall inside the 1-5-session
+     holding window are reported apart (v16 forbids the entry, not the holding). One leader event shared by several
+     peers is related evidence, and S1 and S9 successes on the same event are never summed as independent gains.
+   - **Coverage first (amendment A):** before any inference, a table of events, entry and exit price bars, labels and
+     availability times per market. The stored `bars` start on 7 Oct 2024: of the 242 India and 241 US releases,
+     about 161 and 160 have the entry and exit bars. The study either rebuilds and freezes the long-history cache
+     (`model_history.py`, Yahoo, paced; a dated copy with its per-file SHA-256 manifest, DC-12 (7), as-traded basis
+     DC-12 (2)) or keeps to the covered period, and says which. Timing counts are reported for the cleaned sample
+     (`earnings_events`), not the raw rows. The release time is a filing-time proxy unless checked against dated
+     primary evidence: a sample is checked, unknowns stay visible, and a later 10-Q/10-K's classification is never
+     used as an entry-known feature.
+   - **Precision, an estimate (amendment B):** at an assumed 5-percentage-point standard deviation and 240
+     independent usable events, the standard error is 0.323 points (0.394 at 161). Actual power is unknown until
+     the usable sample, the selected-event distribution, the paired differences and the dependence within results
+     seasons are measured. Meeting 1 reports estimates, uncertainty, counts and sensitivity; an imprecise result is
+     inconclusive, and a null result with wide intervals does not disprove an edge. Nothing is registered from this
+     study alone. The 0.49-0.83% break-even is India's v16 scenario illustration, not a universal or US hurdle.
+     Where v16's account engine is not built yet, account net performance is "not computed".
+   - It lists every missing input and what it would change (older results dates under DC-12 (3), prices, release
+     times, corporate actions, information snapshots) before any collection is commissioned as a later batch.
    - Survivorship stated; all of it is development evidence. Minutes to `research/` and to ChatGPT.
 
    This is what the owner asked for and what has not happened yet.
@@ -497,12 +528,11 @@ Each step is one batch under CLAUDE.md's delivery strategy: one builder, one jud
 
 ## 13. Open questions for ChatGPT
 
-Review 1 answered the four questions of version 2. The open ones for review 2 are in
-[response 2](../reviews/claude/response_2_2026-10-12-stock-desk-design.md), section 3:
-1. Two-level attribution: exploratory shadow ablations for roles, registered pairs only for promotion (section 6)?
-2. Meeting 1 on the 3 stored years with power reported and nothing registered; the backfill a later batch (11)?
-3. The S9 peer read-through as part of meeting 1 (4, 11)?
-4. Do the changed sections now meet review 1's closure changes?
+Reviews 1 and 2 answered the questions of versions 2 and 3. The open ones are in
+[response 3](../reviews/claude/response_3_2026-10-12-stock-desk-design.md), section 3:
+1. Do amendments A and B, as written in sections 4 and 11, close your remaining changes?
+2. Do you accept rebuilding and freezing the long-history cache with the existing `model_history.py` as meeting 1's
+   way past the price-coverage limit, with the limits stated in response 3?
 
 ## 14. Closing the design
 
@@ -511,14 +541,14 @@ Review 1 answered the four questions of version 2. The open ones for review 2 ar
 | 1 Why a team | Agreed; v3 removes the size exception (response 2, 2.1) | Agreed | |
 | 2 Where we stand | Agreed; v3 corrects the cost hurdle and the "trades" wording (2.7) | Agreed | |
 | 3 Fit with PLAN_v16 | Agreed | Agreed | |
-| 4 Edge map | Agreed; v3 changes S1, S2, S3, S7 and adds S9 (2.2, 2.9, 2.10) | Changes required: amendment A — usable event coverage and release/filing anchors (review 2) | |
+| 4 Edge map | Agreed; v4 applies amendment A and adds S10 (response 3) | Changes required: amendment A — usable event coverage and release/filing anchors (review 2) | |
 | 5 The team | Agreed; v3 adds the opportunity record and the model rule (2.3, 2.8) | Agreed | |
-| 6 Scorecards | Agreed with v3's two levels; shadow attribution open with ChatGPT (2.4) | Agreed | |
+| 6 Scorecards | Agreed; v4 adds review 2's bounds on shadow attribution (response 3) | Agreed | |
 | 7 Two loops | Agreed | Agreed | |
 | 8 Evidence rules | Agreed; v3 freezes the cohort first (2.5) | Agreed | |
 | 9 Risk and money | Agreed; v3 marks the additions diagnostic (2.8) | Agreed | |
 | 10 Running cost | Agreed; v3 follows 5.2 for models (2.8) | Agreed | |
-| 11 Build order | Agreed; v3 uses review 1's question and states the data limit (2.6) | Changes required: amendments A/B — joined data coverage and assumption-based power (review 2) | |
+| 11 Build order | Agreed; v4 applies amendments A and B and the S9 conditions (response 3) | Changes required: amendments A/B — joined data coverage and assumption-based power (review 2) | |
 
 The design is final when both AIs mark every section "agreed" (or the owner settles a disagreement) and the owner
 approves. No build starts before that.

@@ -18,3 +18,4 @@ Every response:
 
 - [Response 1: stock desk design v2, for ChatGPT's review](response_1_2026-10-12-stock-desk-design.md)
 - [Response 2: answer to ChatGPT review 1; stock desk design v3](response_2_2026-10-12-stock-desk-design.md)
+- [Response 3: answer to ChatGPT review 2; stock desk design v4](response_3_2026-10-12-stock-desk-design.md)
