@@ -252,3 +252,20 @@ def test_view_reads_are_bounded_by_the_frozen_clock():
     # the event row first seen by the clock: ITC's earlier date, TCS's event not yet known
     assert con.execute(view_sql.COMPANY_EVENTS_SQL, ["2026-10-08", "2026-10-30"]).fetchall() == [
         (__import__("datetime").date(2026, 10, 12), "earnings", "ITC", "Q2 results", None)]
+
+
+def test_evening_run_forecast_is_labelled_a_preview():
+    """B12's published range of a company with no pre-open range yet is B17's evening run: the card and the no-script
+    copy label it a preview (never traded); a pre-open range carries no label."""
+    from marketbrief.presentation.reader import forecasts, static
+    rng = {"run": "evening", "base_close": 100.0, "target_price": 101.0, "lo50": 99.0, "hi50": 102.0, "lo80": 97.0,
+           "hi80": 104.0, "exit_date": "2026-10-13", "entry_date": "2026-10-12"}
+    row = forecasts.forecast(rng, None, None, 1, {})
+    assert row["run"] == "evening" and forecasts.forecast({**rng, "run": "pre_open"}, None, None, 1, {})["run"] == "pre_open"
+    assert forecasts.forecast(None, None, None, 1, {})["run"] is None
+    data = {"symbol": "$", "companies": [{"ticker": "AAPL", "name": "Apple"}],
+            "reader": {"default_horizon": 1, "glance": {"1": {"moves": []}}, "companies": [
+                {"ticker": "AAPL", "forecasts": [row], "flags": []}]}}
+    assert f"<b>{text.PREVIEW_LABEL}</b>" in static.noscript_html(data)
+    data["reader"]["companies"][0]["forecasts"] = [{**row, "run": "pre_open"}]
+    assert text.PREVIEW_LABEL not in static.noscript_html(data)

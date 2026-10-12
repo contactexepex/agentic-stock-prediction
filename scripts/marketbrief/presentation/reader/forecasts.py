@@ -102,6 +102,9 @@ def forecast(rng: dict | None, score: dict | None, previous: dict | None, horizo
         "prob_up": prob, "base_rate": number(score.get("base_rate")) if score else None,
         "lean": side, "strength": strength, "why": why.why_line(score),
         "change": change_record(rng, score, previous, sources),
+        # B12's published range run: "pre_open" (the revision of record) or "evening" (B17's evening preview of a
+        # company with no pre-open range of the as-of date yet; never traded), shown as a preview on the page
+        "run": (rng or {}).get("run"),
     }
 
 
