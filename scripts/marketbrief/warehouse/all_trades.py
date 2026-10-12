@@ -13,8 +13,11 @@ block, as of the cut-off. Research only: a paper trade is a record, never an ord
   the FIFO lots it closes (side sell, entry_date null; pnl_market null; win / loss on pnl_your). Strategy fields null.
 - Open rows carry unrealised_pnl / unrealised_pct before costs (pnl_* null, outcome null); closed rows pnl_* after
   costs. The summary sums closed rows only.
-- Listed: every open trade, and the closed trades whose exit is in the last WINDOW_SESSIONS sessions to the as-of
-  date. Summary: per scope and family, to date and in that window."""
+- Page `_` (all_trades): the summary of every trade (per scope and family, to date and in the last WINDOW_SESSIONS
+  sessions to the as-of date), the head-to-head and owner's trades (every open one, and the closed or not-entered ones
+  whose exit is in that window) and the index of the accuracy-view session pages. The accuracy view (about 200 trades
+  a session) is listed per entry session D on its own page `trades:<D>` (the last SESSION_PAGES sessions), so the
+  market's page does not grow with the trade count (owner's size concern, 2026-10-12)."""
 
 from __future__ import annotations
 
@@ -26,6 +29,9 @@ from marketbrief.warehouse.rm_entities import iso_day
 from marketbrief.warehouse.rm_registry import BuildContext
 
 WINDOW_SESSIONS = 10
+SESSION_PAGES = 60  # accuracy-view trades: one page per entry session, the last 60 (owner's size concern, 2026-10-12)
+SESSION_KEY_PREFIX = "trades:"
+SESSION_COUNT_KEYS = ("open", "closed", "wins", "losses", "flat", "win_rate", "net_pnl_market", "net_pnl_your")
 SCOPE_ALL, SCOPE_HEAD_TO_HEAD, SCOPE_MINE = "all", "head_to_head", "mine"
 SCOPE_OF_VIEW = {"accuracy": SCOPE_ALL, "head_to_head": SCOPE_HEAD_TO_HEAD}
 FAMILY_ALL, FAMILY_MINE = "all", "mine"
@@ -232,20 +238,79 @@ def summary(trades: list[dict], window_from: str | None, currency: str | None) -
     return out
 
 
+def ordered(trades: list[dict]) -> list[dict]:
+    """Open first, then by exit (else entry) date newest first, then by id."""
+    out = sorted(trades, key=lambda t: t["id"])
+    out.sort(key=lambda t: t["exit_date"] or t["entry_date"] or "", reverse=True)
+    out.sort(key=lambda t: t["state"] != STATE_OPEN)
+    return out
+
+
+def every_trade(ctx: BuildContext, context) -> list[dict]:
+    """Every trade row of the market as of the cut-off: strategy trades of both views and the owner's (memoised)."""
+
+    def compute() -> list[dict]:
+        closed = closed_strategy_trades(ctx)
+        strategy = closed + open_strategy_trades(ctx, {t["id"] for t in closed})
+        return [t for t in strategy if t["scope"] is not None] + owner_trades(ctx, context)
+
+    return ctx.shared("b13_every_trade", compute)
+
+
+def accuracy_sessions(ctx: BuildContext, trades: list[dict]) -> dict[str, list[dict]]:
+    """The accuracy-view trades by entry session D, for the last SESSION_PAGES sessions to the newest of the session
+    being traded and the as-of date (older entry sessions have no page), newest session first."""
+    rows = [t for t in trades if t["scope"] == SCOPE_ALL]
+    last = max(filter(None, (rm_common.status_block(ctx)["session"]["session_date"], ctx.as_of)), default=None)
+    days = set(sessions_back(ctx.cfg, last, SESSION_PAGES))
+    out: dict[str, list[dict]] = {}
+    for trade in rows:
+        if trade["entry_date"] in days:
+            out.setdefault(trade["entry_date"], []).append(trade)
+    return {day: ordered(out[day]) for day in sorted(out, reverse=True)}
+
+
+def session_entry(day: str, trades: list[dict]) -> dict:
+    """One line of the per-session index: what the session's page holds, counted as the summary counts."""
+    row = summary_row(SCOPE_ALL, FAMILY_ALL, PERIOD_TO_DATE, trades, None)
+    return {
+        "session_date": day,
+        "entered": len(trades),
+        "not_entered": sum(1 for t in trades if t["state"] == STATE_NOT_ENTERED),
+        **{key: row[key] for key in SESSION_COUNT_KEYS},
+    }
+
+
 def all_trades(ctx: BuildContext, context) -> dict:
-    """rm.portfolio's `all_trades` block: the window, the summary and the listed trades (open first, then by exit
-    date newest first, then by id)."""
-    closed = closed_strategy_trades(ctx)
-    strategy = closed + open_strategy_trades(ctx, {t["id"] for t in closed})
-    trades = [t for t in strategy if t["scope"] is not None] + owner_trades(ctx, context)
-    days = sessions_back(ctx.cfg, ctx.as_of, WINDOW_SESSIONS)
-    window_from = first_of(days)
-    listed = [t for t in trades if listed_in(t, window_from)]
-    listed.sort(key=lambda t: t["id"])
-    listed.sort(key=lambda t: t["exit_date"] or t["entry_date"] or "", reverse=True)
-    listed.sort(key=lambda t: t["state"] != STATE_OPEN)
+    """rm.portfolio's `all_trades` block (page `_`): the window, the summary of every trade, the head-to-head and
+    owner's trades (open, and closed or not entered with the exit in the window) and the index of the accuracy-view
+    session pages (`sessions_pages`)."""
+    trades = every_trade(ctx, context)
+    window_from = first_of(sessions_back(ctx.cfg, ctx.as_of, WINDOW_SESSIONS))
+    listed = [t for t in trades if t["scope"] != SCOPE_ALL and listed_in(t, window_from)]
     return {
         "window": {"sessions": WINDOW_SESSIONS, "from": window_from, "to": ctx.as_of},
         "summary": summary(trades, window_from, ctx.cfg.get("currency")),
-        "trades": listed,
+        "trades": ordered(listed),
+        "sessions": [session_entry(day, rows) for day, rows in accuracy_sessions(ctx, trades).items()],
     }
+
+
+def session_key(day: str) -> str:
+    return f"{SESSION_KEY_PREFIX}{day}"
+
+
+def session_pages(ctx: BuildContext, context) -> dict[str, dict]:
+    """rm.portfolio `trades:<D>`: every accuracy-view trade entered on session D (open, closed or not entered), one
+    page per session of the index (GET /markets/{m}/portfolios/sessions/{date}; no page: 404)."""
+    pages = {}
+    for day, rows in accuracy_sessions(ctx, every_trade(ctx, context)).items():
+        pages[session_key(day)] = {
+            "market": ctx.market,
+            "as_of": ctx.as_of,
+            "session_date": day,
+            "summary": session_entry(day, rows),
+            "trades": rows,
+            "paper": True,
+        }
+    return pages

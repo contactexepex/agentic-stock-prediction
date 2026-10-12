@@ -2,9 +2,10 @@
 GET /api/v1/markets/{market}/portfolios. Payload PaperPortfolios = design/mockups/07-paper-portfolios/data.json per
 market (notes.md there names every key and its selection rule): the shared blocks of rm_common, the companies with
 their last stored close, the head-to-head portfolios (scoreboard rows of scopes strategy and pick_rule), the open
-trades and the latest intraday trade checks (B4's and B12's derivations, the same rows as rm.trades `_`), and the
+head-to-head trades and their latest intraday trade checks (B4's and B12's derivations), and the
 owner's own paper trades and FIFO positions with the EUR view of US positions (WS4/B2's portfolio service), and every
-paper trade in one place (`all_trades`, all_trades.py: open and closed, wins and losses), all as of the cut-off.
+paper trade in one place (`all_trades`, all_trades.py: open and closed, wins and losses; the accuracy view on one page
+per entry session, `trades:<D>`), all as of the cut-off.
 Research only: a paper trade is a record, never an order."""
 
 from __future__ import annotations
@@ -99,15 +100,18 @@ def h2h_rows(ctx: BuildContext) -> list[dict]:
 
 
 def open_trades(ctx: BuildContext) -> list[dict]:
-    """Every open paper trade of the market (B4's shared derivation, rm_common.open_trades: the same rows as B12's
-    rm.trades `_` and the Company records' counts), in its page fields."""
-    return [pick(trade, OPEN_TRADE_FIELDS) for trade in rm_common.open_trades(ctx)]
+    """The open head-to-head paper trades of the market (B4's shared derivation, rm_common.open_trades), in its page
+    fields. The accuracy view's open trades are on the session pages (all_trades.session_pages), so this page does
+    not grow with the trade count (owner's size concern, 2026-10-12)."""
+    return [
+        pick(trade, OPEN_TRADE_FIELDS) for trade in rm_common.open_trades(ctx) if trade["view"] == VIEW_HEAD_TO_HEAD
+    ]
 
 
 def trade_checks(ctx: BuildContext) -> list[dict]:
-    """The rows of the market's latest intraday trade check by the cut-off: B12's rm_company.market_trade_checks
-    (schema TradeCheck), the same list as rm.trades `_`, whole (the 07 page reads its subset of the fields)."""
-    return rm_company.market_trade_checks(ctx)
+    """The head-to-head rows of the market's latest intraday trade check by the cut-off: B12's
+    rm_company.market_trade_checks (schema TradeCheck), whole (the 07 page reads its subset of the fields)."""
+    return [row for row in rm_company.market_trade_checks(ctx) if row["view"] == VIEW_HEAD_TO_HEAD]
 
 
 def portfolio_context(ctx: BuildContext) -> PortfolioContext:
@@ -174,7 +178,8 @@ def owner(ctx: BuildContext, context: PortfolioContext) -> dict:
 
 
 def portfolio_pages(ctx: BuildContext) -> dict[str, dict]:
-    """rm.portfolio: the market's one Paper portfolios page (`all_trades`: every paper trade in one place)."""
+    """rm.portfolio: the market's Paper portfolios page `_` (`all_trades`: every paper trade in one place) and one page
+    per accuracy-view entry session, `trades:<D>` (all_trades.session_pages)."""
     context = portfolio_context(ctx)
     return {
         MARKET_PAGE_KEY: {
@@ -189,11 +194,12 @@ def portfolio_pages(ctx: BuildContext) -> dict[str, dict]:
             "trade_checks": trade_checks(ctx),
             "owner": owner(ctx, context),
             "all_trades": all_trades.all_trades(ctx, context),
-        }
+        },
+        **all_trades.session_pages(ctx, context),
     }
 
 
-BUILDERS = (PageBuilder(RM_PORTFOLIO, "PaperPortfolios", portfolio_pages, owner="B13"),)
+BUILDERS = (PageBuilder(RM_PORTFOLIO, "PaperPortfoliosTable", portfolio_pages, owner="B13"),)
 CONTRACT_CASES = (
     ContractCase(
         path="/api/v1/markets/{market}/portfolios",
@@ -202,5 +208,6 @@ CONTRACT_CASES = (
         mockup_payload=market_mockup,
         map_paths=("$.strategies",),
         extra_keys=("all_trades",),
+        page_keys=lambda key: key == MARKET_PAGE_KEY,
     ),
 )

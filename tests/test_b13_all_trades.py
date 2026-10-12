@@ -17,9 +17,10 @@ from test_b13_pages import lab_context, schema_errors  # noqa: E402
 
 def settled(trade_id, view, family, pnl, your=None, **extra):
     status, exit_day = extra.get("status", "settled"), extra.get("exit_day", "2026-10-09")
+    entry_day = extra.get("entry_day", "2026-10-08")
     return {
         "trade_id": trade_id, "view": view, "strategy_id": f"{family}.x", "family": family, "pick_rule": None,
-        "ticker": "AAPL", "horizon_days": 1, "entry_date": "2026-10-08", "exit_date": exit_day,
+        "ticker": "AAPL", "horizon_days": 1, "entry_date": entry_day, "exit_date": exit_day,
         "exit_date_actual": exit_day, "status": status, "entry_price": 100.0, "exit_price": 101.0, "quantity": 9.0,
         "amount": 1000.0, "currency": "USD", "net_pnl": pnl, "net_pnl_your": your, "return_pct": 1.0,
         "return_pct_your": 0.5, "settled_at": datetime.fromisoformat("2026-10-09T21:00:00+00:00"),
@@ -36,13 +37,13 @@ def opened(trade_id, view, family, **extra):
 
 
 @pytest.fixture
-def block(monkeypatch):
+def make(monkeypatch):
     settlements = [
         settled("a1", "accuracy", "rule", 12.5, 10.0),
         settled("a2", "accuracy", "ai", -3.0, -4.0),
         settled("a3", "accuracy", "baseline", 0.0, -1.0),
         settled("a4", "accuracy", "rule", None, status="no_entry"),
-        settled("a5", "accuracy", "rule", 5.0, 4.0, exit_day="2026-09-01"),  # before the window
+        settled("a5", "accuracy", "rule", 5.0, 4.0, entry_day="2026-08-31", exit_day="2026-09-01"),  # before the window
         settled("h1", "head_to_head", "ai", 7.0, None),
     ]
     opens = [
@@ -72,23 +73,65 @@ def block(monkeypatch):
     ctx.__dict__["collected"] = frozenset({"AAPL"})
     ctx.__dict__["dashboard"] = {"as_of": "2026-10-09"}
     ctx.__dict__.pop("as_of", None)
-    return all_trades.all_trades(ctx, None)
+    monkeypatch.setattr(all_trades.rm_common, "status_block", lambda _ctx: {"session": {"session_date": "2026-10-12"}})
+    return lambda: (all_trades.all_trades(ctx, None), all_trades.session_pages(ctx, None))
+
+
+@pytest.fixture
+def built(make):
+    return make()
+
+
+@pytest.fixture
+def block(built):
+    return built[0]
+
+
+@pytest.fixture
+def pages(built):
+    return built[1]
+
+
+def every_row(block, pages) -> dict[str, dict]:
+    rows = [*block["trades"], *(t for page in pages.values() for t in page["trades"])]
+    assert len(rows) == len({t["id"] for t in rows})  # each trade on one page only
+    return {t["id"]: t for t in rows}
 
 
 def summary_of(block, scope, family, period="to_date"):
     return next(r for r in block["summary"] if (r["scope"], r["family"], r["period"]) == (scope, family, period))
 
 
-def test_every_trade_listed_once_open_first(block):
+def test_market_page_lists_head_to_head_and_mine_open_first(block):
     ids = [t["id"] for t in block["trades"]]
-    assert sorted(ids) == sorted(["a1", "a2", "a3", "a4", "h1", "o1", "o2", "m2", "m3"])  # a5 outside the window
-    assert ids[:3] == ["o1", "o2", "m3"]  # open first, by exit (else entry) date newest first, then id
-    assert {t["id"]: t["state"] for t in block["trades"]}["a1"] == "closed"
-    assert all(t["paper"] is True for t in block["trades"])
+    assert ids == ["o2", "m3", "h1", "m2"]  # open first, by exit (else entry) date newest first, then id
+    assert all(t["scope"] != "all" for t in block["trades"]) and all(t["paper"] is True for t in block["trades"])
 
 
-def test_outcomes_on_market_cost_and_not_entered_never_counted(block):
-    rows = {t["id"]: t for t in block["trades"]}
+def test_accuracy_view_on_one_page_per_entry_session(block, pages):
+    assert sorted(pages) == ["trades:2026-08-31", "trades:2026-10-08", "trades:2026-10-12"]
+    assert [t["id"] for t in pages["trades:2026-10-08"]["trades"]] == ["a1", "a2", "a3", "a4"]
+    assert [t["id"] for t in pages["trades:2026-10-12"]["trades"]] == ["o1"]
+    assert all(page["paper"] is True and page["market"] == "us" for page in pages.values())
+    index = {entry["session_date"]: entry for entry in block["sessions"]}
+    assert [entry["session_date"] for entry in block["sessions"]] == ["2026-10-12", "2026-10-08", "2026-08-31"]
+    assert index["2026-10-08"] == pages["trades:2026-10-08"]["summary"]
+    day = index["2026-10-08"]
+    assert (day["entered"], day["not_entered"], day["open"], day["closed"]) == (4, 1, 0, 3)
+    assert (day["wins"], day["losses"], day["flat"], day["net_pnl_market"]) == (1, 1, 1, 9.5)
+    assert index["2026-10-12"]["open"] == 1
+
+
+def test_sessions_older_than_the_pages_are_dropped_but_still_counted(monkeypatch, make):
+    monkeypatch.setattr(all_trades, "SESSION_PAGES", 3)  # 2026-10-08, 09 and 12
+    block, pages = make()
+    assert sorted(pages) == ["trades:2026-10-08", "trades:2026-10-12"]
+    assert [entry["session_date"] for entry in block["sessions"]] == ["2026-10-12", "2026-10-08"]
+    assert summary_of(block, "all", "all")["closed"] == 4  # a5 (entered 2026-08-31) still counted to date
+
+
+def test_outcomes_on_market_cost_and_not_entered_never_counted(block, pages):
+    rows = every_row(block, pages)
     assert rows["a1"]["outcome"] == "win" and rows["a2"]["outcome"] == "loss" and rows["a3"]["outcome"] == "flat"
     assert rows["a3"]["pnl_your"] == -1.0  # flat on market cost, a loss on your cost: the market cost decides
     assert rows["a4"]["state"] == "not_entered" and rows["a4"]["outcome"] is None
@@ -115,8 +158,8 @@ def test_window_period_counts_exits_in_the_window_only(block):
     assert (window["open"], window["closed"]) == (1, 1)  # a5 exited before the window
 
 
-def test_open_trade_price_sources_and_pending(block):
-    rows = {t["id"]: t for t in block["trades"]}
+def test_open_trade_price_sources_and_pending(block, pages):
+    rows = every_row(block, pages)
     assert rows["o1"]["entry_price_source"] == "intraday_check" and rows["o1"]["last_price_source"] == "intraday_check"
     assert rows["o1"]["last_price_time"] == "2026-10-12T05:00:00Z"
     assert rows["o1"]["unrealised_pnl"] == 18.0 and rows["o1"]["pnl_market"] is None and rows["o1"]["outcome"] is None
@@ -130,8 +173,8 @@ def test_open_trade_price_sources_and_pending(block):
     )
 
 
-def test_owner_trades_on_your_cost_collected_only(block):
-    rows = {t["id"]: t for t in block["trades"]}
+def test_owner_trades_on_your_cost_collected_only(block, pages):
+    rows = every_row(block, pages)
     assert "m1" not in rows and "m4" not in rows  # a fully sold buy; a deleted company
     assert rows["m2"]["state"] == "closed" and rows["m2"]["outcome"] == "win" and rows["m2"]["pnl_market"] is None
     assert (rows["m2"]["side"], rows["m2"]["entry_date"], rows["m2"]["strategy_id"]) == ("sell", None, None)
@@ -142,5 +185,19 @@ def test_owner_trades_on_your_cost_collected_only(block):
     assert (mine["open"], mine["closed"], mine["wins"], mine["net_pnl_your"]) == (1, 1, 1, 20.0)
 
 
-def test_block_validates_against_the_contract(block):
+def test_block_and_pages_validate_against_the_contract(block, pages):
     assert schema_errors([block], "AllTrades") == []
+    assert schema_errors(list(pages.values()), "PortfolioSession") == []
+    assert schema_errors(list(pages.values()), "PaperPortfoliosTable") == []
+
+
+def test_market_page_open_trades_and_checks_are_head_to_head_only(monkeypatch):
+    from marketbrief.warehouse import rm_portfolio
+
+    opens = [opened("o1", "accuracy", "rule"), opened("o2", "head_to_head", "rule")]
+    checks = [{"trade_id": "o1", "view": "accuracy"}, {"trade_id": "o2", "view": "head_to_head"}]
+    monkeypatch.setattr(rm_portfolio.rm_common, "open_trades", lambda _ctx: opens)
+    monkeypatch.setattr(rm_portfolio.rm_company, "market_trade_checks", lambda _ctx: checks)
+    ctx = lab_context("us")
+    assert [t["trade_id"] for t in rm_portfolio.open_trades(ctx)] == ["o2"]
+    assert [t["trade_id"] for t in rm_portfolio.trade_checks(ctx)] == ["o2"]
