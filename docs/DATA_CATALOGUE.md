@@ -422,7 +422,7 @@ None of the example predictions or picks is cost-viable: a round trip at your co
 | expected_gain_your_pct | `p × move − (1 − p) × loss − your_cost_pct` (predictions and picks only) | B2, `lab/gain.py` | % | `-1.9891` |
 | cost_viable | Expected gain after your cost is above zero (predictions and picks only; empty without a probability) | B2, decision 51, owner decision of 2026-10-07 | yes/no | `false` |
 | market_costs, market_cost_lines | The market view, total and per charge | B2 | ₹ / $ | `2.34` = order fee `2.32` + SEC fee `0.02` |
-| your_costs, your_cost_lines | Your view, total and per charge | B2 | ₹ / $ | `17.68` = market lines + FX markup `15.31` + portfolio fee `0.03`; India adds `nri_reporting_buy` and `nri_reporting_sell` `200` each and `dp_charge` |
+| your_costs, your_cost_lines | Your view, total and per charge | B2 | ₹ / $ | `17.68` = market lines + FX markup `15.31` + portfolio fee `0.03`; India adds `nri_reporting_buy` and `nri_reporting_sell` (`200` each under Axis Direct, absent with Groww from 2026-10-12) and `dp_charge` (Groww: `23.6`) |
 | net_pnl_market, return_pct_market, net_pnl_your, return_pct_your | Profit after costs in each view (settlements only) | B2 | ₹ / $, % | `39.66` / `3.966`; `24.32` / `2.432` |
 | holding_days | Calendar days from D to the exit (the US portfolio fee) | calendar | days | `5` |
 | eurusd_entry, eurusd_exit | The EUR/USD closes used for the US order fee and FX markup | `EURUSD=X` (B2) | rate | `1.17` (example rate) |

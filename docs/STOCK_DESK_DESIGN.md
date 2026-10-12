@@ -553,9 +553,9 @@ Each step is one batch under CLAUDE.md's delivery strategy: one builder, one jud
     20.8% Indian tax (STT and DP not deductible, v16 4.5 and 4.8 defaults; DP's GST treated the same way, an
     extension of those defaults). Orders below ₹1,00,000 pay the ₹100
     minimum, so their brokerage is above 0.1%.
-  - **Not yet in use:** replacing v16's zero-brokerage scenario or the lab's Axis Direct costs with Groww's is a
-    separate owner-approved change (PLAN_v16 is never edited; a clarification goes to its errata). Charges are
-    re-read from Groww's schedule before that change.
+  - **In use in the lab** from 2026-10-12 (owner: "switch the lab and plan costs to Groww"; SPEC decision 54).
+    PLAN_v16's India scenario changes only through a clarification agreed with ChatGPT (PLAN_v16 is never edited;
+    a clarification goes to its errata), proposed in `reviews/claude/response_5_2026-10-12-groww-costs.md`.
 
 ## 13. Open questions for ChatGPT
 

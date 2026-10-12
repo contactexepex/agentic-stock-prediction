@@ -48,29 +48,32 @@ us:
 # paper portfolio (scripts/portfolio.py, F1.11), on top of the statutory rates above (india: STT, exchange, SEBI,
 # stamp duty, GST; us: SEC fee, FINRA TAF). The model's backtest keeps the sections above unchanged.
 # Owner decisions 49-52 (2026-10-07): the values marked "owner-provided" come from the brokers' published
-# schedules as the owner researched them (Axis Direct NRI, Normal tier, Non-PIS account; BUX Basic, investor in the
-# Netherlands with a EUR account); the owner confirmed them as final for paper trading on 2026-10-08 (docs/SPEC.md
-# decision 53). Two cost views (decision 50):
+# schedules as the owner researched them (BUX Basic, investor in the Netherlands with a EUR account); the owner
+# confirmed them as final for paper trading on 2026-10-08 (docs/SPEC.md decision 53). India: owner decision of
+# 2026-10-12 (docs/SPEC.md decision 54) replaces Axis Direct with Groww, a Non-PIS NRI account, values marked
+# "Groww" read from https://groww.in/pricing on 2026-10-12; the owner says the bank adds no charges. Two cost views (decision 50):
 #   market: brokerage, statutory taxes, exchange and regulatory fees (what any investor pays; strategies are
 #           ranked on it);
 #   your:   market + the owner-specific items marked `your_view` below (the go-live bar and the owner's money
 #           decisions use it).
 broker:
   india:
-    name: Axis Direct (NRI, Normal tier, Non-PIS)
-    brokerage_each_side: 0.0075        # owner-provided, confirmed final: 0.75% of trade value per side
-    brokerage_min_per_order: 50.0      # owner-provided, confirmed final: minimum Rs 50 per order
-    # GST 18% applies to brokerage + exchange transaction charge + SEBI fee (`gst_rate` above, owner-provided).
-    # STT 0.1% each side and stamp duty 0.015% on the buy side: as above (owner-provided figures agree).
-    nri_reporting_per_trade_date: 200.0   # your_view. owner-provided, confirmed final: NRO
-                                          # Non-PIS reporting charge Rs 200 per trade date, on the purchase date and
-                                          # again on the sale date
-    # your_view. Confirmed final by the owner (first from a secondary source): DP charge per scrip sold, Rs 30 or
-    # 0.04% of the sale value, the higher (docs/SPEC.md F1.6: a source quoted it for NRI accounts).
-    dp_charge_min: 30.0
-    dp_charge_rate: 0.0004
-    demat_amc_per_year: 885.0          # owner-provided, confirmed final: about Rs 885 a year;
-                                       # not per trade, so in no trade's cost
+    name: Groww (NRI, Non-PIS)
+    brokerage_each_side: 0.001         # Groww: "NRI brokerage charges: Equity (Delivery and Intraday) brokerage:
+    brokerage_min_per_order: 100.0     # 0.10% with min Rs 100 per order"
+    # GST 18% applies to brokerage + exchange transaction charge + SEBI fee (`gst_rate` above). STT 0.1% each side
+    # and stamp duty 0.015% on the buy side: as above (Groww's page agrees). Groww's page shows the NSE exchange
+    # charge as 0.00297% while `exchange_txn_each_side` above holds 0.00307% from NSE's circular of 2026-02-27
+    # (search only); kept, a difference of Rs 0.20 per Rs 1 lakh round trip. Not modelled: NSE's investor
+    # protection fund charge, 0.0001% each side plus GST (about Rs 0.24 per Rs 1 lakh round trip).
+    nri_reporting_per_trade_date: 0.0  # your_view. owner, 2026-10-12: no bank or NRI reporting charge beyond Groww's
+    # your_view. Groww: DP charge per sell transaction Rs 3.5 depository + Rs 16.5 Groww = Rs 20, plus GST 18%
+    # (Groww lists DP among the charges GST applies to): Rs 23.60 per scrip sold.
+    dp_charge_min: 20.0
+    dp_charge_rate: 0.0
+    dp_charge_gst: true                # GST at `gst_rate` on the DP charge
+    demat_amc_per_year: 0.0            # Groww: Rs 0 account maintenance (the page does not say whether this
+                                       # applies to NRI accounts); not per trade, so in no trade's cost
   us:
     name: BUX Basic
     order_fee_eur: 0.99                # owner-provided, confirmed final: EUR 0.99 per order,

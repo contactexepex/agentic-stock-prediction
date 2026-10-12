@@ -453,10 +453,10 @@ This is the owner's personal research tool for deciding their own trades; wrong 
   and Bonferroni correction, the go-live bar on your cost, paired comparisons, heatmap data), `backtest` (always-up,
   momentum and, on B10's walk-forward probabilities as of the clock, the model strategies without news; stored bars,
   `--history` adds the cache; basis backtest; `backtest --store` -> `lab_backtests`, once per run_id), `pick-study`. Costs (`lab/costs.py`): the statutory
-  rates of `config/costs.yaml` plus its `broker:` section (Axis Direct NRI Normal tier Non-PIS, BUX Basic;
-  owner-provided, confirmed final for paper trading by the owner on 2026-10-08, SPEC decision 53); market cost =
-  brokerage, statutory taxes and exchange or regulatory fees; your cost adds India's NRI
-  reporting charge (₹200 on the buy date and on the sell date) and DP charge, BUX's FX markup each way and the
+  rates of `config/costs.yaml` plus its `broker:` section (India: Groww NRI Non-PIS from 2026-10-12, SPEC decision 54,
+  replacing Axis Direct; US: BUX Basic, owner-provided, confirmed final for paper trading on 2026-10-08, SPEC decision
+  53); market cost = brokerage, statutory taxes and exchange or regulatory fees; your cost adds India's NRI
+  reporting charge per trade date (none with Groww) and DP charge (Groww: ₹20 plus GST per scrip sold), BUX's FX markup each way and the
   pro-rated portfolio fee; the BUX euro fee is converted at the stored `EURUSD=X` close. `cost_viable` = expected
   gain after your cost > 0 (`expected_gain_your_pct` = p x move - (1 - p) x loss - your cost, with the picks'
   conditional move and loss of `lab/gain.py`; null without a probability or 80% range, or when the amount buys no

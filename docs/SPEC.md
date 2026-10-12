@@ -78,6 +78,7 @@ questions) from the dashboard, Slack, Claude Code and the Claude app.
 | 51 | Cost-viable flag | A prediction or pick is `cost_viable` when its expected gain after your cost is positive: P(up) × move − (1 − P(up)) × loss − your cost > 0, with move and loss the conditional expected rise/shortfall of the pick (lab/gain.py); null without a probability or 80% range, and when the amount buys no whole share at the reference close (no trade, no costs). It is still made, traded and scored either way; picks and Slack show the flag. (Owner decision in the B6 session, 2026-10-07, replacing the first wording "predicted move exceeds your cost".) |
 | 52 | US broker plan | BUX Basic: €0.99 per order, FX markup 0.75% on each EUR↔USD conversion, 0.20% a year portfolio fee (charges in F1.6; owner-provided, confirmed final for paper trading by the owner on 2026-10-08, `config/costs.yaml` `broker:`). |
 | 53 | Broker charges final | The `broker:` values of decisions 49 and 52 (Axis Direct: 0.75% brokerage, ₹50 minimum, ₹200 NRO reporting per trade date, DP charge ₹30 or 0.04%, AMC ₹885 a year; BUX Basic: €0.99 per order, 0.75% FX markup each way, 0.20% a year portfolio fee) are final for paper trading (owner, 2026-10-08); `config/costs.yaml` no longer marks them verify. The statutory rates keep their own source notes. |
+| 54 | India broker: Groww | From 2026-10-12 the India broker is Groww, a Non-PIS NRI account (owner, 2026-10-12), replacing Axis Direct (decisions 49 and 53 for India): brokerage 0.10% per order, at least ₹100; DP charge ₹20 per scrip sold (₹3.5 depository + ₹16.5 Groww) plus 18% GST; no NRI reporting charge (the owner: the bank adds no charges beyond Groww's); AMC ₹0. Read from https://groww.in/pricing on 2026-10-12. Trades settled before the switch keep the costs they were stored with. PLAN_v16's India scenario is changed only through a clarification agreed with ChatGPT. |
 
 Proposals made by the orchestrator that are still open (decision 34 accepted the weekly
 research time, the chat-log retention and the Slack form; the owner may change any of these): every
@@ -143,20 +144,21 @@ part already does it, the feature says "exists" and what changes.
 
    | Market | Charge | Value | View | Source |
    |---|---|---|---|---|
-   | India (Axis Direct NRI, 0.75% plan, Normal tier, Non-PIS; decision 49) | Brokerage, delivery | 0.75% of the order value each side, at least ₹50 per order | market | owner-provided; confirmed final (owner, 2026-10-08) |
+   | India (Groww NRI, Non-PIS; decision 54, replacing Axis Direct of decision 49 from 2026-10-12) | Brokerage, delivery | 0.10% of the order value each side, at least ₹100 per order | market | Groww's published pricing, read 2026-10-12 |
    | India | GST | 18% on brokerage + exchange transaction charge + SEBI fee | market | owner-provided; verify |
    | India | STT | 0.1% each side | market | owner-provided (agrees with `config/costs.yaml`); verify |
    | India | Stamp duty | 0.015% on the buy side | market | owner-provided (agrees with `config/costs.yaml`); verify |
    | India | NSE transaction charge, SEBI fee | 0.00307% and 0.0001% each side, as already in `config/costs.yaml` | market | as documented there (search-only sources) |
-   | India | NRO Non-PIS reporting charge | ₹200 per trade date: the full ₹200 on a paper trade's buy date and again on its sell date | your | owner-provided; confirmed final (owner, 2026-10-08) |
-   | India | DP charge per scrip sold | ₹30 or 0.04% of the sale value, the higher | your | secondary source; confirmed final (owner, 2026-10-08) |
-   | India | Demat AMC | about ₹885 a year: an account charge, in no trade's cost | none | owner-provided; confirmed final (owner, 2026-10-08) |
+   | India | NRI reporting charge | none (Axis Direct's ₹200 per trade date until 2026-10-12) | your | owner, 2026-10-12 |
+   | India | DP charge per scrip sold | ₹20 (₹3.5 depository + ₹16.5 Groww) plus 18% GST = ₹23.60 (Axis Direct: ₹30 or 0.04%, the higher, no GST, until 2026-10-12) | your | Groww's published pricing, read 2026-10-12 |
+   | India | Demat AMC | ₹0 (Axis Direct: about ₹885 a year): an account charge, in no trade's cost | none | Groww's published pricing, read 2026-10-12 |
    | US (BUX Basic; decision 52) | Order fee | €0.99 per order, converted at the EUR/USD close on or before that side's session (when none is stored that early, the oldest stored close, i.e. a later rate known by the run's clock: `lab/market_data.py` `MarketData.eurusd_on`) | market | owner-provided; confirmed final (owner, 2026-10-08) |
    | US | FX markup | 0.75% of the value on each EUR↔USD conversion (on the buy and on the sale) | your | owner-provided; confirmed final (owner, 2026-10-08) |
    | US | Portfolio fee | 0.20% a year on the entry value, pro-rated over the calendar days from D to the exit session | your | owner-provided; confirmed final (owner, 2026-10-08) |
    | US | SEC fee, FINRA TAF | as already in `config/costs.yaml` | market | official, as documented there |
 
-   No GST is added to the reporting and DP charges (the owner's facts put GST on brokerage + exchange + SEBI only).
+   GST is added to the DP charge from decision 54 on (Groww lists it among the charges GST applies to); under Axis
+   Direct no GST was added to the reporting and DP charges (the owner's facts put GST on brokerage + exchange + SEBI only).
    Each cost line is rounded to cents and a view's total is the sum of its rounded lines.
 
    **Round trip at the default amount** (flat price, entry value = exit value; F1.7.3 and decision 51 use the same
