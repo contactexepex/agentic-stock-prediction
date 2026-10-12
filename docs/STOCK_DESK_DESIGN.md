@@ -32,7 +32,7 @@ Version 1 copied the F&O design too directly. Brutal list of its errors:
    history (2011 to 9 Oct 2026) has already been used** in development. The F&O desk had an untouched 2019-2023
    period; we do not. Section 8 handles this honestly.
 3. **It listed 22 AI roles with no budget.** The owner's own decision caps the whole system at $250/month (v16 5.3).
-   Version 2 states the cost of each role and when it runs (section 10).
+   Version 2 states when each role runs and how its cost is measured (section 10).
 4. **It stated hypotheses as facts.** For example, it said investors under-react to results. ChatGPT corrected the
    same error in the F&O design (reviews 1 and 10). In version 2 every edge is a hypothesis with a "what would prove
    it wrong".
@@ -45,18 +45,24 @@ Version 1 copied the F&O design too directly. Brutal list of its errors:
 
 ### 1.1 The owner's reasons, in the owner's words
 
-From the F&O conversation of 12 Oct 2026, which applies to this project too ("same thing for stock prediction"):
+From the F&O conversation of 12 Oct 2026 (`conversations/2026-10-12.md`, quoted verbatim, "..." marks omitted words).
+The owner asked to apply the same team approach here in this project's orchestrator session on 12 Oct 2026 ("we can
+do the same thing for stock prediction as well"; "This is for stock prediction, not for ... future and options"):
 
 - *"It is about consuming data, analyze it, apply the reasoning, intelligence and smartness to find the profitable
   trades. That's how all these different human roles work together."*
-- *"It is not one person responsibility. It is a team effort ... the common goal ... is to find net profitable ...
-  trades. ... whether we have to fix the data, the algorithm, the logic, the code, anything that we need to do."*
-- *"Make sure there are different models running different capabilities. One model should not run all the
-  capabilities ... and there should be one additional role ... called judge."*
-- *"You have huge amount of data. You can compare and check each and every edge case ... each member or role has high
-  processing power ... they can find the pattern, recognize them, find the gaps."*
-- *"The design is about a team of experts in different fields working together, to find the most profitable trades
-  and winning against the odds."*
+- *"It is not one person responsibility. It is a team effort. ... that co common goal for collective team effort is to
+  find net profitable future and option trades. So in order to achieve that goal, whether we have to fix the data,
+  whether we have to fix the algorithm, whether we have to fix the logic, we have to fix the code, anything that we
+  need to do"*
+- *"make sure there are different models running different capabilities. One model should not run. all the
+  capabilities there should be multiple independent models that should work together ... and there should be one
+  additional role which is an independent honest brutal ruthless and transparent role called judge role"*
+- *"You have huge amount of data. You can compare and check each and every edge case, every possible situation. ...
+  each member or role has high processing power they have all the data available they can find the pattern they can
+  recognize them they can find the gaps and see the situations"*
+- *"That the design is about a team of experts in different fields are working together. To find the most profitable
+  trades. And winning against the odds."*
 
 ### 1.2 What the team is for
 
@@ -76,8 +82,8 @@ patterns finds lucky ones. So the team works under strict evidence rules (sectio
 
 | Lesson | What happened in F&O | What it means here |
 |---|---|---|
-| Building is not discovering | 6 review rounds went into making one diagnostic correct; no strategy was found; the owner: "you and ChatGPT are not fulfilling the roles" | Since 8 Oct this project has spent nearly all effort on the app, pipeline and pages, and **no desk research at all**. The same drift. The first deliverable of this design is research (desk meeting 1), not code |
-| Many weak rules agreeing is not evidence | 19 chart rules voting; they did no better than a coin toss (about the 10th percentile of 30 random runs) | Our 8 "rule" strategies are one signal model with different news weights, and the morning Slack post ranks companies **by agreement** among them. Their agreement counts the same opinion up to 8 times. Agreement must count independent sources only |
+| Building is not discovering | Review rounds 2-6 went into making one diagnostic correct; no strategy was found; the owner: "you and ChatGPT are not fulfilling the roles" | Since 8 Oct this project has spent nearly all effort on the app, pipeline and pages. The only research was the research director's weekly review (W41) and the 15-year backtest of 10 Oct; there has been **no desk meeting**. The same drift. The first deliverable of this design is research (desk meeting 1), not code |
+| Many weak rules agreeing is not evidence | 19 chart rules voting; 4 of 30 coin-toss runs did worse (about the 13th percentile): no positive edge was established, and neither was equality with chance | Our 8 "rule" strategies are one signal model, each changing one parameter (news weight, statuses, materiality, cross-market, regime filter or threshold). The morning Slack post ranks companies by how many of all 15 strategies buy at N+1, so the 8 near-identical rule strategies can supply 8 of those votes. Agreement must count independent sources only |
 | Start from the data, not from a strategy | The owner: "not to check existing strategies" | Desk meetings start from questions about the data. The current 15 strategies are one input, not the agenda |
 | Controls on every test | Coin toss, always up, always down; all 219 entries in every control | Keep the v16 comparators (cash, simple momentum, model-only) and add the coin-toss distribution for every discovery test |
 | Costs decide | Charges and pads decided feasibility | India at the old broker: always-up N+1 lost **−1.98% per trade** before tax (PLAN_v16 2.5). Short holds in India start deep under water |
@@ -93,7 +99,7 @@ From PLAN_v16 sections 2.4-2.5 and the stored data:
    constant of about 0.47.
 2. **Direction skill is at coin level:** 1-day open-to-close AUC 0.485 for India and 0.483 for the US. `model_skill` is
    false.
-3. **The ranges over-cover** their 80% band (84-85%) and are not better than a naive baseline.
+3. **The ranges over-cover:** India's rule-only replay (2 Jan 2025 to 9 Oct 2026) covers 83.6-85.4% of outcomes with its 80% band, and is not better than a naive baseline. No US figure is recorded.
 4. **News is a fixed weight per article, not per event.** The "rule" strategies all use AI-scored news, so they are
    not AI-free.
 5. **The 15 strategies are not 15 independent ideas:**
@@ -106,12 +112,13 @@ From PLAN_v16 sections 2.4-2.5 and the stored data:
    14 AI-trader trades.
 6. **All stored history is development data** (PLAN_v16 2.5). The only clean evidence is forward.
 7. **Survivorship bias.** The watchlist is 20 large companies per market chosen in 2026. Any test of them back to
-   2011 only includes companies that survived and grew. Results on them overstate what a strategy would have
+   2011 only includes companies that survived and grew. Results on them may overstate what a strategy would have
    earned.
 8. **The universe is small.** 20 companies per market limits any cross-sectional idea (ranking stocks against each
    other) and the number of independent observations.
-9. **Costs.** At the owner's India costs, a trade must move several tenths of a percent before it breaks even. N+1 in
-   India is the hardest case.
+9. **Costs.** At the owner's India costs, a trade must move several tenths of a percent before it breaks even, and
+   more under the Axis Direct NRI scenario than under a zero-brokerage broker (open question 12.4). N+1 in India is
+   the hardest case.
 10. **Independence is weak:**
     - the judge and the forecaster both run on Opus 5.5;
     - the bull and bear researchers read the same context pack;
@@ -202,7 +209,7 @@ Every role works for the same goal. "Runs as": **code** (deterministic, daily or
 | Risk manager | Limits, correlation, stress tests, loss brake | Code | both | v16 4.9 rules; stress tests new |
 | Data and backtesting engineer | Availability times, no look-ahead, survivorship | Code | both | `validate.py` gates, as-of reads |
 | Regulation | SEBI/NSE and SEC rules, results windows, circuit limits | AI | research | new |
-| Bull and bear researchers | The strongest case each way | AI | daily (frozen) | existing |
+| Bull and bear researchers | The strongest case each way | AI | daily (feed the Opus forecaster; not a frozen input of any v16 policy) | existing |
 | Red team | Breaks every thesis before it is registered | AI, a different model from the author | research | new |
 | Judge | Hard validity (code); sufficiency and interpretation (AI) | Code + AI, a different model from the author | both | judge (build work); `validate.py` |
 
@@ -265,7 +272,8 @@ The two types agreed in the F&O design, mapped onto v16:
     account net result after the role's own running cost;
   - abstentions count, and each role is judged only where it applies.
 
-  v16 already contains one such pair: `acct.ai.v1` (with the AI trader) against `acct.noai.v1` (without). New roles
+  v16 already contains such pairs: `acct.ai.v1` against `acct.noai.v1` measures the whole AI pipeline (news
+  scoring plus the trader); `acct.ai.v1` against `acct.news.v1` isolates the trader. New roles
   are measured the same way, as challengers.
 - **Mandatory control roles** (data, risk, cost, the judge's hard checks): scored on correctness and caught violations.
   They are never removed because no disaster happened lately.
@@ -282,8 +290,9 @@ The two types agreed in the F&O design, mapped onto v16:
   - post-close settlement and reasons.
 
   AI roles take part daily only as frozen parts of a registered policy.
-- **Fixed policy, dynamic decisions:** a strategy is never invented and traded the same day. Adaptation is allowed
-  only when its method is fixed and tested in time order (v16 11.5).
+- **Fixed policy, dynamic decisions:** a strategy is never invented and traded the same day. v16 11.5 allows only
+  learned combination weights (shrunk toward equal weights, tested against the frozen equal-weight policy) and **no
+  automatic adaptation of decision rules in the first phase**. Any other change is a new version.
 
 ## 8. Evidence rules
 
@@ -298,7 +307,8 @@ The two types agreed in the F&O design, mapped onto v16:
      whole ledger);
    - the coin-toss distribution for every test.
 
-   Example of the danger: among 1,000 random rules on 33 tries, about 18 win 23 or more (69.7%) by luck alone.
+   Example of the danger: among 1,000 random rules on 33 independent fair-coin tries, about 18 win 23 or more
+   (69.7%) by luck alone.
 3. **No untouched history is left:** all stored history is development data (PLAN_v16 2.5). The honest options:
    - **Forward paper** (the clean test; slow).
    - **A new cross-section never used:** liquid companies **outside** today's watchlist, history fetched for research
@@ -308,7 +318,7 @@ The two types agreed in the F&O design, mapped onto v16:
    - **Never** call development data out-of-sample, and never tune on a challenge set.
 4. **Survivorship and the small universe** are stated in every result.
 5. **Agreement counts independent sources only.** Strategies that share a model or inputs count as one vote. The
-   Slack morning ranking "by agreement" is relabelled or changed to count independent families (a fix proposed to
+   Slack morning ranking (by how many of all 15 strategies buy at N+1) is relabelled or changed to count independent families (a fix proposed to
    the owner; it touches B6's alert, not a registered policy).
 6. **Pass/fail is fixed before a test runs;** availability times are respected; AI replays before the training
    cutoff are exploratory.
@@ -322,7 +332,8 @@ The two types agreed in the F&O design, mapped onto v16:
 - size = account value ÷ 3;
 - at most 3 positions and 2 per sector;
 - results blackout;
-- a 10% loss brake that pauses new entries only, with the owner restarting;
+- a 10% loss brake that pauses new entries only; the rehearsal account (the one the owner follows) restarts only with
+  the owner's approval, while the policy accounts assume a restart after 5 sessions (v16 4.9);
 - every trade carries every real cost from day one.
 
 **What the risk manager adds** (code, proposals to calibrate in research before they govern anything):
@@ -338,7 +349,7 @@ The two types agreed in the F&O design, mapped onto v16:
 
   Full repricing of the positions, shown as stress results, not as worst cases.
 
-The current 209 paper trades per market (each prediction its own trade) stay as the **measurement** of strategies. The
+The current per-prediction paper trades (209 India and 182 US on 12 Oct; each prediction its own trade) stay as the **measurement** of strategies. The
 **account** view (v16 9.3) is the one that answers "what would I have made".
 
 ## 10. Running cost (the owner's ceiling: $250/month for the whole system)
@@ -371,7 +382,8 @@ The current 209 paper trades per market (each prediction its own trade) stay as 
    - the judge's three checks for theses;
    - the head of desk.
 4. **New AI roles, one at a time,** each measured on its scorecard.
-5. **The first registered challenger under v16,** from a thesis that passed. The owner approves.
+5. **The first registered challenger under v16,** from a thesis that passed. The owner approves. No challenger can
+   register until v16 steps 1-3 are built and the step-3 report is reviewed (PLAN_v16 section 11).
 
 Each step is one batch under CLAUDE.md's delivery strategy: one builder, one judge review.
 
