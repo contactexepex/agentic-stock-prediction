@@ -2,8 +2,10 @@ Run the news-only light run for MARKET=<india|us> in this repository. Follow CLA
 repo root. Export `MB_MARKET=<market>` so every script uses this market. Research only: never place
 trades. This run collects news and nothing else: no prices, no agents (no news analyst, claim checker,
 researchers or forecaster), no report, no Slack message, no Neo4j sync (the one optional extra is the warehouse
-sync of step 3a). It runs every 4 hours, every
-day including weekends and exchange holidays, so the pre-open run (routine/PROMPT.md) finds every
+sync of step 3a). It runs in a combined news session for both markets: the session follows this prompt for
+India, then pulls main and follows it again for the US. Sessions run weekdays at 10:45 and 13:45 IST and at 11:27,
+14:27 and 17:27 New York time; weekends at 10:45 IST, 11:27 and 17:27 New York time; exchange holidays included
+(31 sessions a week; crons in docs/DESIGN.md section 2). So the pre-open run (routine/PROMPT.md) finds every
 headline stored since it last ran (docs/DESIGN.md section 3, "News timing").
 
 Data rules: files under `data/` are append-only (CLAUDE.md "Data rules"): never edit, reorder or delete
@@ -27,9 +29,10 @@ a line or file there, and never run a tool that overwrites one. Only the collect
      most Google News queries failed, an outlet listed as `stale`) never block; name them in your final
      message.
    - Exit 1 (a blocking failure): commit nothing. Run `git checkout -- data` and `git clean -fdq data`
-     (this discards only this session's unpushed news rows; the next run reaches back over them because
-     its window starts at the last successful run on main) and end the session, naming each failure
-     (code, detail) in your final message. No retry: the next light run or the pre-open run collects
+     (this discards only this pass's unpushed news rows; the next run reaches back over them because
+     its window starts at the last successful run on main) and end this market's pass, naming each failure
+     (code, detail) in your final message. After the India pass, go on with the US pass from step 1; a failed
+     India pass never stops the US pass. No retry: the next light run or the pre-open run collects
      the same news again.
 
 3. Save: add only the folders the script lists in `commit_paths` of `work/news_light_run.json`
@@ -41,7 +44,8 @@ a line or file there, and never run a tool that overwrites one. Only the collect
    on a conflict (the pre-open run or another light run appended to the same day file meanwhile), do
    not resolve it by hand: `git rebase --abort`, `git reset --hard origin/main`, run step 2 once more
    (it re-collects; items already on main are skipped as duplicates) and step 3 once more. If it fails
-   again, end the session and say so: the next run catches up.
+   again, end this market's pass and say so (the next run catches up); after the India pass, go on with the US pass
+   from step 1.
 
 3a. Warehouse (optional, non-blocking): only when step 3 pushed a commit, run
     `python scripts/warehouse_sync.py --kind news`. It refreshes the market's copy in MotherDuck and

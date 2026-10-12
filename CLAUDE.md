@@ -437,7 +437,9 @@ root as `MB_NOW=2026-10-09T23:59:00Z PYTHONPATH=scripts python docs/plan_volatil
   the eod-analyst, Opus 5.5 for the forecaster (also the Opus trader), graph-builder, research-director and judge;
   table in DESIGN.md section 13).
 - `routine/PROMPT.md` the routines' saved prompt (one per market). `routine/NEWS_PROMPT.md` the news-only light
-  run (one per market, every 4 hours, weekends and holidays included): `collect_news_only.py` runs `collect_news`,
+  run (one combined session for both markets, India then the US, 31 a week: weekdays 10:45 and 13:45 IST and
+  11:27, 14:27 and 17:27 New York time, weekends 10:45 IST, 11:27 and 17:27 New York time, holidays included;
+  owner decision 2026-10-12): `collect_news_only.py` runs `collect_news`,
   India's NSE announcements, `collect_articles`, `news_clusters` and `validate --stage news_collect`, then the
   session commits and pushes the news data folders only; no agents, no Slack. The pre-open run's news analyst
   scores `news_pending.py`'s output: every news/announcement id first seen since the last enrichment
