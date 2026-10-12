@@ -21,7 +21,9 @@ Each review records:
 - proposed numbers kept apart from validated results and approved changes;
 - for a design under review, the section-by-section closing table.
 
-A saved review does not by itself authorise implementation; the owner approves designs, and the judge passes code.
+A saved review does not by itself authorise implementation. A design the owner sends to both AIs needs both AIs'
+agreement and the owner's approval before anything is built (`CLAUDE.md`); code reaches `main` only after the
+judge's PASS.
 
 ## Reviews
 

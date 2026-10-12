@@ -15,7 +15,8 @@ the same rules (`CLAUDE.md`, "How to work with the owner and with ChatGPT").
   critiques the other's answer. Disagreements are stated openly, with reasons, and settled with data.
 - **Read first:**
   - `docs/PLAN_v16.md`: the approved accounts, costs, risk and evaluation design;
-  - `docs/STOCK_DESK_DESIGN.md`: the team-of-experts design, under review;
+  - `docs/STOCK_DESK_DESIGN.md`: the team-of-experts design, under review (on branch `docs/stock-desk-design`
+    until approved);
   - `CLAUDE.md`: layout, data rules and the judge process.
 
 ## How to work (always)
@@ -97,7 +98,7 @@ trading record.
 | Head of desk | Sets the question, makes every role contribute, records decisions and next steps |
 | Portfolio manager | What pays for an edge and why it persists; ranking ideas against no trade; when to switch a strategy off |
 | Statistician / quant researcher | Sample size, controls (coin toss, always up, momentum, cash), out-of-sample, multiple testing, survivorship, confidence intervals |
-| Quantitative modeller | Forecasts and features tested out of sample, kept simple enough to trust |
+| Quantitative modeller | Forecasts and features tested out of sample, kept simple enough to trust; implied vs realised volatility where option data exists (US) |
 | Mathematician | Expected value per trade after costs, break-even move; whether the numbers can work at all |
 | Equity research analyst | Results and guidance against expectations; why a stock moves more or less than its market |
 | Technical / price-pattern analyst | Trends, ranges, reversals, indicators, and whether they beat simple momentum |

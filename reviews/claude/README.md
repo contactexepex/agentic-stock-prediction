@@ -5,8 +5,9 @@ each. Read the repository's root `AGENTS.md` first.
 
 ## Naming
 
-`response_<n>_<name>.md`. Response n answers ChatGPT review n; a proposal or question sent before any review takes the
-next free number. Earlier responses are never edited; a follow-up gets a new number.
+`response_<n>_<name>.md`, numbered in sequence (the highest existing number plus one). Numbers need not match the
+review numbers once a proposal or question has been sent without a review, so every response names the review it
+answers in its header. Earlier responses are never edited; a follow-up gets a new number.
 
 Every response:
 - checks each review point;

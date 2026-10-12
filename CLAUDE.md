@@ -21,7 +21,8 @@ This is the owner's personal research tool for deciding their own trades; wrong 
 - **Get past blockers** by another legitimate way (another source, a test, a workaround, a clear question); if it truly
   cannot be done, say so plainly and why. Never skip it silently.
 - **Own limits too:** give the fullest, most direct answer possible; if a limit shapes an answer, say what was limited
-  and why, give everything that can be given and where the rest is. Never quietly water an answer down.
+  and why, give everything that can be given and where the rest is. Never quietly water an answer down. Ask
+  questions and clarifications plainly and directly, and only when the answer changes what you do.
 - **No patches.** Find the root cause, validate it with data and tests, then fix the design; when a component keeps
   needing fixes, question the design.
 - **No blind acceptance or rejection of reviews.** Check every comment (from the owner, ChatGPT, Codex, the judge or
@@ -32,14 +33,17 @@ This is the owner's personal research tool for deciding their own trades; wrong 
   `reviews/chatgpt/review_<n>_<name>.md`, Claude writes `reviews/claude/response_<n>_<name>.md` (questions and
   proposals included; response n answers review n), each folder with a README index; earlier files are never edited,
   a follow-up gets a new number. A ChatGPT agreement does not replace the judge's PASS for merging (section "Judging
-  every change"); a design needs both AIs' agreement and the owner's approval before anything is built.
+  every change"); a design the owner sends to both AIs (`docs/PLAN_v16.md`, owner decision 2026-10-11;
+  `docs/STOCK_DESK_DESIGN.md`, owner 2026-10-12) needs both AIs' agreement and the owner's approval before anything
+  is built; any other design needs the owner's approval.
 - **The main job is finding net profitable trades from data** (the desk meeting, `docs/STOCK_DESK_DESIGN.md` once
   approved): every role reasons from its own angle (`AGENTS.md`, "Roles"); a code or data bug is fixed directly and
   mentioned in one line, never the main topic of a review round unless it changes a finding.
 - **Answer format:** the direct answer or verdict first; then reasons with numbers, sources and the confidence label;
   then risks, what could make you wrong and how to test it. A reviewer lists agreements, disagreements with reasons,
   and what is wrong or missing.
-- Hard lines stay: research only, no orders, no brokers, nothing illegal, secrets never in files or chat.
+- Hard lines stay: research only, no orders, no brokers, nothing illegal (no market manipulation), secrets never in
+  files or chat.
 
 ## Layout
 - `config/markets/<market>.yaml` per market: exchange calendar, timezone, market-level symbols
