@@ -53,7 +53,7 @@ function TrackRecord({ p }: { p: Payload }) {
       <PageHead page={p} title="Track record" subtitle={`${p.name} · how often the daily forecast was right · data up to ${fmtDate(t.as_of, false)} · research only`} />
       <p className="tr-intro">
         This page checks two things: (1) how often the daily AI forecast was right, and (2) whether the statistical model had any real skill when replayed on past years. The paper trades’ results are on{" "}
-        <Link href={pagePath(p.market, "strategies")}>Strategy lab</Link> and <Link href={pagePath(p.market, "compare")}>Rule vs AI</Link>.
+        <Link href={pagePath(p.market, "lab")}>Strategy lab</Link> and <Link href={pagePath(p.market, "compare")}>Rule vs AI</Link>.
       </p>
       <SkillBand p={p} />
       <Kpis p={p} />
@@ -309,9 +309,9 @@ function BacktestCard({ p }: { p: Payload }) {
   const b = p.track.backtest, lt = p.status.session.local_time;
   const head = (
     <CardHead title="Replay on past years (not real trades)" end={b ? <span className="muted">{`computed ${fmtLocal(b.computed_at, p.market, lt, true)}`}</span> : undefined}
-      help="Each month the model was trained only on earlier data and then tested on the next month, as if in real time (a walk-forward test, run by the weekly review). Not live, and not a paper trade." />
+      help="Each month the model was trained only on earlier data and then tested on the next month, as if in real time (a walk-forward test, rerun by the weekly review on the first trading day of each week). Not live, and not a paper trade." />
   );
-  if (!b) return <Card label="Signal model back-test">{head}<Quiet>No replay of the signal model yet. The weekly run on Friday evening (New York time) writes one.</Quiet></Card>;
+  if (!b) return <Card label="Signal model back-test">{head}<Quiet>No replay of the signal model yet. The weekly review writes one on the first trading day of each week.</Quiet></Card>;
   const d = b.data;
   return (
     <Card label="Signal model back-test">

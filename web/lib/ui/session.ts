@@ -2,7 +2,7 @@
 // stored `in_session` / `late_run` flags are the warehouse build's, frozen at its cut-off). The state comes from the
 // stored session_open_utc / session_close_utc against the viewer's clock; every time is shown on the market's clock
 // (fmtLocal), never the viewer's. Pure.
-import { fmtLocal } from "./format.ts";
+import { fmtLocal, offsetMinutes } from "./format.ts";
 import type { StatusBlock } from "./types.ts";
 
 export type SessionState = "no_session" | "before_open" | "open" | "closed";
@@ -17,17 +17,32 @@ export interface SessionChipWords {
   tip: string;
 }
 
-/** The chip at `nowMs` (epoch milliseconds). Without stored session times it falls back to the stored flags. */
+/** The market-local calendar date (YYYY-MM-DD) of `ms`, on the UTC offset of the status block's local time. */
+const marketDate = (ms: number, localTime: string): string =>
+  new Date(ms + offsetMinutes(localTime) * 60000).toISOString().slice(0, 10);
+
+/** The chip at `nowMs` (epoch milliseconds). The stored session is the one being predicted: the build day's own
+ *  session until its close, then the next session (after a close, on a weekend or a holiday). So:
+ *  - between its open and close: "Open now"; after its close: "Closed for today";
+ *  - before its open on its own date: "Opens HH:MM";
+ *  - before its open on an earlier date: that date has no session left. It is the build day ("Closed for today" when
+ *    the build day was a session day, else "No session today") or a day between the build and the session, which
+ *    has no session by construction ("No session today").
+ *  Without stored session times it falls back to the stored flags. */
 export function sessionChipAt(status: StatusBlock, nowMs: number): SessionChipWords {
   const s = status.session, m = status.market, lt = s.local_time;
-  const tip = `Session ${fmtLocal(s.session_open_utc, m, lt)}–${fmtLocal(s.session_close_utc, m, lt)}.`;
-  if (!s.trading_day) return { state: "no_session", open: false, text: "No session today", bold: null, tip };
+  const tip = `Session ${fmtLocal(s.session_open_utc, m, lt, true)}–${fmtLocal(s.session_close_utc, m, lt)}.`;
   const open = Date.parse(s.session_open_utc), close = Date.parse(s.session_close_utc);
-  const state: SessionState = Number.isNaN(open) || Number.isNaN(close)
-    ? (s.in_session ? "open" : s.late_run ? "closed" : "before_open")
-    : nowMs < open ? "before_open" : nowMs < close ? "open" : "closed";
-  if (state === "open") return { state, open: true, text: "Open now", bold: "Open now", tip };
-  if (state === "closed") return { state, open: false, text: "Closed for today", bold: null, tip };
-  const at = fmtLocal(s.session_open_utc, m, lt);
-  return { state, open: false, text: `Opens ${at}`, bold: at, tip };
+  const closedToday: SessionChipWords = { state: "closed", open: false, text: "Closed for today", bold: null, tip };
+  const none: SessionChipWords = { state: "no_session", open: false, text: "No session today", bold: null, tip };
+  const isOpen: SessionChipWords = { state: "open", open: true, text: "Open now", bold: "Open now", tip };
+  if (Number.isNaN(open) || Number.isNaN(close)) return !s.trading_day ? none : s.in_session ? isOpen : closedToday;
+  if (nowMs >= close) return closedToday;
+  if (nowMs >= open) return isOpen;
+  const today = marketDate(nowMs, lt);
+  if (today === s.session_date.slice(0, 10)) {
+    const at = fmtLocal(s.session_open_utc, m, lt);
+    return { state: "before_open", open: false, text: `Opens ${at}`, bold: at, tip };
+  }
+  return today === lt.slice(0, 10) && s.trading_day ? closedToday : none;
 }

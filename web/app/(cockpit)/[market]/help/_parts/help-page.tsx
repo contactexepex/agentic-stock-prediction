@@ -351,7 +351,8 @@ function WhenFill() {
     ["The after-close write-up (end-of-day analysis)", "At the after-close run, once the first trades have finished."],
     ["Rule vs AI rankings", `After ${MIN_TRADES_TO_RANK} finished trades per side; before that each figure says “too early to tell”.`],
     ["A strategy proven (the go-live bar)", `At the earliest ${GO_LIVE_MONTHS} months after paper testing starts, with about ${GO_LIVE_TRADES_ABOUT} finished trades and all the other checks passed.`],
-    ["The weekly research review and the replay on past years", "Every Friday evening, New York time."],
+    ["The weekly research review and the Strategy lab’s replay on past years", "Every Friday evening, New York time."],
+    ["Track record’s replay of the signal model", "The weekly review, on the first trading day of each week."],
     ["The daily forecast’s track record", "A 1-day forecast is checked after the next trading day’s close."],
     ["News", "Several times a day, 31 runs a week for both markets, weekends and holidays included: daily at 10:45 IST and 11:27 and 17:27 New York time, weekdays also at 13:45 IST and 14:27 New York time."],
   ];
