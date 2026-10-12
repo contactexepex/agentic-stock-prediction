@@ -1,5 +1,5 @@
 "use client";
-// "All your paper trades in one place" (owner request 2026-10-12): a plain summary per family and of your own trades,
+// "All paper trades in one place" (owner request 2026-10-12): a plain summary per family and of your own trades,
 // then one trade list with filters (whose trades, open or closed, won or lost), from B13's `all_trades` block of
 // GET /api/v1/markets/{market}/portfolios. Every strategy's trades (the accuracy view) and the head-to-head trades are
 // two views of the same predictions: one is shown at a time, never added together. Paper only, never advice.
@@ -33,9 +33,9 @@ export function AllTradesCard({ p, all }: Props) {
   const [result, setResult] = useState<ResultFilter>("any");
   const label = p.status.paper_label || PAPER_LABEL;
   const head = (
-    <CardHead title={<>All your paper trades in one place <PaperTag label={label} /></>}
-      end={all?.window.from && all.window.to ? `listed: every open trade, and closed ones from ${fmtDate(all.window.from, false)} to ${fmtDate(all.window.to, false)}` : undefined}
-      help={`Every paper trade the strategies made, and your own, in one list. "All strategies" counts each strategy’s own trades; "Head-to-head" counts the daily picks of the strongest rule strategy and the strongest AI trader. The two are views of the same predictions, so they are shown one at a time and never added together. A trade wins when it made money after costs (strategies: after market cost; yours: after your own broker’s cost). A paper trade is a record, never an order; nothing here is advice.`} />
+    <CardHead title={<>All paper trades in one place <PaperTag label={label} /></>}
+      end={all?.window.from && all.window.to ? `listed: every open trade, and the closed or never-entered ones from ${fmtDate(all.window.from, false)} to ${fmtDate(all.window.to, false)}` : undefined}
+      help={`Every paper trade the strategies made, and your own, in one list. "All strategies" counts each strategy’s own trades; "Head-to-head" counts the daily picks of the strongest rule strategy and the strongest AI trader. The two are views of the same predictions, so they are shown one at a time and never added together. A trade wins when it made money after costs (strategies: after market cost; yours: after your own broker’s cost). This card always shows both costs; the cost switch above does not change it. A paper trade is a record, never an order; nothing here is advice.`} />
   );
   if (!all) return <Card label="All paper trades">{head}<Quiet>The list of all paper trades is not in this page’s data yet.</Quiet></Card>;
   const total = summaryRow(all, scope, totalFamily(scope), "to_date");
@@ -141,7 +141,7 @@ function TradeList({ p, rows }: { p: Props["p"]; rows: AllTradesRow[] }) {
   return (
     <div className="md-table-wrap">
       <table className="md-table tbl at-list">
-        <thead><tr><th>Company</th><th>Whose</th><th>Dates</th><th className="num cw">Bought at</th><th className="num cw">Sold at / last</th><th>State</th><th className="num">Result</th></tr></thead>
+        <thead><tr><th>Company</th><th>Whose</th><th className="dt">Dates</th><th className="num cw">Bought at</th><th className="num cw">Sold at / last</th><th>State</th><th className="num">Result</th></tr></thead>
         <tbody>
           {rows.map((row) => {
             const cur = row.currency ?? p.currency, d = moneyDecimals(cur), res = resultFigure(row);
@@ -151,7 +151,7 @@ function TradeList({ p, rows }: { p: Props["p"]; rows: AllTradesRow[] }) {
               <tr key={`${row.scope}-${row.id}`} className={row.state === "not_entered" ? "few" : ""}>
                 <td><Link className="tk" href={companyPath(p.market, row.ticker)}>{row.ticker}</Link><small className="muted" style={{ display: "block", fontSize: 11 }}>{nameOf(row.ticker)}</small></td>
                 <td className="whom">{who(p, row)}</td>
-                <td className="nowrap">{row.scope === "mine" ? (row.side === "sell" ? `sold ${fmtDate(row.exit_date, false)}` : `bought ${fmtDate(row.entry_date, false)}`) : <>{row.entry_date ? fmtDate(row.entry_date, false) : DASH}{" → "}{row.exit_date ? fmtDate(row.exit_date, false) : DASH}</>}{row.state === "open" && row.exit_date ? <small className="muted" style={{ display: "block", fontSize: 11 }}>planned exit</small> : null}</td>
+                <td className="nowrap dt">{row.scope === "mine" ? (row.side === "sell" ? `sold ${fmtDate(row.exit_date, false)}` : `bought ${fmtDate(row.entry_date, false)}`) : <>{row.entry_date ? fmtDate(row.entry_date, false) : DASH}{" → "}{row.exit_date ? fmtDate(row.exit_date, false) : DASH}</>}{row.state === "open" && row.exit_date ? <small className="muted" style={{ display: "block", fontSize: 11 }}>planned exit</small> : null}</td>
                 <td className="num cw">{row.price_pending ? DASH : price(cur, row.entry_price)}</td>
                 <td className="num cw">{row.price_pending ? DASH : price(cur, row.exit_or_last_price)}{lastWords ? <small className="muted" style={{ display: "block", fontSize: 11 }}>{lastWords}</small> : null}</td>
                 <td>{stateWords(row)}</td>

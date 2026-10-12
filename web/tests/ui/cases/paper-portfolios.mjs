@@ -6,8 +6,9 @@ import { storedApi } from "../b16/stored.mjs";
 import { readFileSync } from "node:fs";
 import { envelope, mockupPayload } from "../fixtures.mjs";
 
-/** B13's sample all_trades block (judged build/b13-all-trades 83887948, from tests/test_b13_all_trades.py's fixture; the
- * not-entered row's prices nulled by B13 as in real data), on the US mockup page. */
+/** B13's sample all_trades block (judged build/b13-all-trades 83887948, from tests/test_b13_all_trades.py's fixture): a
+ * subset B13 sent (4 of its 18 summary rows, 5 of its 9 trades, so the head-to-head summary has no trade behind it in
+ * the list), the not-entered row's prices nulled by B13 as in real data; on the US mockup page. */
 const SAMPLE = JSON.parse(readFileSync(new URL("../b16/all-trades-sample-us.json", import.meta.url), "utf8"));
 function withSample(rest, market) {
   if (rest !== "portfolios") return undefined;
@@ -50,7 +51,7 @@ function withAllTrades(rest, market) {
     trades: [
       row({ id: "acc:rule.model_news.v1:2026-10-05-RELIANCE-3d", scope: "all", strategy_id: "rule.model_news.v1", family: "rule", ticker: "RELIANCE", entry_date: "2026-10-06", exit_date: "2026-10-09", state: "open", outcome: null, entry_price: 1182, exit_or_last_price: 1218, last_price_source: "intraday_check", last_price_time: "2026-10-07T05:43:00Z", last_price_date: "2026-10-07", pnl_market: null, pnl_your: null, unrealised_pnl: 3024, unrealised_pct: 3.05 }),
       row({ id: "acc:rule.model_news.v1:2026-09-29-HDFCBANK-3d", scope: "all", strategy_id: "rule.model_news.v1", family: "rule", ticker: "HDFCBANK", entry_date: "2026-09-30", exit_date: "2026-10-05", state: "closed", outcome: "loss", entry_price: 711.5, exit_or_last_price: 702, pnl_market: -1200, pnl_your: -1650, settled_at: "2026-10-05T12:15:00Z" }),
-      row({ id: "acc:base.always_up.v1:2026-10-01-TCS-1d", scope: "all", strategy_id: "base.always_up.v1", family: "baseline", ticker: "TCS", entry_date: "2026-10-02", exit_date: "2026-10-02", state: "not_entered", outcome: null, not_entered_reason: "no_entry", entry_price: null, exit_or_last_price: null, quantity: null, pnl_market: null, pnl_your: null }),
+      row({ id: "acc:base.always_up.v1:2026-10-01-TCS-1d", scope: "all", strategy_id: "base.always_up.v1", family: "baseline", horizon_days: 1, ticker: "TCS", entry_date: "2026-10-02", exit_date: "2026-10-02", state: "not_entered", outcome: null, not_entered_reason: "no_entry", entry_price: null, exit_or_last_price: null, quantity: null, pnl_market: null, pnl_your: null }),
       row({ id: "h2h:highest_probability:ai.combined.opus.v1:2026-09-29-RELIANCE-3d", scope: "head_to_head", view: "head_to_head", strategy_id: "ai.combined.opus.v1", family: "ai", pick_rule: "highest_probability", ticker: "RELIANCE", entry_date: "2026-09-30", exit_date: "2026-10-06", state: "closed", outcome: "win", entry_price: 1182, exit_or_last_price: 1218, pnl_market: 1016, pnl_your: 575, settled_at: "2026-10-06T12:15:00Z" }),
       row({ id: "pt-india-20261006-RELIANCE-2", scope: "mine", view: null, strategy_id: null, family: "mine", horizon_days: null, side: "sell", ticker: "RELIANCE", entry_date: null, exit_date: "2026-10-06", state: "closed", outcome: "win", entry_price: 1182, exit_or_last_price: 1218, quantity: 50, amount: null, pnl_market: null, pnl_your: 1800 }),
     ],
@@ -78,6 +79,8 @@ export const cases = [
       if (text.includes("planned exit")) problems.push("a planned exit shown on your own open lot");
       await page.click('[aria-label="Whose trades"] button:has-text("Head-to-head")');
       if (!(await page.textContent('[aria-label="All paper trades"]')).includes("1 without your-cost figure yet")) problems.push("missing your-cost count not shown");
+      const hidden = await page.$$eval(".p-portfolios .at-list th", (ths) => ths.filter((th) => th.getBoundingClientRect().right > window.innerWidth + 1).map((th) => th.textContent));
+      if (hidden.length) problems.push(`columns past the screen edge: ${hidden.join(", ")}`);
       return problems;
     },
   },
@@ -87,7 +90,7 @@ export const cases = [
     api: withAllTrades,
     widths: [1280, 390],
     waitFor: ".p-portfolios .at-list",
-    expectText: ["All your paper trades in one place", "Since paper trading began", "Last 10 sessions", "1 open · 1 closed · 0 won, 1 lost", "closed, lost money", "did not enter: no stored open price that day", "so far, before costs", "checked 11:13 IST", "Closed trades older than the last 10 sessions are counted above but not listed."],
+    expectText: ["All paper trades in one place", "Since paper trading began", "Last 10 sessions", "1 open · 1 closed · 0 won, 1 lost", "closed, lost money", "did not enter: no stored open price that day", "so far, before costs", "checked 11:13 IST", "Closed trades older than the last 10 sessions are counted above but not listed."],
     check: async (page) => {
       const problems = [];
       let text = await listText(page);
