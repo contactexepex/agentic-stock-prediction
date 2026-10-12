@@ -120,8 +120,9 @@ The page stays on Material 3 with the app's tokens, components and icon sprite:
 - side colours from the chart tokens;
 - polished empty states.
 
-Dark mode uses `design/system/tokens-dark.css`. **The web app does not import that file today**, so dark mode is
-app-wide work. **Owner decision needed:** turn it on for every page in this change, or leave it for later.
+Dark mode uses `design/system/tokens-dark.css`. The owner decided on 2026-10-12 to leave it out of this change; it
+came app-wide as its own change (UX4, 2026-10-12): the web app imports the file and the top bar has a light / dark /
+system toggle.
 
 ### Additive data for v3, beyond v2's
 

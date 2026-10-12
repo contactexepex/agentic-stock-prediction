@@ -1,5 +1,6 @@
 // Copies the design system (design/system/ and design/mockups/_shared/shell.css) into the app, unchanged:
-//   web/styles/tokens.css, components.css, page.css  <- tokens.css, components.css, _shared/shell.css
+//   web/styles/tokens.css, tokens-dark.css, components.css, page.css  <- tokens.css, tokens-dark.css, components.css,
+//                                                                        _shared/shell.css
 //   web/components/icons/sprite.generated.ts        <- icons.svg as a string constant (inlined once in the root layout)
 // Run from web/: `node tools/sync-design.mjs`; `--check` exits 1 when a copy is out of date (lib/ui/tests/design-sync.test.ts).
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
@@ -14,6 +15,7 @@ export function expectedCopies() {
   const sprite = read("system/icons.svg");
   return {
     "styles/tokens.css": read("system/tokens.css"),
+    "styles/tokens-dark.css": read("system/tokens-dark.css"),
     "styles/components.css": read("system/components.css"),
     "styles/page.css": read("mockups/_shared/shell.css"),
     "components/icons/sprite.generated.ts":

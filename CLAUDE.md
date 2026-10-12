@@ -10,6 +10,41 @@ register `docs/PLAN_v16_errata.md` (DC-1 to DC-12, DC-11 withdrawn) and the 58 a
 `docs/PLAN_v16_stories.md` (GitHub issues #361-#418, index #419). Run its Appendix E script from the repository
 root as `MB_NOW=2026-10-09T23:59:00Z PYTHONPATH=scripts python docs/plan_volatility.py`.
 
+## How to work with the owner and with ChatGPT (always; owner decision 2026-10-12, same rules as `exepex/trading`)
+This is the owner's personal research tool for deciding their own trades; wrong results cost real money later. ChatGPT
+(and any other assistant) follows the same rules in `AGENTS.md`.
+- **Never hold back.** Share every relevant fact, risk, idea and doubt, including what the owner may not want to hear.
+- **Be brutally honest.** Disagree openly and say why; never agree just to please the owner or the other AI. Never
+  present a guess as a fact: label every recommendation **strong evidence** (data or published studies, cited),
+  **some evidence** or **reasoning only**.
+- **Simple, precise, concise.** Plain words, real numbers, short answers; explain any jargon you must use.
+- **Get past blockers** by another legitimate way (another source, a test, a workaround, a clear question); if it truly
+  cannot be done, say so plainly and why. Never skip it silently.
+- **Own limits too:** give the fullest, most direct answer possible; if a limit shapes an answer, say what was limited
+  and why, give everything that can be given and where the rest is. Never quietly water an answer down. Ask
+  questions and clarifications plainly and directly, and only when the answer changes what you do.
+- **No patches.** Find the root cause, validate it with data and tests, then fix the design; when a component keeps
+  needing fixes, question the design.
+- **No blind acceptance or rejection of reviews.** Check every comment (from the owner, ChatGPT, Codex, the judge or
+  a reviewing bot) with your own reasoning and, where possible, data: re-run the numbers, read the code, test the
+  claim. Accept only when the check shows it is correct; push back when it is not. Every acceptance and every
+  rejection states its reason and evidence; partial agreement says which part and why.
+- **Everything for the other AI goes in the repository**, never only in chat: ChatGPT writes
+  `reviews/chatgpt/review_<n>_<name>.md`, Claude writes `reviews/claude/response_<n>_<name>.md` (questions and
+  proposals included; numbered in sequence, each naming the review it answers), each folder with a README index; earlier files are never edited,
+  a follow-up gets a new number. A ChatGPT agreement does not replace the judge's PASS for merging (section "Judging
+  every change"); a design the owner sends to both AIs (`docs/PLAN_v16.md`, owner decision 2026-10-11;
+  `docs/STOCK_DESK_DESIGN.md`, owner 2026-10-12) needs both AIs' agreement and the owner's approval before anything
+  is built; any other design needs the owner's approval.
+- **The main job is finding net profitable trades from data** (the desk meeting, `docs/STOCK_DESK_DESIGN.md` once
+  approved): every role reasons from its own angle (`AGENTS.md`, "Roles"); a code or data bug is fixed directly and
+  mentioned in one line, never the main topic of a review round unless it changes a finding.
+- **Answer format:** the direct answer or verdict first; then reasons with numbers, sources and the confidence label;
+  then risks, what could make you wrong and how to test it. A reviewer lists agreements, disagreements with reasons,
+  and what is wrong or missing.
+- Hard lines stay: research only, no orders, no brokers, nothing illegal (no market manipulation), secrets never in
+  files or chat.
+
 ## Layout
 - `config/markets/<market>.yaml` per market: exchange calendar, timezone, market-level symbols
   (benchmark, vol index, cues, factors), regime thresholds, sectors, `company_meta` (per-company metadata: name,
@@ -211,13 +246,19 @@ root as `MB_NOW=2026-10-09T23:59:00Z PYTHONPATH=scripts python docs/plan_volatil
   `/api/v1/markets/{market}/stocks/{ticker}[/bars|/strategies|/lifecycle/{date}]` and `/trades[?ticker=]`
   (`api/paths|schemas/company.yaml`). `rm_company.trade_checks(ctx)` / `market_trade_checks(ctx)` give the latest
   check's rows to the market and portfolio pages.
-- Paper portfolio page v3 (UX3, docs/ux/paper_portfolio_redesign.md; owner approval 2026-10-12, light mode only): the
+- Paper portfolio page v3 (UX3, docs/ux/paper_portfolio_redesign.md; owner approval 2026-10-12; dark mode came app-wide with UX4): the
   reader's questions in order (up or down, which bets work, why, what the system learns). `warehouse/trade_why.py` adds
   each strategy row's `why` (open: the latest intraday check's market / sector / own move and deviation note; closed:
   B2's automatic reason and the end-of-day AI reason), `direction`, `prob_up`, `reason`, `sessions`, the `learning`
   block and rm.lifecycle's "Full story" fields; `warehouse/trade_pages.py` adds rm.portfolio `open:<k>` and
   `finished:<D>` (indexes `open_holds`, `finished_sessions`), served by `/api/v1/markets/{market}/portfolios/open/{hold}`
   and `.../finished/{date}`. The story view is the lifecycle page with `#story=<prediction>&trade=<trade>`.
+- Dark mode (UX4, owner approval 2026-10-12): the cockpit imports `web/styles/tokens-dark.css` (a copy of
+  `design/system/tokens-dark.css` by `web/tools/sync-design.mjs`) and follows the device's prefers-color-scheme; the top
+  bar's theme button (`components/shell/theme-toggle.tsx`, `lib/ui/theme.ts`) cycles System / Light / Dark, remembered
+  in localStorage `mb-theme` and applied by a head script before the first paint. The few app roles that differ in dark
+  (heatmap fills and its no-trade dot, alert links, round marks) are in `web/styles/app.css`. The UI harness's dark cases (`tests/ui/cases/dark.mjs`,
+  `--theme dark`, `--contrast`) fail on text below WCAG AA (`tests/ui/contrast.mjs`).
 - Strategy lab and lifecycle formats (W1, docs/SPEC.md sections 3-4 and 10; field guide `docs/DATA_CATALOGUE.md`,
   example data `design/catalogue/*.json`, rebuilt by `design/catalogue/make_examples.py` with B2's engine code; notes
   `docs/ws/w1.md`): `config/strategies.yaml` is the strategy registry. It holds the horizon list
@@ -538,6 +579,8 @@ orchestrating session itself (its own edits and merge-conflict resolutions inclu
   merge or push on an agent's word: only a judge PASS counts. (Daily-run appends to `data/` pass
   on the `validate.py` gates instead; see below.)
 - Any FALSE claim makes the verdict FAIL, even if the code is right (the report must be true too).
+- The builder checks every judge finding before fixing it (no blind acceptance, above); a finding the evidence shows
+  to be wrong is answered with that evidence in the next round, and the judge decides again.
 - Severity: every finding is a BLOCKER or COSMETIC. Blockers: broken or wrong functionality, wrong
   numbers, look-ahead, data loss or corruption, false claims or invented sources/data, broken rules,
   untested core logic. Cosmetic: doc wording, naming, formatting, nice-to-have tests for code that

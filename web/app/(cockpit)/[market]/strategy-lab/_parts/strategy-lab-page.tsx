@@ -515,7 +515,7 @@ function Heat({ title, help, ids, cols, cellOf, p, metric }: {
                 if (!x) return <td key={c.key} className="e"><span>·</span></td>;
                 const share = shares[i * cols.length + j], up = metric === "net" ? x.net >= 0 : (x.win ?? 0) >= 0.5;
                 return (
-                  <td key={c.key} tabIndex={0} style={{ background: `color-mix(in srgb, var(${up ? "--mb-color-up" : "--mb-color-down"}) ${share.toFixed(0)}%, var(--md-sys-color-surface-container-lowest))` }}
+                  <td key={c.key} tabIndex={0} style={{ background: `color-mix(in srgb, var(${up ? "--mb-heat-up" : "--mb-heat-down"}) ${share.toFixed(0)}%, var(--md-sys-color-surface-container-lowest))` }}
                     data-tip={`${p.strategies[id]?.name ?? id} × ${c.full}: ${plural(x.n, "trade")}, ${pct(x.win)} won, ${money(cur, x.net, moneyDecimals(cur), true)} after market cost.`}>
                     <span>{metric === "net" ? compactProfit(cur, x.net) : pct(x.win)}</span>
                   </td>
@@ -581,11 +581,11 @@ function Heatmaps({ p, v }: { p: Payload; v: View }) {
       <div className="hmleg">
         <span>{metric === "net" ? "Profit after market cost:" : "Win rate:"}</span>
         <span className="sc" aria-hidden="true">
-          <i style={{ background: "color-mix(in srgb, var(--mb-color-down) 60%, var(--md-sys-color-surface-container-lowest))" }} />
-          <i style={{ background: "color-mix(in srgb, var(--mb-color-down) 25%, var(--md-sys-color-surface-container-lowest))" }} />
+          <i style={{ background: "color-mix(in srgb, var(--mb-heat-down) 60%, var(--md-sys-color-surface-container-lowest))" }} />
+          <i style={{ background: "color-mix(in srgb, var(--mb-heat-down) 25%, var(--md-sys-color-surface-container-lowest))" }} />
           <i style={{ background: "var(--md-sys-color-surface-container-low)" }} />
-          <i style={{ background: "color-mix(in srgb, var(--mb-color-up) 25%, var(--md-sys-color-surface-container-lowest))" }} />
-          <i style={{ background: "color-mix(in srgb, var(--mb-color-up) 60%, var(--md-sys-color-surface-container-lowest))" }} />
+          <i style={{ background: "color-mix(in srgb, var(--mb-heat-up) 25%, var(--md-sys-color-surface-container-lowest))" }} />
+          <i style={{ background: "color-mix(in srgb, var(--mb-heat-up) 60%, var(--md-sys-color-surface-container-lowest))" }} />
         </span>
         <span>{metric === "net" ? "loss … profit, darker = larger; the number is in every cell (k = thousand; the exact figure in the tooltip)" : "below half … above half; the number is in every cell"}</span>
         <span>· = no trade · every cell’s tooltip has the trade count</span>
