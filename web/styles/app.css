@@ -106,3 +106,14 @@ details.mb-tech[open] > summary { margin-bottom: var(--mb-space-2); }
 .pk .gain .mb-label{white-space:normal}
 /* the KPI cost labels are words now ("none expected to beat market fees"): they wrap inside the card */
 .mb-kpi .labs .mb-label{white-space:normal;text-align:left}
+/* Dark mode (UX4): tokens-dark.css recolours every design token; these few app roles need a different mix in dark,
+   so text keeps WCAG AA on them. Light keeps the values the pages had. The same two selectors as tokens-dark.css:
+   the reader's choice (data-theme) or, on System, the device. */
+:root{--mb-heat-up:var(--mb-color-up);--mb-heat-down:var(--mb-color-down);--mb-alert-link:var(--md-sys-color-primary);--mb-quiet-mark:var(--md-sys-color-outline)}
+:root[data-theme="dark"]{--mb-heat-up:color-mix(in srgb, var(--mb-color-up) 50%, var(--md-sys-color-shadow));--mb-heat-down:color-mix(in srgb, var(--mb-color-down) 50%, var(--md-sys-color-shadow));--mb-alert-link:currentColor;--mb-quiet-mark:var(--md-sys-color-on-surface-variant)}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){--mb-heat-up:color-mix(in srgb, var(--mb-color-up) 50%, var(--md-sys-color-shadow));--mb-heat-down:color-mix(in srgb, var(--mb-color-down) 50%, var(--md-sys-color-shadow));--mb-alert-link:currentColor;--mb-quiet-mark:var(--md-sys-color-on-surface-variant)}
+}
+.mb-alert a{color:var(--mb-alert-link)}
+/* the round marks' glyph: the fill's "on" ink (white in light, as components.css draws it; dark ink on dark's light fills) */
+.mb-mark.ok,.mb-mark.hit{color:var(--mb-color-on-up)} .mb-mark.no,.mb-mark.miss{color:var(--mb-color-on-down)} .mb-mark.na{color:var(--mb-color-on-neutral)}

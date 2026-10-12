@@ -7,7 +7,11 @@
 //   - writes app-<width>-full.png and, where the mockup has a screenshot at that width, compare-<width>.png (the mockup
 //     left, the app right) for the side-by-side review against the mockup. The comparison is for review: pixel
 //     equality is not required, so it never fails the run.
+// Themes (UX4): a case's `theme` ("light" | "dark") is the browser's prefers-color-scheme for it (default light);
+// `--theme dark` runs every case in dark. A case with `contrast: true`, every case of a dark run, and every case with
+// `--contrast` also fails on text below WCAG AA contrast (tests/ui/contrast.mjs).
 // Usage (from web/): node tests/ui/harness.mjs [--only <case-name-substring>] [--port 3123] [--out ../work/ui]
+//   [--theme light|dark] [--contrast]
 // Cases live in tests/ui/cases/*.mjs (one file per page session; each exports `cases`, an array, see cases/shell.mjs).
 // Playwright is the machine's global 1.56.1 (CI installs it the same way), launched on the preinstalled Chromium.
 // Fonts: the app self-hosts the design's face Inter (styles/fonts.css), so text widths do not depend on the machine;
@@ -20,6 +24,7 @@ import { execSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { contrastProblems } from "./contrast.mjs";
 import { apiFixture } from "./fixtures.mjs";
 
 const web = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -32,6 +37,9 @@ const port = Number(arg("--port", "3123"));
 const out = resolve(arg("--out", join(repo, "work", "ui")));
 const only = arg("--only", "");
 const fallbackFonts = process.argv.includes("--fallback-fonts");
+const forcedTheme = arg("--theme", "");
+if (forcedTheme && !["light", "dark"].includes(forcedTheme)) throw new Error("--theme takes light or dark");
+const contrastAll = process.argv.includes("--contrast");
 const origin = `http://127.0.0.1:${port}`;
 
 function loadPlaywright() {
@@ -81,7 +89,8 @@ async function loadCases() {
     const mod = await import(pathToFileURL(join(dir, file)).href);
     for (const c of mod.cases ?? []) all.push({ file, ...c });
   }
-  return all.filter((c) => !only || c.name.includes(only));
+  const picked = all.filter((c) => !only || c.name.includes(only));
+  return forcedTheme ? picked.map((c) => ({ ...c, theme: forcedTheme, contrast: c.contrast || forcedTheme === "dark", name: forcedTheme === (c.theme ?? "light") ? c.name : `${c.name}@${forcedTheme}` })) : picked;
 }
 
 async function startServer() {
@@ -136,9 +145,10 @@ async function runCase(browser, c) {
   const shots = [];
   const widths = c.widths ?? [1280, 390];
   const market = c.market ?? "india";
+  const theme = c.theme ?? "light";
   for (const width of widths) {
     const mobile = width < 600;
-    const ctx = await browser.newContext({ viewport: { width, height: mobile ? 844 : 900 }, deviceScaleFactor: mobile ? 2 : 1, isMobile: mobile, hasTouch: mobile });
+    const ctx = await browser.newContext({ viewport: { width, height: mobile ? 844 : 900 }, deviceScaleFactor: mobile ? 2 : 1, isMobile: mobile, hasTouch: mobile, colorScheme: theme });
     const page = await ctx.newPage();
     const tag = `${c.name} @${width}`;
     page.on("console", (m) => {
@@ -194,6 +204,7 @@ async function runCase(browser, c) {
       width,
     );
     if (wide.length) errors.push(`${tag} elements past the edge: ${wide.join(" | ")}`);
+    if (c.contrast || contrastAll) for (const problem of await contrastProblems(page)) errors.push(`${tag} ${problem}`);
     const text = await page.evaluate(() => document.body.innerText);
     for (const want of c.expectText ?? []) if (!text.includes(want)) errors.push(`${tag} missing text: ${want}`);
     for (const sel of c.expectSelector ?? []) if (!(await page.$(sel))) errors.push(`${tag} missing element: ${sel}`);

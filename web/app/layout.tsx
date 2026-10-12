@@ -1,13 +1,17 @@
 // Root layout of the cockpit app (B7): the design system's styles (unchanged copies of design/, tools/sync-design.mjs)
 // plus the app's additions, and the icon sprite inlined once. No font, script or stylesheet from a CDN. Route handlers
 // (/api, /slack, /mcp) do not render layouts. The design's font, Inter, is self-hosted (styles/fonts.css) and its
-// latin subset preloaded.
+// latin subset preloaded. Dark mode (UX4): styles/tokens-dark.css follows the device unless <html data-theme> says
+// light or dark; the boot script (lib/ui/theme.ts, a constant) sets that attribute from the saved choice before the
+// first paint, so the html element's attribute differs from the server's markup by design (suppressHydrationWarning).
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import { ICON_SPRITE } from "../components/icons/sprite.generated.ts";
+import { THEME_BOOT_SCRIPT } from "../lib/ui/theme.ts";
 import { INTER_FONT } from "../lib/ui/vendor.ts";
 import "../styles/fonts.css";
 import "../styles/tokens.css";
+import "../styles/tokens-dark.css";
 import "../styles/components.css";
 import "../styles/page.css";
 import "../styles/app.css";
@@ -24,8 +28,9 @@ export const viewport: Viewport = { width: "device-width", initialScale: 1 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
         <link rel="preload" href={INTER_FONT.preload} as="font" type="font/woff2" crossOrigin="anonymous" />
       </head>
       <body>
