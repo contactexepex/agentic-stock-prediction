@@ -40,12 +40,13 @@ PaperPortfolios:
     One market's Paper portfolios page as of the cut-off: the head-to-head portfolios (scoreboard rows of scopes
     strategy and pick_rule, forward basis), every open paper trade (B4's open-trade derivation) and the rows of the
     latest intraday trade check (B12's), and the owner's own paper trades and FIFO positions with the EUR view of US
-    positions. Research only: a paper trade is a record, never an order. Paper only.
+    positions, and every paper trade in one place (all_trades). Research only: a paper trade is a record, never an
+    order. Paper only.
   allOf:
     - $ref: '#/components/schemas/PageHeader'
     - $ref: '#/components/schemas/HorizonChoice'
     - type: object
-      required: [status, go_live, strategies, companies, h2h_rows, open_trades, trade_checks, owner]
+      required: [status, go_live, strategies, companies, h2h_rows, open_trades, trade_checks, owner, all_trades]
       properties:
         status: {$ref: '#/components/schemas/StatusBlock'}
         go_live: {$ref: '#/components/schemas/GoLive'}
@@ -64,6 +65,7 @@ PaperPortfolios:
           type: array
           items: {$ref: '#/components/schemas/TradeCheck'}
         owner: {$ref: '#/components/schemas/OwnerPortfolio'}
+        all_trades: {$ref: '#/components/schemas/AllTrades'}
 H2hPortfolioRow:
   type: object
   x-source: warehouse/rm_portfolio.h2h_rows
@@ -164,3 +166,79 @@ EurView:
     fx_effect_eur: {type: number}
     pnl_eur: {type: number}
     note: {type: ['string', 'null']}
+AllTrades:
+  type: object
+  x-source: warehouse/all_trades.all_trades
+  description: >-
+    Every paper trade in one place as of the cut-off (owner request 2026-10-12). Scope all = the accuracy view (every
+    strategy), head_to_head = the head-to-head view (never pooled with all: two views of the same predictions), mine =
+    the owner's own trades (WS4's FIFO ledger, your cost only). Listed: every open trade and the closed or not-entered
+    trades whose exit is in the window. Win / loss on the net P&L after market cost (mine: after your cost).
+  required: [window, summary, trades]
+  properties:
+    window:
+      type: object
+      required: [sessions, from, to]
+      properties:
+        sessions: {type: integer}
+        from: {type: ['string', 'null'], format: date}
+        to: {type: ['string', 'null'], format: date}
+    summary:
+      type: array
+      description: Per scope and family, period to_date and window; not_entered trades are never counted
+      items: {$ref: '#/components/schemas/AllTradesSummaryRow'}
+    trades:
+      type: array
+      description: Open trades first, then by exit (or entry) date newest first, then by id
+      items: {$ref: '#/components/schemas/AllTradesRow'}
+AllTradesSummaryRow:
+  type: object
+  required: [scope, family, period, open, closed, wins, losses, flat, win_rate, net_pnl_market, net_pnl_your,
+             pnl_your_missing, currency]
+  properties:
+    scope: {type: string, enum: [all, head_to_head, mine]}
+    family: {type: string, enum: [all, rule, ai, baseline, mine]}
+    period: {type: string, enum: [to_date, window]}
+    open: {type: integer}
+    closed: {type: integer}
+    wins: {type: integer}
+    losses: {type: integer}
+    flat: {type: integer}
+    win_rate: {type: ['number', 'null'], description: Wins as a percent of closed trades; null without any}
+    net_pnl_market: {type: ['number', 'null'], description: Sum over closed trades after market cost (null for mine)}
+    net_pnl_your: {type: ['number', 'null'], description: Sum over closed trades with a your-cost figure}
+    pnl_your_missing: {type: integer, description: Closed trades without a your-cost figure yet}
+    currency: {type: ['string', 'null']}
+AllTradesRow:
+  type: object
+  required: [id, scope, view, strategy_id, family, pick_rule, ticker, horizon_days, entry_date, exit_date, state,
+             outcome, entry_price, entry_source, exit_or_last_price, last_source, last_price_date, price_pending,
+             quantity, amount, currency, pnl_market, pnl_your, return_pct_market, return_pct_your, settled_at, paper]
+  properties:
+    id: {type: string, description: The trade id (strategy trades) or the portfolio trade id (mine)}
+    scope: {type: string, enum: [all, head_to_head, mine]}
+    view: {type: ['string', 'null'], enum: [accuracy, head_to_head, null]}
+    strategy_id: {type: ['string', 'null']}
+    family: {type: string, enum: [rule, ai, baseline, mine]}
+    pick_rule: {type: ['string', 'null']}
+    ticker: {$ref: '#/components/schemas/Ticker'}
+    horizon_days: {type: ['integer', 'null']}
+    entry_date: {type: ['string', 'null'], format: date}
+    exit_date: {type: ['string', 'null'], format: date}
+    state: {type: string, enum: [open, closed, not_entered]}
+    outcome: {type: ['string', 'null'], enum: [win, loss, flat, null]}
+    entry_price: {type: ['number', 'null']}
+    entry_source: {type: ['string', 'null'], enum: [daily_bar, intraday_check, null]}
+    exit_or_last_price: {type: ['number', 'null'], description: The exit price (closed) or the last price (open)}
+    last_source: {type: ['string', 'null'], enum: [daily_bar, intraday_check, null]}
+    last_price_date: {type: ['string', 'null'], format: date}
+    price_pending: {type: boolean, description: Entered at D's open but no price stored or checked yet}
+    quantity: {type: ['number', 'null']}
+    amount: {type: ['number', 'null']}
+    currency: {type: ['string', 'null']}
+    pnl_market: {type: ['number', 'null'], description: Net after market cost (open trades - unrealised); null for mine}
+    pnl_your: {type: ['number', 'null'], description: Net after your cost (strategy trades - closed only)}
+    return_pct_market: {type: ['number', 'null']}
+    return_pct_your: {type: ['number', 'null']}
+    settled_at: {type: ['string', 'null'], format: date-time}
+    paper: {type: boolean, const: true}
