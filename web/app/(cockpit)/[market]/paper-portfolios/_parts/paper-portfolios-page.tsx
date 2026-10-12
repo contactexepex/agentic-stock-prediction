@@ -24,6 +24,7 @@ import {
   receiptState, SOURCE, tradeRequest, type OpenFilter, type PaperPortfoliosPayload, type Receipt, type TradeForm,
 } from "../../../../../lib/strategy-pages/paper-portfolios.ts";
 import { CostSwitch, LuckBar } from "../../_b16/parts.tsx";
+import { openHeadline, perSession } from "../../../../../lib/strategy-pages/all-trades.ts";
 import { AllTradesCard } from "./all-trades-card.tsx";
 import "./paper-portfolios.css";
 
@@ -59,7 +60,7 @@ function Portfolios({ p }: { p: Payload }) {
       <div style={{ marginTop: 16 }}><AllTradesCard p={p} all={p.all_trades} /></div>
       <Kpis p={p} cost={cost} pending={sent.length} />
       <div style={{ marginTop: 16 }}><H2hCard p={p} cost={cost} /></div>
-      <div style={{ marginTop: 16 }}><OpenTradesCard p={p} /></div>
+      {p.all_trades && perSession(p.all_trades) ? null : <div style={{ marginTop: 16 }}><OpenTradesCard p={p} /></div>}
       <div style={{ marginTop: 16 }}><OwnerCard p={p} sent={sent} onSent={(s) => setSent((list) => [...list, s])} /></div>
       <div className="legend2" aria-label="Legend">
         <span>Legend (sample values): <span className="mb-delta up">+1.2%</span> up, <span className="mb-delta down">−1.2%</span> down, always with the sign</span>
@@ -73,13 +74,23 @@ function Portfolios({ p }: { p: Payload }) {
 }
 
 function Kpis({ p, cost, pending }: { p: Payload; cost: CostView; pending: number }) {
-  const cur = p.currency, d = moneyDecimals(cur), open = openSummary(p), own = positionsSummary(p.owner.positions);
+  const cur = p.currency, d = moneyDecimals(cur), own = positionsSummary(p.owner.positions);
+  const split = p.all_trades ? openHeadline(p.all_trades) : null;
   const R = familyH2hRow(p.h2h_rows, "rule"), A = familyH2hRow(p.h2h_rows, "ai");
+  let openKpi;
+  if (split) {
+    openKpi = <Kpi icon="account_balance_wallet" tone="paper" label="Open paper trades" value={String(split.open)}
+      tip="The accuracy view’s paper trades that have entered and not yet exited, all strategies and horizons; unrealised against the latest stored price, before costs; flagged by their latest intraday check. Head-to-head trades are a separate view, counted apart."
+      sub={<span>unrealised <MoneyDelta currency={cur} value={split.unrealised} decimals={d} /> before costs · {split.flagged} flagged{split.h2hOpen === null ? "" : ` · head-to-head ${split.h2hOpen} open`}</span>} />;
+  } else {
+    const open = openSummary(p);
+    openKpi = <Kpi icon="account_balance_wallet" tone="paper" label="Open paper trades" value={String(open.open)}
+      tip="Every paper trade that has entered and not yet exited, all strategies and horizons, both views; unrealised against the latest stored close."
+      sub={<span>unrealised <MoneyDelta currency={cur} value={open.unrealised} decimals={d} /> before costs{p.trade_checks.length ? ` · ${open.flagged} flagged` : ""}</span>} />;
+  }
   return (
     <KpiRow>
-      <Kpi icon="account_balance_wallet" tone="paper" label="Open paper trades" value={String(open.open)}
-        tip="Every paper trade that has entered and not yet exited, all strategies and horizons, both views; unrealised against the latest stored close."
-        sub={<span>unrealised <MoneyDelta currency={cur} value={open.unrealised} decimals={d} /> before costs{p.trade_checks.length ? ` · ${open.flagged} flagged` : ""}</span>} />
+      {openKpi}
       <Kpi icon="layers" tone="info" label="Head-to-head rule portfolio" value={R ? <MoneyDelta currency={cur} value={figure(R, "net_pnl", cost)} decimals={d} /> : "No trades yet"}
         tip="The two family portfolios of the head-to-head view: the strongest rule strategy vs the strongest AI trader on identical company-days (decisions 41-42)."
         sub={<span>AI portfolio {A ? <MoneyDelta currency={cur} value={figure(A, "net_pnl", cost)} decimals={d} /> : DASH}{` · after ${cost} cost · ${(R?.trades ?? 0) + (A?.trades ?? 0)} settled`}</span>} />
