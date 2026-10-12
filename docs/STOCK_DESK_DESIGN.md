@@ -508,17 +508,17 @@ Review 1 answered the four questions of version 2. The open ones for review 2 ar
 
 | Section | Claude | ChatGPT | Owner |
 |---|---|---|---|
-| 1 Why a team | Agreed; v3 removes the size exception (response 2, 2.1) | Changes required: V16-compatible sizing (review 1, section 3) | |
-| 2 Where we stand | Agreed; v3 corrects the cost hurdle and the "trades" wording (2.7) | Agreed (dated evidence; review 1) | |
-| 3 Fit with PLAN_v16 | Agreed | Agreed (including approved clarifications) | |
-| 4 Edge map | Agreed; v3 changes S1, S2, S3, S7 and adds S9 (2.2, 2.9, 2.10) | Changes required: observable, tradable hypotheses (review 1, section 5) | |
-| 5 The team | Agreed; v3 adds the opportunity record and the model rule (2.3, 2.8) | Changes required: forecast-to-profit record (review 1, section 4) | |
-| 6 Scorecards | Agreed with v3's two levels; shadow attribution open with ChatGPT (2.4) | Changes required: paired role attribution (review 1, section 7) | |
+| 1 Why a team | Agreed; v3 removes the size exception (response 2, 2.1) | Agreed | |
+| 2 Where we stand | Agreed; v3 corrects the cost hurdle and the "trades" wording (2.7) | Agreed | |
+| 3 Fit with PLAN_v16 | Agreed | Agreed | |
+| 4 Edge map | Agreed; v3 changes S1, S2, S3, S7 and adds S9 (2.2, 2.9, 2.10) | Changes required: amendment A — usable event coverage and release/filing anchors (review 2) | |
+| 5 The team | Agreed; v3 adds the opportunity record and the model rule (2.3, 2.8) | Agreed | |
+| 6 Scorecards | Agreed with v3's two levels; shadow attribution open with ChatGPT (2.4) | Agreed | |
 | 7 Two loops | Agreed | Agreed | |
-| 8 Evidence rules | Agreed; v3 freezes the cohort first (2.5) | Changes required: predeclared cross-sectional challenge (review 1, section 7) | |
-| 9 Risk and money | Agreed; v3 marks the additions diagnostic (2.8) | Agreed (proposals remain diagnostic until approved) | |
-| 10 Running cost | Agreed; v3 follows 5.2 for models (2.8) | Agreed (actual billing and V16/DC-10 govern) | |
-| 11 Build order | Agreed; v3 uses review 1's question and states the data limit (2.6) | Changes required: feasible first results study (review 1, section 5) | |
+| 8 Evidence rules | Agreed; v3 freezes the cohort first (2.5) | Agreed | |
+| 9 Risk and money | Agreed; v3 marks the additions diagnostic (2.8) | Agreed | |
+| 10 Running cost | Agreed; v3 follows 5.2 for models (2.8) | Agreed | |
+| 11 Build order | Agreed; v3 uses review 1's question and states the data limit (2.6) | Changes required: amendments A/B — joined data coverage and assumption-based power (review 2) | |
 
 The design is final when both AIs mark every section "agreed" (or the owner settles a disagreement) and the owner
 approves. No build starts before that.
