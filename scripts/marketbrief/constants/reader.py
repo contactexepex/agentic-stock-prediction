@@ -77,3 +77,5 @@ BRIEF_PATH = "/brief/{market}/{session}-{token}"
 BRIEF_SESSIONS = 30                  # report days kept in rm.brief (older links answer 404)
 RM_BRIEF = "brief"
 BRIEF_MARKER = '"reader":{'          # a page built by the reader layer (older report pages are not served)
+
+PREVIEW_LABEL = "Preview (evening run, never traded)"   # a forecast whose published range is B17's evening run

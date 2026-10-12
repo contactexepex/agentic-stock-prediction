@@ -120,6 +120,7 @@ def reader_data(cfg: dict, con, cutoff_time: datetime, view: dict) -> dict:
         "horizons": list(shown),
         "default_horizon": DEFAULT_HORIZON if DEFAULT_HORIZON in shown else (shown[0] if shown else None),
         "lean": {"slight": text.LEAN_SLIGHT, "clear": text.LEAN_CLEAR},
+        "preview_label": text.PREVIEW_LABEL,
         "cutoff": cutoff_time.replace(microsecond=0).isoformat(),
         "as_of": as_of, "as_of_label": day_label(as_of),
         **market_blocks(ctx, as_of),

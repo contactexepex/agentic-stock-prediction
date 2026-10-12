@@ -103,6 +103,8 @@ function card(c){
   const lean = f ? f.lean : 'none';
   head.append(nm, tag(f && f.prob_up != null ? lean : 'none', (lean === 'up' ? '▲ ' : lean === 'down' ? '▼ ' : '● ') + leanText(f)));
   a.append(head);
+  // an evening-run range (B17/B12: the company had no pre-open range for this as-of date yet) is a preview only
+  if (f && f.run === 'evening') a.append(tag('warn', R.preview_label || 'Preview (evening run, never traded)', 'warning'));
   const p = el('div', {class: 'co-price'});
   p.append(document.createTextNode('Last close '), el('b', null, fmtMoney(f && f.base_close != null ? f.base_close : c.close)), document.createTextNode(' '));
   if (c.ret_1d != null) p.append(el('span', {class: c.ret_1d > 0 ? 'up-t' : c.ret_1d < 0 ? 'down-t' : ''}, arrow(c.ret_1d) + fmtFrac(c.ret_1d)));
