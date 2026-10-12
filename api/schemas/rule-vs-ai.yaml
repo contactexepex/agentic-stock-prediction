@@ -257,7 +257,7 @@ ResearchReview:
 ReviewDue:
   type: object
   x-source: warehouse/rm_compare.review_due
-  description: The next weekly research review (Saturday, market-local date) whose ISO week has no stored review yet
+  description: The next weekly research review (Friday, New York date, both markets) whose ISO week has no stored review yet
   required: [date, iso_week]
   properties:
     date: {$ref: '#/components/schemas/IsoDate'}
