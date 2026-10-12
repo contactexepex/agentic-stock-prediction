@@ -101,7 +101,10 @@ def scores_asof(market: str, as_of: datetime, horizon_days: int | None = None,
     return records.scores_asof(market, as_of, horizon_days, variant=variant)
 
 
-def ranges_asof(market: str, as_of: datetime, horizon_days: int | None = None) -> list[HorizonRange]:
+def ranges_asof(market: str, as_of: datetime, horizon_days: int | None = None,
+                run: str = "pre_open") -> list[HorizonRange]:
     """The first published range per ticker and horizon for the session after the newest as-of date made by
-    `as_of` (the range a strategy prediction copies; N+k rows only)."""
-    return records.ranges_asof(market, as_of, horizon_days)
+    `as_of` (the range a strategy prediction copies; N+k rows only). run="pre_open" (default): the pre-open run's
+    rows, the revision of record; run="evening": the evening run's preview of the same ids (ranges_evening), for
+    showing evening vs pre-open; never traded."""
+    return records.ranges_asof(market, as_of, horizon_days, run=run)

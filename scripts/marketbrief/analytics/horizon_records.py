@@ -13,7 +13,8 @@ import pandas as pd
 
 from marketbrief.constants.model import (KIND_MODEL_SCORES, KIND_MODEL_VARIANT_SCORES, MODEL_VARIANTS,
                                          MSG_UNKNOWN_VARIANT, VARIANT_BASE)
-from marketbrief.constants.horizons import LABEL_N_PLUS_K, SQL_LABEL_MODEL_SCORES, SQL_LABEL_RANGES
+from marketbrief.constants.horizons import (LABEL_N_PLUS_K, MSG_UNKNOWN_RUN, RUN_EVENING, RUN_KINDS, RUN_PRE_OPEN,
+                                           SQL_LABEL_MODEL_SCORES, SQL_LABEL_RANGES)
 from marketbrief.core.database import connect
 from marketbrief.core.horizons import entry_exit
 from marketbrief.core.market_config import load_market
@@ -33,8 +34,8 @@ ORDER BY ticker, horizon_days, as_of_date DESC"""
 # The first published range per id made by the time, of the newest as-of date with any N+k range by then.
 RANGES_SQL = f"""
 WITH known AS (
-    SELECT DISTINCT ON (id) * REPLACE ({SQL_LABEL_RANGES} AS horizon_label)
-    FROM ranges WHERE made_at <= ?::TIMESTAMPTZ ORDER BY id, made_at
+    SELECT DISTINCT ON (id) * {{exclude}}REPLACE ({SQL_LABEL_RANGES} AS horizon_label)
+    FROM {{table}} WHERE made_at <= ?::TIMESTAMPTZ ORDER BY id, made_at
 ), current AS (
     SELECT * FROM known WHERE horizon_label = '{LABEL_N_PLUS_K}'
 )
@@ -99,11 +100,16 @@ def scores_asof(market: str, as_of, horizon_days: int | None = None, con=None,
     return out
 
 
-def ranges_asof(market: str, as_of, horizon_days: int | None = None, con=None) -> list[dict]:
+def ranges_asof(market: str, as_of, horizon_days: int | None = None, con=None, run: str = RUN_PRE_OPEN) -> list[dict]:
     """The first published N+k range per ticker and horizon of the newest as-of date ranged by `as_of`
-    (HorizonRange records; the range a strategy prediction copies)."""
+    (HorizonRange records; the range a strategy prediction copies). run: RUN_PRE_OPEN (`ranges`, the revision of
+    record) or RUN_EVENING (`ranges_evening`, the evening run's preview with the same ids; its `run` column is
+    dropped so the records keep the HorizonRange fields)."""
+    if run not in RUN_KINDS:
+        raise SystemExit(MSG_UNKNOWN_RUN.format(run=run, runs=", ".join(RUN_KINDS)))
     con = con or connect(market)
     cfg = load_market(market)
-    frame = con.execute(RANGES_SQL, [as_timestamp(as_of), horizon_days, horizon_days]).df()
+    sql = RANGES_SQL.format(table=RUN_KINDS[run], exclude="EXCLUDE (run) " if run == RUN_EVENING else "")
+    frame = con.execute(sql, [as_timestamp(as_of), horizon_days, horizon_days]).df()
     return [with_window(cfg, {key: plain(value) for key, value in rec.items()}) for rec in frame.to_dict("records")]
 

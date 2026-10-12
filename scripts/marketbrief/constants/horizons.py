@@ -7,6 +7,11 @@ KEY_HORIZONS, KEY_AI_HORIZONS = "horizons", "ai_horizons"
 LABEL_N_PLUS_K = "n_plus_k"
 LABEL_LEGACY_CC = "legacy_cc"
 LABEL_LEGACY_5D_D4 = "legacy_5d_d4"
+# The evening run (B17's post-go-live batch, option C): ranges of the day's close, stored apart in ranges_evening with
+# the same ids as the pre-open rows they preview; the pre-open rows in `ranges` stay the revision of record.
+RUN_PRE_OPEN, RUN_EVENING = "pre_open", "evening"
+RUN_KINDS = {RUN_PRE_OPEN: "ranges", RUN_EVENING: "ranges_evening"}
+MSG_UNKNOWN_RUN = "unknown run {run!r}; use one of {runs}"
 HORIZON_LABELS = (LABEL_N_PLUS_K, LABEL_LEGACY_CC, LABEL_LEGACY_5D_D4)
 COL_HORIZON_LABEL, COL_ENTRY_DATE, COL_EXIT_DATE = "horizon_label", "entry_date", "exit_date"
 

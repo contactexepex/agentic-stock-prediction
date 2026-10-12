@@ -209,6 +209,9 @@ BASE_SCHEMAS: Schemas = {
         # close, 5-day: D+4's close), labelled on read (core/horizons.legacy_label)
         "horizon_label": "VARCHAR", "entry_date": "DATE", "exit_date": "DATE",
     }),
+    # The evening run's ranges (ranges.py --evening): the `ranges` columns plus run = "evening", same ids as the
+    # pre-open rows they preview; never scored, never read by ranges_asof unless asked (run="evening")
+    "ranges_evening": ("jsonl", {}),
     "range_outcomes": ("jsonl", {
         "range_id": "VARCHAR", "scored_at": "TIMESTAMPTZ", "target_date": "DATE",
         "actual_close": "DOUBLE", "z": "DOUBLE", "hit50": "BOOLEAN", "hit80": "BOOLEAN",
@@ -255,3 +258,5 @@ BASE_SCHEMAS: Schemas = {
         "settings": "JSON", "detail": "JSON",
     }),
 }
+
+BASE_SCHEMAS["ranges_evening"] = ("jsonl", {**BASE_SCHEMAS["ranges"][1], "run": "VARCHAR"})

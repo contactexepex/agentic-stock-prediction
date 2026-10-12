@@ -353,7 +353,9 @@ root as `MB_NOW=2026-10-09T23:59:00Z PYTHONPATH=scripts python docs/plan_volatil
   N+1. Legacy rows are never pooled with N+k; the context pack's signal-model section shows N+k scores only, and
   `ai_replay score` scores calls recorded before `n_plus_k_from` on their old window apart (`legacy_cc`).
   `contracts/horizons.py` `scores_asof` (`variant=base|cross_market`) and `ranges_asof` give the N+k records as of
-  a time (no look-ahead).
+  a time (no look-ahead). The evening run (B17, option C): `ranges.py --evening` writes the day's-close ranges to
+  `ranges_evening` (same ids as the pre-open rows, `run: "evening"`, no overnight cue), never scored or traded;
+  `ranges_asof(..., run="evening")` reads them, its default stays the pre-open rows in `ranges`.
 - Paper portfolio and signal tiers (WS4; `scripts/portfolio.py --market india|us`, logic in `marketbrief/portfolio/`,
   settings `config/portfolio.yaml`, notes `docs/ws/ws4.md`): research only, a paper trade is a record, never an order.
   `add-trade` validates (watchlist ticker, a session, price = the stored bar's open/close or a manual price inside its

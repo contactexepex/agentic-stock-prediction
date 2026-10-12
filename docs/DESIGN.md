@@ -1918,6 +1918,14 @@ Decision 37: horizon k is N+k, buy at the open of D and sell at the close of the
   `config/settings.yaml` (the moment B10 reached main) separates old and new 5-day calls. The context pack's
   "Signal model" section shows N+k scores only (#95); the AI replay scores calls recorded before that moment on
   their old window as `legacy_cc`, apart (section 7, #96).
+- **Evening run** (B17's post-go-live batch, option C; B10's part). `ranges.py --evening` publishes the day's-close
+  ranges to the kind `ranges_evening`: the `ranges` columns plus `run: "evening"`, the same ids as the pre-open rows
+  they preview, once per id there. It applies no overnight cue (the day's stored quotes are its own pre-open cue, whose
+  session has closed) and no forecaster widening (the forecaster has not run). The pre-open rows in `ranges` stay
+  the revision of record: scoring, settlement, picks, trade checks and `ranges_asof` read only them.
+  `ranges_asof(..., run="evening")` reads the evening rows for showing evening vs pre-open. Model scores stay in
+  `model_scores`: an evening row is followed by a pre-open row only when the probability changed, and readers take
+  the newest computed_at by their clock.
 - **Backtest per horizon** (`model_backtest.py --out DIR` on stored data, open-to-close, after costs; model long at
   p >= 0.55, % per date, 95% block bootstrap; vs = mean difference per date; full run 37 s):
 
