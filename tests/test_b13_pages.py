@@ -219,21 +219,21 @@ def test_rule_vs_ai_records_are_the_mockups(market):
     )
     # the W41 reviews (written 10 Oct) are after the cut-off and never read
     assert [r["iso_week"] for r in built["reviews"]] == ["2026-W40"]
-    assert (
-        rm_compare.review_due(ctx, built["reviews"])
-        == mockup["review_due"]
-        == {
-            "date": "2026-10-10",
-            "iso_week": "2026-W41",
-        }
-    )
+    # the weekly run moved to Friday evening New York time (owner, 2026-10-10); the mockup still shows the Saturday
+    assert rm_compare.review_due(ctx, built["reviews"]) == {"date": "2026-10-09", "iso_week": "2026-W41"}
+    assert mockup["review_due"]["iso_week"] == "2026-W41"
 
 
 def test_review_due_moves_past_a_week_already_reviewed():
-    ctx = compare_context("us")
-    ctx.cutoff_time = datetime.fromisoformat("2026-10-10T18:00:00+00:00")  # Saturday, after the W41 review
-    assert rm_compare.review_due(ctx, [{"iso_week": "2026-W41"}]) == {"date": "2026-10-17", "iso_week": "2026-W42"}
-    assert rm_compare.review_due(ctx, []) == {"date": "2026-10-10", "iso_week": "2026-W41"}
+    for market in ("us", "india"):
+        ctx = compare_context(market)
+        # Friday 9 Oct 23:45 New York (Saturday morning in India), after the W41 review
+        ctx.cutoff_time = datetime.fromisoformat("2026-10-10T03:45:00+00:00")
+        assert rm_compare.review_due(ctx, [{"iso_week": "2026-W41"}]) == {"date": "2026-10-16", "iso_week": "2026-W42"}
+        assert rm_compare.review_due(ctx, []) == {"date": "2026-10-09", "iso_week": "2026-W41"}
+        # Saturday in New York: that week's Friday has passed, the next one is due
+        ctx.cutoff_time = datetime.fromisoformat("2026-10-10T18:00:00+00:00")
+        assert rm_compare.review_due(ctx, []) == {"date": "2026-10-16", "iso_week": "2026-W42"}
 
 
 # ---------- populated records against the contract (the stored data has no settled trade yet) ----------
