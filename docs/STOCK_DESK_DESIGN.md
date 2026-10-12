@@ -540,17 +540,18 @@ Each step is one batch under CLAUDE.md's delivery strategy: one builder, one jud
 - **3. Slack ranking:** yes, count independent strategy families only (a later small change to B6's alert, judged as
   usual; not started yet).
 - **4. India broker:** the owner will use **Groww**, a **non-PIS** NRI account (owner, 12 Oct 2026: Groww supports
-  NRI accounts, checked by the owner; the bank adds no charges beyond Groww's).
+  NRI accounts, checked by the owner; "same changes as charged by Groww", read as: the bank adds no charges beyond Groww's).
   - **Groww's published charges** (https://groww.in/pricing, read 12 Oct 2026):
     - NRI equity delivery brokerage "0.10% with min ₹ 100 per order";
-    - DP charge per sell transaction ₹3.5 depository + ₹16.5 Groww;
+    - DP charge per sell transaction ₹3.5 depository (₹3.25 for women) + ₹16.5 Groww;
     - STT 0.1% buy and sell; stamp duty 0.015% on the buy;
     - NSE exchange charge 0.00297%; SEBI fee 0.0001%; investor protection fund charge (NSE) 0.0001%;
     - GST 18% on brokerage, DP, exchange, SEBI and IPFT charges;
     - account opening and maintenance ₹0 (the page does not say whether this applies to NRI accounts).
   - **Arithmetic** (Claude, not a Groww figure): a ₹1,00,000 round trip at flat prices costs ₹482.08 (0.48%),
     of which brokerage plus its GST is ₹236. The gross rise to break even is 0.48% before tax and 0.54% after the
-    20.8% Indian tax (STT, DP and its GST not deductible, v16 4.8 defaults). Orders below ₹1,00,000 pay the ₹100
+    20.8% Indian tax (STT and DP not deductible, v16 4.5 and 4.8 defaults; DP's GST treated the same way, an
+    extension of those defaults). Orders below ₹1,00,000 pay the ₹100
     minimum, so their brokerage is above 0.1%.
   - **Not yet in use:** replacing v16's zero-brokerage scenario or the lab's Axis Direct costs with Groww's is a
     separate owner-approved change (PLAN_v16 is never edited; a clarification goes to its errata). Charges are
