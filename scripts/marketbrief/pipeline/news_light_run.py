@@ -1,5 +1,6 @@
-"""The news-only light run (routine/NEWS_PROMPT.md; docs/DESIGN.md section 3, "News timing"): every 4 hours,
-every day including weekends and holidays, collect news so busy outlet feeds and a closed day lose nothing.
+"""The news-only light run (routine/NEWS_PROMPT.md; docs/DESIGN.md section 3, "News timing"): in each combined
+india+us news session (31 a week, weekends and holidays included; docs/DESIGN.md section 2), collect news so busy
+outlet feeds and a closed day lose nothing.
 
 Runs, one after the other, each as its own script with this market (MB_MARKET), saving each JSON summary to
 work/steps/<name>.json (summaries left in work/steps/ by an earlier run are deleted first: the gate reads them):

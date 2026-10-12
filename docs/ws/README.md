@@ -107,6 +107,7 @@ Open (round 2):
 
 ### Open questions
 1. News-run cadence: answered by the owner: every 4 hours, 5 runs per market per day (ARCHITECTURE.md 5, DESIGN.md section 2).
+   Superseded by the owner on 2026-10-12: 31 combined india+us sessions a week (DESIGN.md section 2).
 2. MotherDuck billing (per-query minimum, idle cool-down, Postgres endpoint) decides whether news
    syncs may touch MotherDuck at all; to verify in week 1 from the usage page (ARCHITECTURE.md 5).
 3. Dashboard form writes need a MotherDuck token that can write the `inbox` schema in Vercel. If

@@ -29,9 +29,10 @@ a line or file there, and never run a tool that overwrites one. Only the collect
      most Google News queries failed, an outlet listed as `stale`) never block; name them in your final
      message.
    - Exit 1 (a blocking failure): commit nothing. Run `git checkout -- data` and `git clean -fdq data`
-     (this discards only this session's unpushed news rows; the next run reaches back over them because
-     its window starts at the last successful run on main) and end the session, naming each failure
-     (code, detail) in your final message. No retry: the next light run or the pre-open run collects
+     (this discards only this pass's unpushed news rows; the next run reaches back over them because
+     its window starts at the last successful run on main) and end this market's pass, naming each failure
+     (code, detail) in your final message. After the India pass, go on with the US pass from step 1; a failed
+     India pass never stops the US pass. No retry: the next light run or the pre-open run collects
      the same news again.
 
 3. Save: add only the folders the script lists in `commit_paths` of `work/news_light_run.json`
@@ -43,7 +44,8 @@ a line or file there, and never run a tool that overwrites one. Only the collect
    on a conflict (the pre-open run or another light run appended to the same day file meanwhile), do
    not resolve it by hand: `git rebase --abort`, `git reset --hard origin/main`, run step 2 once more
    (it re-collects; items already on main are skipped as duplicates) and step 3 once more. If it fails
-   again, end the session and say so: the next run catches up.
+   again, end this market's pass and say so (the next run catches up); after the India pass, go on with the US pass
+   from step 1.
 
 3a. Warehouse (optional, non-blocking): only when step 3 pushed a commit, run
     `python scripts/warehouse_sync.py --kind news`. It refreshes the market's copy in MotherDuck and
