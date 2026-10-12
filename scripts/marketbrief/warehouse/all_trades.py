@@ -32,9 +32,9 @@ from marketbrief.warehouse.rm_registry import BuildContext
 WINDOW_SESSIONS = 10
 SESSION_PAGES = 60  # accuracy-view trades: one page per entry session, the last 60 (owner's size concern, 2026-10-12)
 SESSION_KEY_PREFIX = "trades:"
-# Step 1 of the size fix (docs/ws/b13.md): the accuracy-view rows stay on page `_` too while B16's deployed card lists
-# them from there; step 2 (after B16's page reads the session pages and is deployed) sets this False.
-LIST_ACCURACY_ON_MARKET_PAGE = True
+# Step 2 of the size fix (docs/ws/b13.md): the accuracy-view rows are listed on the session pages only, now that the
+# deployed Paper portfolios page reads them there (True was step 1, while the deployed card listed them from `_`).
+LIST_ACCURACY_ON_MARKET_PAGE = False
 SESSION_COUNT_KEYS = (
     "open", "closed", "wins", "losses", "flat", "win_rate", "net_pnl_market", "net_pnl_your", "unrealised_pnl",
     "flagged_open",

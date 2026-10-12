@@ -107,20 +107,18 @@ def summary_of(block, scope, family, period="to_date"):
     return next(r for r in block["summary"] if (r["scope"], r["family"], r["period"]) == (scope, family, period))
 
 
-def test_step_1_market_page_still_lists_the_accuracy_view(block, pages):
-    """B16's deployed card lists scope "all" from all_trades.trades: step 1 keeps those rows on `_` (a5 is outside the
-    window), the same rows as on the session pages."""
-    ids = [t["id"] for t in block["trades"]]
-    assert ids == ["o1", "o2", "m3", "a1", "a2", "a3", "a4", "h1", "m2"]  # open first, newest exit/entry, then id
+def test_step_2_market_page_lists_head_to_head_and_mine_only(block):
+    assert all_trades.LIST_ACCURACY_ON_MARKET_PAGE is False
+    assert [t["id"] for t in block["trades"]] == ["o2", "m3", "h1", "m2"]  # open first, newest exit/entry, then id
+    assert all(t["scope"] != "all" and t["paper"] is True for t in block["trades"])
+
+
+def test_step_1_listing_kept_behind_the_switch(monkeypatch, make, pages):
+    monkeypatch.setattr(all_trades, "LIST_ACCURACY_ON_MARKET_PAGE", True)
+    block, _pages = make()
+    assert [t["id"] for t in block["trades"]] == ["o1", "o2", "m3", "a1", "a2", "a3", "a4", "h1", "m2"]
     on_pages = {t["id"]: t for page in pages.values() for t in page["trades"]}
     assert all(t == on_pages[t["id"]] for t in block["trades"] if t["scope"] == "all")
-    assert all(t["paper"] is True for t in block["trades"])
-
-
-def test_step_2_market_page_lists_head_to_head_and_mine_only(monkeypatch, make):
-    monkeypatch.setattr(all_trades, "LIST_ACCURACY_ON_MARKET_PAGE", False)
-    block, _pages = make()
-    assert [t["id"] for t in block["trades"]] == ["o2", "m3", "h1", "m2"]
 
 
 def test_accuracy_view_on_one_page_per_entry_session(block, pages):
@@ -227,7 +225,7 @@ def test_block_and_pages_validate_against_the_contract(block, pages):
     assert schema_errors(list(pages.values()), "PaperPortfoliosTable") == []
 
 
-def test_market_page_open_trades_and_checks_stay_whole_and_pass_price_pending(monkeypatch):
+def test_market_page_open_trades_and_checks_are_head_to_head_only_and_pass_price_pending(monkeypatch):
     from marketbrief.warehouse import rm_portfolio
 
     opens = [opened("o1", "accuracy", "rule"), opened("o2", "head_to_head", "rule")]
@@ -237,7 +235,7 @@ def test_market_page_open_trades_and_checks_stay_whole_and_pass_price_pending(mo
     monkeypatch.setattr(rm_portfolio.rm_company, "market_trade_checks", lambda _ctx: checks)
     ctx = lab_context("us")
     listed = rm_portfolio.open_trades(ctx)
-    assert [t["trade_id"] for t in listed] == ["o1", "o2", "o3"]  # B16's live page counts this list
-    assert [t["trade_id"] for t in rm_portfolio.trade_checks(ctx)] == ["o1", "o2"]
-    pending = listed[2]
+    assert [t["trade_id"] for t in listed] == ["o2", "o3"]  # the accuracy view is on the session pages
+    assert [t["trade_id"] for t in rm_portfolio.trade_checks(ctx)] == ["o2"]
+    pending = listed[1]
     assert (pending["price_pending"], pending["entry_price_source"], pending["last_price_time"]) == (True, None, None)

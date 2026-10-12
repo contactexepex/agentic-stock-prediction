@@ -65,8 +65,8 @@ PaperPortfolios:
   x-source: warehouse/rm_portfolio.portfolio_pages
   description: >-
     One market's Paper portfolios page as of the cut-off: the head-to-head portfolios (scoreboard rows of scopes
-    strategy and pick_rule, forward basis), every open paper trade (B4's open-trade derivation) and the rows of the
-    latest intraday trade check (B12's), and the owner's own paper trades and FIFO positions with the EUR view of US
+    strategy and pick_rule, forward basis), the open head-to-head trades (B4's open-trade derivation) and their rows of
+    the latest intraday trade check (B12's), and the owner's own paper trades and FIFO positions with the EUR view of US
     positions, and every paper trade in one place (all_trades). Research only: a paper trade is a record, never an
     order. Paper only.
   allOf:
@@ -199,9 +199,9 @@ AllTrades:
   description: >-
     Every paper trade in one place as of the cut-off (owner request 2026-10-12). Scope all = the accuracy view (every
     strategy), head_to_head = the head-to-head view (never pooled with all: two views of the same predictions), mine =
-    the owner's own trades (WS4's FIFO ledger, your cost only). The summary counts every trade; listed here: every
-    open trade and the closed or not-entered ones whose exit is in the window (the accuracy view only during step 1 of
-    the size fix, docs/ws/b13.md). The accuracy view is also listed per entry session on GET
+    the owner's own trades (WS4's FIFO ledger, your cost only). The summary counts every trade; listed here: the
+    head-to-head and owner's trades (every open one, and the closed or not-entered ones whose exit is in the window;
+    older ones are counted in the summary and listed nowhere). The accuracy view is listed per entry session on GET
     /portfolios/sessions/{date} (index: sessions). Win / loss on the net P&L after market cost (mine: after your cost).
   required: [window, summary, trades, sessions]
   properties:
@@ -218,7 +218,7 @@ AllTrades:
       items: {$ref: '#/components/schemas/AllTradesSummaryRow'}
     trades:
       type: array
-      description: Open, and closed or not entered with the exit in the window (the accuracy view while step 1 of the size fix lasts; then head-to-head and mine only); open first, then by exit (or entry) date newest first, then by id
+      description: Head-to-head and mine (the accuracy view is on the session pages); open, and closed or not entered with the exit in the window; open first, then by exit (or entry) date newest first, then by id
       items: {$ref: '#/components/schemas/AllTradesRow'}
     sessions:
       type: array
