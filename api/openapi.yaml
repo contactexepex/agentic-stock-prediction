@@ -633,7 +633,10 @@ components:
       x-source: warehouse/rm_entities.open_trades
       description: >-
         A paper trade that has entered and not yet settled (catalogue entity Open trade; intraday/trades.open_trades
-        as of the cut-off), valued at the newest stored close before costs on today's price basis. Paper only
+        as of the cut-off), open from D's open: entered at D's stored open, else at the intraday check's open of D
+        (B9's trade_checks), valued before costs on today's price basis at the newest of the last stored close and the
+        latest intraday check's price. Past D's open with no price yet (no stored open, no check): `price_pending`
+        true and the prices, the quantity and the measures null. Paper only
       required: [trade_id, view, prediction_id, strategy_id, family, market, ticker, horizon_days, entry_date,
                  exit_date, entry_price, quantity, amount, currency, last_price, last_price_date, unrealised_pnl,
                  unrealised_pct, paper]
@@ -648,8 +651,15 @@ components:
         horizon_days: {$ref: '#/components/schemas/Horizon'}
         entry_date: {$ref: '#/components/schemas/IsoDate'}
         exit_date: {$ref: '#/components/schemas/IsoDate'}
-        entry_price: {type: number}
-        quantity: {type: number, exclusiveMinimum: 0}
+        entry_price: {$ref: '#/components/schemas/NullableNumber'}
+        entry_price_source:
+          type: ['string', 'null']
+          enum: [daily_bar, intraday_check, null]
+          description: daily_bar = D's stored open; intraday_check = the open of D from the newest intraday check
+        quantity:
+          oneOf:
+            - {type: number, exclusiveMinimum: 0}
+            - {type: 'null'}
         amount: {type: number}
         currency: {type: string, enum: [INR, USD]}
         target_price: {$ref: '#/components/schemas/NullableNumber'}
@@ -657,11 +667,24 @@ components:
         lo50: {$ref: '#/components/schemas/NullableNumber'}
         hi50: {$ref: '#/components/schemas/NullableNumber'}
         hi80: {$ref: '#/components/schemas/NullableNumber'}
-        last_price: {type: number}
-        last_price_date: {$ref: '#/components/schemas/IsoDate'}
-        unrealised_pnl: {type: number}
-        unrealised_pct: {type: number}
+        last_price: {$ref: '#/components/schemas/NullableNumber'}
+        last_price_date:
+          oneOf:
+            - {$ref: '#/components/schemas/IsoDate'}
+            - {type: 'null'}
+        last_price_source:
+          type: ['string', 'null']
+          enum: [daily_close, intraday_check, null]
+          description: daily_close = the newest stored close; intraday_check = the newest check's price (a later session)
+        last_price_time:
+          type: ['string', 'null']
+          description: The intraday check's price time (ISO UTC); null for a stored close
+        unrealised_pnl: {$ref: '#/components/schemas/NullableNumber'}
+        unrealised_pct: {$ref: '#/components/schemas/NullableNumber'}
         to_target_pct: {$ref: '#/components/schemas/NullableNumber'}
+        price_pending:
+          type: boolean
+          description: True past D's open while no price is known yet (no stored open of D, no intraday check)
         paper: {type: boolean, const: true}
 
     Overview:
