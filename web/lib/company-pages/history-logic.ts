@@ -3,7 +3,7 @@
 // signal-model run of the last 10 as-of dates, the words of each run's change from the run before, how its numbers
 // were made, and the geometry of the two-panel chart (price ranges over the runs' times above, P(up) below). Pure.
 import { extent, linearScale, niceDomain, niceTicks } from "../ui/scales.ts";
-import type { ForecastHistory, HistoryRange, HistoryScore } from "./types.ts";
+import type { ForecastHistory, ForecastRun, HistoryRange, HistoryScore } from "./types.ts";
 
 const MINUS = "−";
 const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -31,14 +31,30 @@ export function historyEntries(ranges: HistoryRange[], scores: HistoryScore[]): 
   return list.sort((a, b) => time(b.at) - time(a.at) || (a.kind === b.kind ? 0 : a.kind === "range" ? -1 : 1));
 }
 
-/** "a revision of the same as-of date" when the previous run predicted from the same close, else the next date's. */
-const revision = (row: { as_of_date: string }, previous: { as_of_date: string } | null) => previous != null && previous.as_of_date === row.as_of_date;
+/** An evening run (B17): a preview on the day's close, never traded; the pre-open run of the same id replaces it. */
+export const isEvening = (row: { run?: ForecastRun }) => row.run === "evening";
+
+/** The run's name for the list and the chart: "evening" or "pre-open" once any run of the history is an evening run
+ *  (null on older rows reads as pre-open, schema ForecastRun); "" while none is, so older histories stay unlabelled. */
+export function runName(row: { run?: ForecastRun }, anyEvening: boolean): string {
+  return !anyEvening ? "" : isEvening(row) ? "evening" : "pre-open";
+}
+
+/** Whether any run of these lists is an evening run. */
+export const hasEvening = (...lists: Array<Array<{ run?: ForecastRun }>>) => lists.some((rows) => rows.some(isEvening));
+
+type RunRow = { as_of_date: string; run?: ForecastRun };
+/** The first word of a change: the pre-open revision of the evening run, a revision of the same close, or a new close. */
+function revisionWords(row: RunRow, previous: RunRow | null, sameClose: string): string {
+  if (previous == null || previous.as_of_date !== row.as_of_date) return "new close";
+  return isEvening(previous) && !isEvening(row) ? "pre-open revision of the evening run" : sameClose;
+}
 
 /** What changed in a range run since the run before (plain words; the first run says so). */
 export function rangeChangeWords(e: { row: HistoryRange; previous: HistoryRange | null }): string[] {
   const { row, previous } = e, c = row.change;
   if (!c) return ["first range run in the window"];
-  const words: string[] = [revision(row, previous) ? "revised for the same close" : "new close"];
+  const words: string[] = [revisionWords(row, previous, "revised for the same close")];
   words.push(c.target_pct == null ? "target move not computable" : `target ${sgn(c.target_pct, 2, "%")}`);
   if (c.width80_pct == null) words.push("80% width move not computable");
   else words.push(c.width80_pct === 0 ? "80% range as wide as before" : `80% range ${c.width80_pct > 0 ? "wider" : "narrower"} by ${Math.abs(c.width80_pct).toFixed(2)}%`);
@@ -61,7 +77,7 @@ const groupWords = (groups: Record<string, number>) =>
 export function scoreChangeWords(e: { row: HistoryScore; previous: HistoryScore | null }): string[] {
   const { row, previous } = e, c = row.change;
   if (!c) return ["first score run in the window"];
-  const words: string[] = [revision(row, previous) ? "re-scored for the same close" : "new close"];
+  const words: string[] = [revisionWords(row, previous, "re-scored for the same close")];
   words.push(c.prob_up == null ? "P(up) move not computable" : `P(up) ${sgn(c.prob_up * 100, 1, " pts")}`);
   const moved = groupWords(c.groups);
   words.push(moved.length ? `points moved: ${moved.join(", ")}` : "no group’s points moved");

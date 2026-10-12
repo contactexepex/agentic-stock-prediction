@@ -75,6 +75,8 @@ def main() -> int:
     install_feedparser(market, now)
     install_articles()
     install_nse_replay()
+    from marketbrief.sources import pacing   # request spacing never sleeps on the offline fakes
+    pacing.pause = lambda _seconds: None
     freeze_clock(script)
     sys.argv = [script, *arguments]
     runpy.run_path(str(CODE / "scripts" / script), run_name="__main__")

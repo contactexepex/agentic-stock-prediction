@@ -36,6 +36,9 @@ root as `MB_NOW=2026-10-09T23:59:00Z PYTHONPATH=scripts python docs/plan_volatil
   `earnings_estimates_asof(ts)`, context only), `collect_news` (catch-up window: Google News `when:` and the oldest item
   kept reach back to the market's last successful news run, +1 h, at most 7 days, never below 1 day / 3 days;
   a query filling Google News' 100-item answer is re-asked per day; one row per run in `data/<market>/news_runs/`;
+  requests spaced (`news.google_news.pause_seconds` 1.5 s, `news.outlet_pause_seconds` 0.5 s); a Google 429/503 or
+  captcha/HTML page stops Google News for the rest of the run (`google_stopped`, `google_skipped`; the run is not
+  `ok`, so the next window reaches back over it; `marketbrief/collectors/news_fetch.py`);
   `marketbrief/collectors/news_window.py`, DESIGN.md section 3 "News timing"; de-duplication, once per market:
   the same article link or the same normalised title from the same outlet (outlet key: host without www./m./amp.,
   allowlisted domain and its `same_as`, or a configured outlet name) within 9 days is not stored again, a new
@@ -43,7 +46,11 @@ root as `MB_NOW=2026-10-09T23:59:00Z PYTHONPATH=scripts python docs/plan_volatil
   on read via `news_id_map` (`news` view: one row per item with its latest headline by now, `news_asof(ts)`,
   `news_aliases`, `news_lookup` for any stored id; `marketbrief/analytics/news_dedup.py`, DESIGN.md section 3
   "News de-duplication")), `collect_filings`, `collect_options` (US option-chain
-  implied vol; India skips). Then `score_predictions` (calls and ranges; its summary adds the proper
+  implied vol; India skips). Every Yahoo call (prices, quotes, options, events, intraday checks, model_history,
+  onboarding) goes through `marketbrief/sources/yahoo_pacing.py` (`paced_yfinance`: `yahoo.pause_seconds` 0.5 s in
+  `config/settings.yaml`; after a rate limit no further Yahoo call in that process: summary `yahoo_stopped`,
+  `yahoo_skipped`, the symbols in `failed`); `tests/test_request_pacing.py` fails when a network library or an
+  unpaced request function is used outside the paced clients. Then `score_predictions` (calls and ranges; its summary adds the proper
   scores of `scoring.py`: Brier, log loss, reliability with Wilson intervals, interval and quantile
   scores, also in the context pack, weekly review and HTML track record), `lessons` (reflection log,
   pattern from TauricResearch/TradingAgents: `prepare` writes the deterministic facts of settled calls
@@ -353,7 +360,11 @@ root as `MB_NOW=2026-10-09T23:59:00Z PYTHONPATH=scripts python docs/plan_volatil
   N+1. Legacy rows are never pooled with N+k; the context pack's signal-model section shows N+k scores only, and
   `ai_replay score` scores calls recorded before `n_plus_k_from` on their old window apart (`legacy_cc`).
   `contracts/horizons.py` `scores_asof` (`variant=base|cross_market`) and `ranges_asof` give the N+k records as of
-  a time (no look-ahead).
+  a time (no look-ahead). The evening run (B17, option C): `ranges.py --evening` writes the day's-close ranges to
+  `ranges_evening` (same ids as the pre-open rows, `run: "evening"`, no overnight cue), never scored or traded;
+  `ranges_asof(..., run="evening")` reads them, its default stays the pre-open rows in `ranges`; new `model_scores`
+  rows carry `run` (`model_scores.py --evening`; null on older rows = pre_open); `range_runs` and `score_runs` give
+  every run of a window of as-of dates, labelled by run (B12's forecast history).
 - Paper portfolio and signal tiers (WS4; `scripts/portfolio.py --market india|us`, logic in `marketbrief/portfolio/`,
   settings `config/portfolio.yaml`, notes `docs/ws/ws4.md`): research only, a paper trade is a record, never an order.
   `add-trade` validates (watchlist ticker, a session, price = the stored bar's open/close or a manual price inside its

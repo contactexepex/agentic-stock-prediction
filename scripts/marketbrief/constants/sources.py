@@ -62,3 +62,16 @@ NSE_DATE_FORMATS = ("%d-%b-%Y %H:%M:%S", "%d-%b-%Y %H:%M", "%d-%b-%Y", "%d-%m-%Y
 NSE_MISSING_VALUES = (None, "", "-", "Nil", "NA")
 NSE_YAHOO_SUFFIX = ".NS"
 TIMEZONE_IST = ZoneInfo("Asia/Kolkata")
+
+# Yahoo (yfinance) pacing and polite stop (marketbrief/sources/yahoo_pacing.py; config/settings.yaml `yahoo:`):
+# at least YAHOO_PAUSE_SECONDS between the starts of two Yahoo calls of one process; after a rate-limit answer
+# no further Yahoo call is made in that run and the symbols not asked are listed (`yahoo_skipped`).
+CFG_YAHOO = "yahoo"
+CFG_PAUSE_SECONDS = "pause_seconds"
+YAHOO_PAUSE_SECONDS = 0.5
+YAHOO_RATE_LIMIT_CLASS = "YFRateLimitError"   # yfinance 1.7.0, yfinance/exceptions.py
+YAHOO_RATE_LIMIT_PATTERN = r"Too Many Requests|Rate limited|\b429\b"
+YAHOO_STOP_RATE_LIMITED = "rate_limited"
+MSG_YAHOO_STOPPED = "Yahoo not asked for {symbol}: stopped for this run after a rate limit ({reason})"
+SUMMARY_YAHOO_STOPPED = "yahoo_stopped"
+SUMMARY_YAHOO_SKIPPED = "yahoo_skipped"

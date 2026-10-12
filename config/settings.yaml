@@ -27,3 +27,8 @@ call_scoring:
   # close, label legacy_5d_d4) and are never pooled with N+5; 1-day calls were N+1 already. Set to when B10 reached
   # main (owner decision 2026-10-07: the merge time).
   n_plus_k_from: "2026-10-07T22:41:00+00:00"
+# Yahoo (yfinance) request spacing (marketbrief/sources/yahoo_pacing.py): every Yahoo call of a process (prices,
+# quotes, options, events, intraday checks, model_history, onboarding) waits until pause_seconds have passed since
+# the previous one started; after a rate-limit answer (HTTP 429) no further Yahoo call is made in that run.
+yahoo:
+  pause_seconds: 0.5

@@ -143,6 +143,7 @@ news:
     window: 1d
     params: {hl: en-IN, gl: IN, ceid: "IN:en"}
     query_template: '"{name}" share'
+    pause_seconds: 1.5   # least seconds between two Google News requests of a run (collectors/news_fetch.py)
   categories:
     macro: ["RBI monetary policy", "India inflation CPI", "India GDP growth"]
     flows: ["FII DII net buying selling"]
@@ -157,6 +158,7 @@ news:
     monsoon: ["monsoon IMD", "monsoon kharif sowing"]
     metals: ["steel prices India", "aluminium prices LME"]
     premarket: ["GIFT Nifty"]                                     # GIFT Nifty (formerly SGX Nifty) pre-market reports
+  outlet_pause_seconds: 0.5   # least seconds between two outlet-feed requests of a run
   outlets:   # verify each URL on the first run; drop any that fail repeatedly
     - {name: ET Markets, url: "https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms", category: general}
     # Moneycontrol's own RSS feeds (marketreports, latestnews, business, ...) stopped updating in

@@ -20,7 +20,7 @@ from marketbrief.constants.model import (VARIANT_BASE, VARIANT_CROSS, KIND_MODEL
                                          MSG_NEWS_NOT_TRAINED, MSG_SCORE_STALE, MSG_TOO_LITTLE_HISTORY)
 from marketbrief.core.cli import market_arg, require_market
 from marketbrief.core.clock import clock, utc_now, utc_today
-from marketbrief.constants.horizons import LABEL_N_PLUS_K
+from marketbrief.constants.horizons import LABEL_N_PLUS_K, RUN_EVENING, RUN_PRE_OPEN
 from marketbrief.core.database import connect
 from marketbrief.core.horizons import entry_exit, horizons
 from marketbrief.core.market_config import benchmark_key
@@ -122,7 +122,7 @@ def latest_probabilities(con) -> dict[str, tuple[float, str]]:
 
 def score_record(fit: MonthlyFit, row: pd.DataFrame, news: dict, meta: dict) -> dict:
     """One model_scores row. meta: ticker, horizon, as_of, model_id, model_version, variant, entry and exit (D and
-    the exit session of N+k)."""
+    the exit session of N+k), run (pre_open or evening)."""
     explanation = explain_row(fit, row, news["logit"], news["text"])
     explanation["news"] = {k: news[k] for k in ("score", "items", "ids", "by_event_type")}
     explanation["news"]["note"] = MSG_NEWS_NOT_TRAINED
@@ -136,11 +136,12 @@ def score_record(fit: MonthlyFit, row: pd.DataFrame, news: dict, meta: dict) -> 
             "news_logit": round(news["logit"], 6), "contributions": explanation,
             "model_version": meta["model_version"], "model_id": meta["model_id"],
             "trained_until": str(fit.cutoff.date()), "computed_at": utc_now(), "horizon_label": LABEL_N_PLUS_K,
-            "entry_date": str(meta["entry"]), "exit_date": str(meta["exit"])}
+            "entry_date": str(meta["entry"]), "exit_date": str(meta["exit"]), "run": meta["run"]}
 
 
-def run(cfg: dict) -> dict:
-    """Score every watchlist ticker and horizon for the as-of date; returns the JSON summary."""
+def run(cfg: dict, run_name: str = RUN_PRE_OPEN) -> dict:
+    """Score every watchlist ticker and horizon for the as-of date; returns the JSON summary. run_name: the run that
+    writes the rows (`run` column; RUN_EVENING from model_scores.py --evening)."""
     market, settings = cfg[CFG_MARKET], load_model_config()
     con = connect(market)
     inputs = read_inputs(con, market)
@@ -164,7 +165,7 @@ def run(cfg: dict) -> dict:
         entry, exit_day = entry_exit(cfg, as_of.date(), horizon)
         meta = {"horizon": horizon, "as_of": as_of, "model_version": settings["model_version"], "variant": variant,
                 "model_id": version_id(market, horizon, settings["model_version"], fit.cutoff, variant), "entry": entry,
-                "exit": exit_day}
+                "exit": exit_day, "run": run_name}
         for ticker in tickers:
             if ticker not in today_rows.index:
                 last = inputs["bars"][ticker].index[-1].date() if ticker in inputs["bars"] else None
@@ -187,6 +188,9 @@ def run(cfg: dict) -> dict:
 
 def main() -> int:
     """Entry point of scripts/model_scores.py."""
-    cfg = require_market(market_arg(__doc__).parse_args())
-    print(json.dumps(run(cfg), indent=2, default=str))
+    parser = market_arg(__doc__)
+    parser.add_argument("--evening", action="store_true",
+                        help="the evening run: rows marked run = evening (the pre-open run revises them)")
+    args = parser.parse_args()
+    print(json.dumps(run(require_market(args), RUN_EVENING if args.evening else RUN_PRE_OPEN), indent=2, default=str))
     return 0

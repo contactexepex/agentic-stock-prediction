@@ -1,4 +1,5 @@
-"""The weekly research director's inputs (docs/SPEC.md F6.2), as of the run's clock (Saturday 10:00 local).
+"""The weekly research director's inputs (docs/SPEC.md F6.2), as of the run's clock (the weekly run,
+Friday evening New York time, both markets).
 
 The week = the ISO week of the last completed session (Monday to Sunday dates). Inputs, each with the ids the
 director may cite:
