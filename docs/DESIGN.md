@@ -47,7 +47,8 @@ changes the gaps.
 Post-close runs (`routine/POSTCLOSE_PROMPT.md`; docs/SPEC.md F6.1) and weekly research runs
 (`routine/WEEKLY_PROMPT.md`; F6.2), in exchange time (B17, Wave 5). The post-close run starts at least 120 minutes
 after the close (`BAR_SETTLE_MINUTES`), when the session's bar counts as final; on a holiday it stops at its
-session check. The weekly research run is separate from the weekly review (step 10a of the pre-open run).
+session check. The weekly research run is separate from the weekly review (step 10a of the pre-open run). It runs on
+Friday evening New York time for both markets (owner decision 2026-10-10), after the US post-close and evening runs.
 The evening forecast run (`routine/EVENING_PROMPT.md`; owner decision 2026-10-10) publishes preview ranges, model
 scores and rule-strategy predictions on the day's close, after the bar is final:
 - the previews go to `ranges_evening`, `strategy_predictions_evening` and `run: "evening"` model scores;
@@ -59,8 +60,8 @@ scores and rule-strategy predictions on the day's close, after the bar is final:
 | US post-close | `CRON_TZ=America/New_York 15 18 * * 1-5` | 22:15 in EDT, 23:15 in EST |
 | India evening forecast | `30 21 * * 1-5` (UTC) | 21:30 |
 | US evening forecast | `CRON_TZ=America/New_York 30 18 * * 1-5` | 22:30 in EDT, 23:30 in EST |
-| India weekly research | `CRON_TZ=Asia/Kolkata 51 9 * * 6` (SPEC's 10:00, moved off the hour) | Saturday 04:21 |
-| US weekly research | `CRON_TZ=America/New_York 51 9 * * 6` (SPEC's 10:00, moved off the hour) | Saturday 13:51 in EDT, 14:51 in EST |
+| India weekly research | `CRON_TZ=America/New_York 30 19 * * 5` (owner decision 2026-10-10: Friday evening, both markets) | Friday 23:30 in EDT, Saturday 00:30 in EST |
+| US weekly research | `CRON_TZ=America/New_York 30 19 * * 5` (same) | Friday 23:30 in EDT, Saturday 00:30 in EST |
 
 **Open paper trades (B9, docs/ws/b9.md).** Each check also covers every open paper trade (F1) of every
 strategy and horizon, in both views: the price against the trade's entry, its target and its own range, on

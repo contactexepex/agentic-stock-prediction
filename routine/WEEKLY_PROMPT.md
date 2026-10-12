@@ -1,6 +1,6 @@
 Run the weekly research run for MARKET=<india|us> in this repository (docs/SPEC.md F6.2; session B3, notes in
-docs/ws/b3.md). Schedule: Saturday 09:51 local (India 09:51 IST, US 09:51 New York time; cron in docs/DESIGN.md
-section 2). It is separate from the existing weekly review (step 10a of the first pre-open run of the ISO week), which
+docs/ws/b3.md). Schedule: Friday 19:30 New York time for both markets (owner decision 2026-10-10; cron in
+docs/DESIGN.md section 2), after the week's last post-close and evening runs. It is separate from the existing weekly review (step 10a of the first pre-open run of the ISO week), which
 stays as it is. Follow CLAUDE.md. Work from the repo root. Export `MB_MARKET=<market>` and `PYTHONPATH=scripts`.
 Research only: never place trades; the director's proposals change nothing until the owner applies them. Run every
 step below even on a week without a session: each script says when it has nothing to do.
@@ -14,6 +14,13 @@ and right after it is stored. Save every step's JSON summary under `work/steps/`
 
 1. Prepare: `mkdir -p work`, `rm -rf work/steps && mkdir -p work/steps`, then
    `pip install -q -r requirements.txt`.
+   For the US, check that today's EOD analyses are stored: `ls data/us/eod_analyses/$(TZ=America/New_York date +%Y/%m/%F).jsonl`
+   (the post-close run of 18:15 New York writes them, before midnight UTC, so the file carries the New York date). If the file is missing, the US post-close run has not stored today's
+   analyses yet: go on, the director then sees the week without them, and say so in your final message. Skip this
+   check on a week whose Friday is a US holiday.
+   The week reviewed is the ISO week of the last completed session. A session on a Saturday or Sunday (e.g. India's
+   Muhurat session, a `special_sessions` day of the market config) comes after this Friday run: it is in no week's
+   "this week" figures (the next run reviews the next ISO week), but it counts in the leaders to date.
 
 2. News-impact study (F3, session B2): `python scripts/lab.py news-impact > work/steps/lab_news_impact.json`. It
    appends the ISO week's `news_impact` rows (docs/SPEC.md F3: per event type, verification status and materiality,
