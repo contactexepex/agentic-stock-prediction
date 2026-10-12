@@ -193,7 +193,7 @@ as it was known at the time, which a fair test needs.
 | S6 | Sector and market context | Sector rotation and global cues move groups together | Cross-market features already showed no tradable skill in the 15-year test (DESIGN.md 15.1) | Sector analyst, macro economist | Prices, indices, FX, rates from 2011 |
 | S7 | Scheduled corporate events | Dividends, splits, buybacks, index inclusion on known dates | No excess total economic outcome after costs around the event, counted with DC-12 (1)-(2): an ex-date drop plus the dividend receivable, a split on the as-traded share count (stored prices are not dividend-adjusted) | Corporate-actions analyst, regulation | Events and adjustments as collected |
 | S8 | Cost and no-trade discipline | Not an edge alone: few trades, held longer, beat the cost drag that sinks frequent trading | — | Cost accountant, portfolio manager | Measured per trade |
-| S9 | Cross-company information transmission (ChatGPT review 1) | A verified event at one company (results, guidance, a supplier or customer shock) may change expectations for a related company before it fully reprices. The results blackout blocks only the reporting company: a peer that has not reported yet and is outside its own blackout can be traded at its next pre-open decision | No net value after costs against own-momentum and sector controls; or the effect is plain common sector movement | Sector analyst, equity research, statistician | Results dates from Oct 2023; pairs predeclared from the current watchlist's sectors (survivorship and mapping caveat stated). The connection map has no point-in-time history, so map-based pairs start forward |
+| S9 | Cross-company information transmission (ChatGPT review 1) | A verified event at one company (results, guidance, a supplier or customer shock) may change expectations for a related company before it fully reprices. The results blackout blocks only the reporting company: a peer that has not reported yet and is outside its own blackout can be traded at its next pre-open decision | No net value after costs against own-momentum and sector controls, in either direction (published work finds peer news can be overreacted to and reverse); or the effect is plain common sector movement | Sector analyst, equity research, statistician | Results dates from Oct 2023; pairs predeclared from the current watchlist's sectors (survivorship and mapping caveat stated). The connection map has no point-in-time history, so map-based pairs start forward |
 
 **Out of scope at first** (a scope choice for our data, schedule and costs, not proof that no edge exists):
 - intraday trading;
@@ -445,8 +445,9 @@ prediction its own record, not a funded position) stay as the **measurement** of
      pre-open decision with the required information available, do entry-known release characteristics or completed
      price/volume reactions predict additional executable net benefit at N+1/N+3/N+5?"
    - **The first legal entry:** v16 4.9 blocks new entries from the day before results until the day after, so for
-     results on day E the first entry is usually the open of E+2 (the current prediction gate blocks only
-     `days_to_earnings` <= 1, calendar days, i.e. E−1 and E; the study reports both and does not decide v16's rule).
+     results on day E the first entry is usually the open of E+2. The current prediction gate blocks entry sessions D
+     with `days_to_earnings` = E − D <= 1 calendar day: E and the calendar day before, not E+1, and not a Friday entry
+     before Monday results. The study reports both entry rules and does not decide v16's rule.
      The move before the first legal entry is shown apart from the tradable rest.
    - **Proxies, labelled:** consensus exists only from 7 Oct 2026, so history uses the completed reaction (return and
      volume from E to the entry) and reported numbers; never called a consensus surprise.

@@ -17,7 +17,8 @@ results blackout blocks the reporting company, but not its peers (section 4 belo
 
 ## 1. Checks of review 1's numbers (all re-run by me on 12 Oct 2026)
 
-**Strong evidence: DuckDB queries on the stored data, and the arithmetic in a script.**
+**Strong evidence: DuckDB queries on the stored data, and the arithmetic in a script.** I did not re-run review 1's
+AUC figures (0.4853 / 0.4826 and the weekly 0.4877 / 0.4829); they match the AUCs already in the design (section 2).
 
 | Review 1 claim | My check | Result |
 |---|---|---|
@@ -55,8 +56,10 @@ a new policy version.
   82 during the session, 30 before the open, 21 untimed. So S1 for this account can only be **drift that is still left
   at the first legal entry**, not the announcement move. The design now says this.
 - **One more fact for the blackout:** the current prediction gate blocks `days_to_earnings <= 1`
-  (`prediction_rules.py` line 131), counted in calendar days (`features.py` line 98), which covers E−1 and E but not
-  E+1. v16's wording covers E+1. The study reports both entry points; which one the account uses is v16's build
+  (`prediction_rules.py` line 131). `days_to_earnings` = E minus the entry session D in calendar days (`features.py`
+  line 98; D is the session after the as-of close, line 175; only events dated on or after D count, line 77). So it
+  blocks entry on E and on the calendar day before E, but not on E+1, and not on the session before E when a weekend
+  or holiday lies between (a Friday entry before Monday results gives 3). v16's wording covers E−1 through E+1. The study reports both entry points; which one the account uses is v16's build
   (step 1), not this design.
 - **S2 (verified news):** accepted. Verified news can move prices less but more predictably; rumours can move them
   violently the wrong way. A "bigger move" test answers the wrong question. The falsifier is now: no gain in net
@@ -133,7 +136,7 @@ I accept all five conditions:
 
 **What review 1 missed (strong evidence: stored data):** past results dates start on 11 Oct 2023 (India) and
 12 Oct 2023 (US) (DC-12 (3)). `earnings_events` gives 242 India and 241 US releases up to 9 Oct 2026, about 12 per
-company, in 26 and 34 calendar months. Rough power: if one stock's return from E+2 to N+5 has a spread of about 5%, a
+company, over 36 months (12 quarters; releases fall in 26 and 34 distinct calendar months). Rough power: if one stock's return from E+2 to N+5 has a spread of about 5%, a
 plain average over 240 events has a standard error of about 0.3%. That is before counting that a results season is
 one shared shock, which makes the real error larger. The after-tax break-even is 0.49-0.83%, so this sample can only
 show a large effect, or end "inconclusive". It cannot prove a small one.
@@ -177,8 +180,8 @@ large Indian companies, so India is an open question. These are priors for the r
   contradicted section 5.2 ("never the author's model"). Section 5.2 now governs: the red team and judge run on a model
   other than the author's (Sonnet-authored cards checked by Opus, Opus-authored theses by Sonnet), and ChatGPT
   reviews every thesis.
-- I applied this to this response: the fact-check of these amendments ran on Sonnet, not on Opus, the model that
-  wrote them.
+- I applied this to this response: the fact-check of these amendments ran on Sonnet (the judge agent's frontmatter
+  says Opus; Sonnet was chosen for this review), not on Opus, the model that wrote them.
 
 ### 2.9 13F and flows — **accepted**
 
@@ -188,7 +191,8 @@ context until its publication-timed value is shown. Section 4 (S3) says so.
 ### 2.10 New thesis S9: cross-company information transmission — **accepted, and extended**
 
 **Some evidence (published studies on intra-industry information transfer, e.g. Foster 1981; Thomas and Zhang 2008)
-for the effect existing in general; reasoning only for this account.** I add S9 to the edge map as proposed,
+for the effect existing in general; reasoning only for this account.** Thomas and Zhang report overreaction to peer
+news, which later reverses, so the tradable sign may be against the first peer move; the test must allow both. I add S9 to the edge map as proposed,
 forward-first where point-in-time maps are missing.
 
 **My extension, because of the blackout:** the blackout blocks the company that reports, not its peers. When the first
