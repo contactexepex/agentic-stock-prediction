@@ -1,5 +1,121 @@
 # Paper portfolio page: redesign proposal (UX3)
 
+Status: **v3, waiting for the owner's approval.** Nothing is built yet. v1 and v2 are kept below for reference.
+
+## v3 (owner feedback of 2026-10-12, second round)
+
+Files in `paper_portfolio_redesign/`:
+- `mockup-v3.html`: the page.
+- `story.html`: the "Full story" of one trade.
+- `make_mockup_v3.py`: rebuilds both mockups.
+- Screenshots: `v3-{desktop,phone}-{light,dark}-top.png`, `v3-{desktop,phone}-light-hold.png` (a "why" popover
+  open), `v3-{desktop,phone}-light-full.png` and `v3-story-{desktop,phone}-{light,dark}.png`.
+
+The mockup uses real stored data for India, as built at Mon 12 Oct 2026, 18:31 IST:
+- `rm.portfolio`;
+- the latest intraday check of each ticker (market, sector and own move);
+- the deviation-explainer notes;
+- the predictions' chance of a rise and the AI reasons;
+- the week-41 research review.
+
+Only the finished-trades rows are an illustration with sample numbers, labelled as such: nothing has finished yet.
+At 390 px there is no horizontal scroll (`scrollWidth` 390), and no table overflows its card.
+
+### The reader's questions, in order
+
+1. **Am I up or down?** One hero card for every strategy's open trades:
+   - the result so far, large, coloured and with an arrow (−₹2,13,564);
+   - "−1.0% on ₹2.06 crore in 209 open trades, before fees";
+   - "Nothing finished yet — first results Tue 13 Oct, ~17:45 IST";
+   - open / finished / won · lost;
+   - a bar of trades going as predicted against trades going the other way.
+2. **Which bets are working?** Three side cards, side by side: Rule strategies, Simple benchmarks and AI traders.
+   - Each card shows its result so far, a win/lose bar, the as-predicted and against counts, and finished, won and
+     lost.
+   - When Rule has no trades, its card says "No trades today: the signal model saw no clear rise ⓘ". The popover
+     gives the reason: the highest chance today was 50%, below its 55% bar.
+   - Next to the cards: "Rule vs AI: the daily picks" (Rule side and AI side) and "Your own trades".
+   - These views are never added together.
+3. **Why?** Every losing trade carries the reason in three layers:
+   - **One line, always visible**, from the latest intraday check. Examples: "Fell mostly on its own (−2.9%); the
+     market added −0.7%. Its sector −2.0%." or "Fell with the whole market (Nifty −1.0%, so −1.5% for this stock);
+     −0.9% on its own." When a deviation-explainer note exists, an "AI note" chip sits beside the line.
+   - **An ⓘ popover**: what was expected (the chance of a rise and the range), what happened so far, the main cause
+     and the sell date.
+   - **"Full story →"** opens `story.html`, which is the company page's lifecycle view. It has:
+     - the trade's hero;
+     - "Why is it going against the prediction?": bars splitting the move into the whole market's part and the
+       company's own part, plus the sector as context;
+     - "What happened, step by step": the prediction with its AI reason, the buy, each check with its split and AI
+       note, then the steps still to come;
+     - "What the system learned".
+
+   Finished losses get the same line from B2's automatic reason and the end-of-day AI reason.
+4. **What does the system learn?** A card with three parts, described honestly:
+   - **Lessons**: written after each AI forecast settles. Only the AI forecaster reads them, from the next morning.
+     None exist yet.
+   - **End-of-day reasons**: they explain and change nothing. The first ones come after the close of Tue 13 Oct.
+   - **Weekly research review**: it proposes changes and nothing changes without the owner's approval. The card
+     quotes the real week-41 finding: no change was proposed, and the next review is Fri 16 Oct.
+
+   The card also says that rule strategies and simple benchmarks never adjust themselves.
+
+### Plain words
+
+- "Baseline" becomes **"Simple benchmarks"** (ⓘ: the yardsticks the others must beat), and "Rule" becomes **"Rule
+  strategies"**.
+- The section titles are questions.
+- Explanations live in ⓘ popovers.
+
+### Open trades
+
+There is one block per hold length (1–5 days), always visible and never in tabs. Each block has:
+- a header with the sell date, a progress bar towards the sale, and the result so far;
+- a Rule · Benchmark · AI strip (count, win/lose bar, ✓/✗, result so far);
+- the losing trades first, each with its reason line, then the trades going as predicted.
+
+Rows with identical trades from strategies on the same side are merged. For example, "Always buy + Follow
+yesterday" for the same stock becomes one row marked ×2, with the two results added. Each list shows 3 rows, then
+"Show N more".
+
+The columns are Company, Who, *Price vs expected* (a small range bar: the tick is the buy price, the dot is now)
+and So far. On a phone, Who moves under the company and the range bar is hidden.
+
+### Visual design
+
+The page stays on Material 3 with the app's tokens, components and icon sprite:
+- a large hero figure, an 8 px spacing grid and borderless cards;
+- tabular, right-aligned ₹ figures with Indian grouping, and signed values shown with both colour and an arrow;
+- red and green used for money and the win/lose bars only;
+- side colours from the chart tokens;
+- polished empty states.
+
+Dark mode uses `design/system/tokens-dark.css`. **The web app does not import that file today**, so dark mode is
+app-wide work. **Owner decision needed:** turn it on for every page in this change, or leave it for later.
+
+### Additive data for v3, beyond v2's
+
+- **Open rows:** the latest check's `market_pct`, `sector_pct`, `own_pct` and `beta` (from intraday_checks), the
+  latest deviation-explainer note's text (from intraday_explanations), and `prob_up`, `direction` and `reason` (from
+  strategy_predictions).
+- **Finished rows:** B2's automatic reason (reason_code and its market, sector, news and company parts) and the
+  end-of-day AI reason (trade_reasons_ai), when there is one.
+- **rm.portfolio `_`:** a small `learning` block with:
+  - the lessons count and the newest lesson (lessons);
+  - the newest research review's week, its first finding, its proposals count and the next review's date
+    (research_reviews);
+  - for the empty Rule card, the highest rule `prob_up` of the session and the bar.
+- **rm.lifecycle** (B12's page, additive): `checks_attribution` (per check: market, sector and own move, and beta)
+  and `deviation_notes` (intraday_explanations for the ticker within the page's window), plus `lessons` and
+  `eod_reasons` for the page's trades. The prediction, its chance, the AI reason, the range, the trade checks, the
+  settlement and the AI reasons are already on it. The "Full story" link points to
+  `/[market]/stocks/[ticker]/lifecycle/[entry date]`.
+
+---
+
+## v2 and v1 (superseded)
+
+
 Status: **revised proposal (v2), waiting for the owner's approval.** Nothing is built yet.
 
 This version applies the owner's feedback on v1, given on 2026-10-12. v1 (`paper_portfolio_redesign/mockup.html`,
