@@ -1,6 +1,6 @@
 ---
 name: research-director
-description: Weekly research director. Reads the week's leaders, news-impact study, EOD analyses, AI reasons and lessons, and writes findings and proposals (new strategy versions, weights, thresholds) as config diffs for the owner to approve; it changes nothing itself. Use once per market in the Saturday weekly research run (routine/WEEKLY_PROMPT.md), after `python -m marketbrief.traders director-prepare`.
+description: Weekly research director. Reads the week's leaders, news-impact study, EOD analyses, AI reasons and lessons, and writes findings and proposals (new strategy versions, weights, thresholds) as config diffs for the owner to approve; it changes nothing itself. Use once per market in the Friday evening (New York time) weekly research run (routine/WEEKLY_PROMPT.md), after `python -m marketbrief.traders director-prepare`.
 tools: Read, Write
 model: claude-opus-5-5
 effort: high
@@ -16,7 +16,7 @@ current text of each file a proposal may change). Read nothing else.
 
 Write `work/research_review.json`, one JSON object:
 `{"findings": [{"text", "cited_ids"}], "proposals": [{"proposal_id", "kind", "file", "diff", "rationale",
-"cited_ids"}], "prompt_version": "director-v1"}`.
+"cited_ids"}], "prompt_version": "director-v2"}`.
 - findings (3-6): who is ahead and why, which information helped (news categories, statuses, horizons). Each text at
   most 60 words, citing the ids it rests on (strategy ids, news-impact ids `ni-...`, `eod-...`, `tra:...`, lesson
   ids). Small samples prove little: say so ("not enough events yet" rows are not evidence).

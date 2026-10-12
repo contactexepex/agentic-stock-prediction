@@ -164,7 +164,7 @@ MSG_EOD_PROMPT = "prompt_version must be {want!r}"
 MSG_EOD_STORED = "{id} is already stored"
 
 # ---------- research director (F6.2) ----------
-DIRECTOR_PROMPT_VERSION = "director-v1"
+DIRECTOR_PROMPT_VERSION = "director-v2"
 DIRECTOR_AGENT_FILE = "research_review.json"
 PROPOSAL_KINDS = ("new_strategy_version", "weight", "threshold")
 PROPOSAL_FILES = ("config/strategies.yaml", "config/model.yaml", "config/ranges.yaml", "config/costs.yaml")
