@@ -13,14 +13,14 @@ import { Avatar, Card, CardHead, FamilyLabel, GoLink, Label, MoneyDelta, Odds, P
 import { ErrorState, LoadingState, PageState } from "../../../../../components/ui/states.tsx";
 import type { Market } from "../../../../../lib/data/constants.ts";
 import { FAMILY, FAMILY_SHORT, MIN_TRADES_TO_RANK, PAPER_LABEL, PICK_RULE, type Family } from "../../../../../lib/ui/constants.ts";
-import { DASH, fmtDate, fmtDateYear, money, moneyDecimals, pct, signed } from "../../../../../lib/ui/format.ts";
+import { DASH, fmtDate, money, moneyDecimals, pct, signed } from "../../../../../lib/ui/format.ts";
 import { companyPath, pagePath } from "../../../../../lib/ui/routes.ts";
 import type { GoLive, PageBase } from "../../../../../lib/ui/types.ts";
 import { usePage } from "../../../../../lib/ui/use-api.ts";
 import { figure, REGIME_WORDS, tooFewToRank, type CostView, type ScoreboardRow } from "../../../../../lib/strategy-pages/scoreboard.ts";
 import {
   familyLines, familyRow, matches, NOT_ENTERED, notEnteredFor, matchTally, matchWinner, perCompany, pickCandidate, pickFor, tradeNet, tradeReturn,
-  viableLine, whoLeads, type Match, type Pick, type ReviewPayload, type RuleVsAiPayload, type SettledTrade,
+  reviewDueWords, viableLine, whoLeads, type Match, type Pick, type ReviewPayload, type RuleVsAiPayload, type SettledTrade,
 } from "../../../../../lib/strategy-pages/rule-vs-ai.ts";
 import { CostSwitch, LuckBar } from "../../_b16/parts.tsx";
 import "./rule-vs-ai.css";
@@ -366,7 +366,7 @@ function ReviewCard({ p, market }: { p: Payload; market: Market }) {
   const r = res.state === "ready" ? res.envelope.payload.reviews[0] ?? null : null;
   const head = (
     <CardHead title="The week’s research review" end={r ? `${r.iso_week} · ${fmtDate(r.period_start, false)}–${fmtDate(r.period_end, false)}` : undefined}
-      help="Every Saturday the research director (Opus, F6.2) reads the scoreboard, the news-impact study, the week’s EOD analyses and lessons, and writes who is ahead and why, which information helped, and proposals as config diffs. It changes nothing itself: every proposal stays “proposed” until the owner approves it." />
+      help="Every Friday evening, New York time (both markets), the research director (Opus, F6.2) reads the scoreboard, the news-impact study, the week’s EOD analyses and lessons, and writes who is ahead and why, which information helped, and proposals as config diffs. It changes nothing itself: every proposal stays “proposed” until the owner approves it." />
   );
   if (res.state === "loading") return <Card label="Weekly research review" className="rev">{head}<LoadingState label="Loading the research review" cards={1} /></Card>;
   if (res.state === "error") return <Card label="Weekly research review" className="rev">{head}<ErrorState problem={res.problem} onRetry={res.reload} /></Card>;
@@ -375,7 +375,7 @@ function ReviewCard({ p, market }: { p: Payload; market: Market }) {
     <Card label="Weekly research review" className="rev">
       {head}
       {!r ? (
-        <Quiet>{rp.review_due ? `No weekly review written by the cut-off. The next one (${rp.review_due.iso_week}) is due on Saturday ${fmtDateYear(rp.review_due.date)}, after the cut-off.` : "No weekly review written by the cut-off."}</Quiet>
+        <Quiet>{reviewDueWords(rp.review_due)}</Quiet>
       ) : (
         <>
           <h3>Who leads</h3>

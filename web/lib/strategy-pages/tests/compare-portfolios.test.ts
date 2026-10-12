@@ -6,7 +6,7 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import {
-  familyLines, familyRow, notEnteredFor, matchTally, matchWinner, matches, perCompany, pickFor, tradeNet, viableLine, whoLeads,
+  familyLines, familyRow, notEnteredFor, reviewDueWords, matchTally, matchWinner, matches, perCompany, pickFor, tradeNet, viableLine, whoLeads,
   type RuleVsAiPayload, type SettledTrade,
 } from "../rule-vs-ai.ts";
 import {
@@ -122,6 +122,13 @@ test("receipt states and the idempotency key's format", () => {
   assert.equal(receiptState(409), "refused");
   assert.match(newIdempotencyKey(), /^[A-Za-z0-9_-]{8,64}$/);
   assert.notEqual(newIdempotencyKey(), newIdempotencyKey());
+});
+
+test("the review-due line names the due date's own weekday", () => {
+  assert.equal(reviewDueWords({ date: "2026-10-16", iso_week: "2026-W42" }),
+    "No weekly review written by the cut-off. The next one (2026-W42) is due on Friday 16 Oct 2026, after the cut-off.");
+  assert.match(reviewDueWords({ date: "2026-10-10", iso_week: "2026-W41" }), /due on Saturday 10 Oct 2026/);
+  assert.equal(reviewDueWords(null), "No weekly review written by the cut-off.");
 });
 
 test("a price-pending open trade is counted as open but adds nothing to the unrealised sums", () => {
