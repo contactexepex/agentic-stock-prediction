@@ -3,8 +3,9 @@ GET /api/v1/markets/{market}/portfolios. Payload PaperPortfolios = design/mockup
 market (notes.md there names every key and its selection rule): the shared blocks of rm_common, the companies with
 their last stored close, the head-to-head portfolios (scoreboard rows of scopes strategy and pick_rule), the open
 trades and the latest intraday trade checks (B4's and B12's derivations, the same rows as rm.trades `_`), and the
-owner's own paper trades and FIFO positions with the EUR view of US positions (WS4/B2's portfolio service), all as of
-the cut-off. Research only: a paper trade is a record, never an order."""
+owner's own paper trades and FIFO positions with the EUR view of US positions (WS4/B2's portfolio service), and every
+paper trade in one place (`all_trades`, all_trades.py: open and closed, wins and losses), all as of the cut-off.
+Research only: a paper trade is a record, never an order."""
 
 from __future__ import annotations
 
@@ -15,7 +16,7 @@ from marketbrief.portfolio import service as portfolio_service
 from marketbrief.portfolio.context import Context as PortfolioContext
 from marketbrief.portfolio.settings import load_portfolio_config, market_costs
 from marketbrief.utils.numbers import json_safe_float
-from marketbrief.warehouse import rm_common, rm_company
+from marketbrief.warehouse import all_trades, rm_common, rm_company
 from marketbrief.warehouse.rm_registry import BuildContext, ContractCase, PageBuilder
 from marketbrief.warehouse.rm_strategies import market_mockup, pick, scoreboard_rows
 
@@ -161,10 +162,9 @@ def owner_positions(context: PortfolioContext) -> list[dict]:
     return out
 
 
-def owner(ctx: BuildContext) -> dict:
+def owner(ctx: BuildContext, context: PortfolioContext) -> dict:
     """The owner's paper portfolio of the market as of the cut-off, collected companies only (a deleted company's
     trades and position, with its EUR view, are never shown)."""
-    context = portfolio_context(ctx)
     return {
         "trades": [trade for trade in owner_trades(context) if trade["ticker"] in ctx.collected],
         "positions": [position for position in owner_positions(context) if position["ticker"] in ctx.collected],
@@ -174,7 +174,8 @@ def owner(ctx: BuildContext) -> dict:
 
 
 def portfolio_pages(ctx: BuildContext) -> dict[str, dict]:
-    """rm.portfolio: the market's one Paper portfolios page."""
+    """rm.portfolio: the market's one Paper portfolios page (`all_trades`: every paper trade in one place)."""
+    context = portfolio_context(ctx)
     return {
         MARKET_PAGE_KEY: {
             **rm_common.header(ctx),
@@ -186,7 +187,8 @@ def portfolio_pages(ctx: BuildContext) -> dict[str, dict]:
             "h2h_rows": h2h_rows(ctx),
             "open_trades": open_trades(ctx),
             "trade_checks": trade_checks(ctx),
-            "owner": owner(ctx),
+            "owner": owner(ctx, context),
+            "all_trades": all_trades.all_trades(ctx, context),
         }
     }
 
@@ -199,5 +201,6 @@ CONTRACT_CASES = (
         mockup="design/mockups/07-paper-portfolios/data.json",
         mockup_payload=market_mockup,
         map_paths=("$.strategies",),
+        extra_keys=("all_trades",),
     ),
 )
