@@ -18,13 +18,17 @@ block, as of the cut-off. Research only: a paper trade is a record, never an ord
   that window; the accuracy view only while LIST_ACCURACY_ON_MARKET_PAGE, step 1 of the size fix) and the index of
   the accuracy-view session pages. The accuracy view (about 200 trades
   a session) is listed per entry session D on its own page `trades:<D>` (the last SESSION_PAGES sessions), so the
-  market's page does not grow with the trade count (owner's size concern, 2026-10-12)."""
+  market's page does not grow with the trade count (owner's size concern, 2026-10-12).
+- UX3 (docs/ux/paper_portfolio_redesign.md v3): every strategy row also carries its prediction's direction, chance of
+  a rise and AI reason, and `why` (trade_why.py: the latest intraday check's attribution and note while open, B2's
+  automatic reason and the end-of-day AI reason once closed) and, while open, `sessions` (how far it is towards its
+  sale). The pages by hold and by exit session and their indexes are trade_pages.py's."""
 
 from __future__ import annotations
 
 from marketbrief.portfolio import service as portfolio_service
 from marketbrief.utils.numbers import json_safe_float
-from marketbrief.warehouse import rm_common, rm_company
+from marketbrief.warehouse import rm_common, rm_company, trade_why
 from marketbrief.warehouse.rm_company import first_of, sessions_back
 from marketbrief.warehouse.rm_entities import iso_day
 from marketbrief.warehouse.rm_registry import BuildContext
@@ -72,7 +76,7 @@ def trade_row(**fields) -> dict:
         "exit_date", "state", "not_entered_reason", "outcome", "entry_price", "entry_price_source",
         "exit_or_last_price", "last_price_source", "last_price_date", "last_price_time", "price_pending", "quantity",
         "amount", "currency", "unrealised_pnl", "unrealised_pct", "pnl_market", "pnl_your", "return_pct_market",
-        "return_pct_your", "settled_at", *RANGE_KEYS, "check",
+        "return_pct_your", "settled_at", *RANGE_KEYS, "check", "direction", "prob_up", "reason", "why", "sessions",
     )  # fmt: skip
     return {**{key: fields.get(key) for key in keys}, "paper": True}
 
@@ -112,6 +116,8 @@ def closed_strategy_trades(ctx: BuildContext) -> list[dict]:
                 return_pct_market=json_safe_float(row.get("return_pct")) if entered else None,
                 return_pct_your=json_safe_float(row.get("return_pct_your")) if entered else None,
                 settled_at=rm_common.iso_z(row["settled_at"]),
+                **trade_why.prediction_fields(ctx, row.get("prediction_id")),
+                why=trade_why.settled_why(ctx, row) if entered else None,
             )  # fmt: skip
         )
     return out
@@ -158,6 +164,9 @@ def open_strategy_trades(ctx: BuildContext, settled_ids: set[str]) -> list[dict]
                 unrealised_pct=trade.get("unrealised_pct"),
                 **{key: json_safe_float(trade.get(key)) for key in RANGE_KEYS},
                 check=checks.get(trade["trade_id"]),
+                **trade_why.prediction_fields(ctx, trade.get("prediction_id")),
+                why=trade_why.open_why(ctx, trade["ticker"], trade["entry_date"]),
+                sessions=trade_why.held_sessions(ctx, trade),
             )  # fmt: skip
         )
     return out
@@ -338,3 +347,4 @@ def session_pages(ctx: BuildContext, context) -> dict[str, dict]:
             "paper": True,
         }
     return pages
+

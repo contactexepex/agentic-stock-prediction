@@ -5,7 +5,8 @@ their last stored close, the head-to-head portfolios (scoreboard rows of scopes 
 head-to-head trades and their rows of the latest intraday trade check (B4's and B12's derivations), and the
 owner's own paper trades and FIFO positions with the EUR view of US positions (WS4/B2's portfolio service), and every
 paper trade in one place (`all_trades`, all_trades.py: open and closed, wins and losses; the accuracy view on one page
-per entry session, `trades:<D>`), all as of the cut-off.
+per entry session, `trades:<D>`, per hold, `open:<k>`, and per exit session, `finished:<D>`; UX3), all as of the
+cut-off.
 Research only: a paper trade is a record, never an order."""
 
 from __future__ import annotations
@@ -17,7 +18,7 @@ from marketbrief.portfolio import service as portfolio_service
 from marketbrief.portfolio.context import Context as PortfolioContext
 from marketbrief.portfolio.settings import load_portfolio_config, market_costs
 from marketbrief.utils.numbers import json_safe_float
-from marketbrief.warehouse import all_trades, rm_common, rm_company
+from marketbrief.warehouse import all_trades, rm_common, rm_company, trade_pages
 from marketbrief.warehouse.rm_registry import BuildContext, ContractCase, PageBuilder
 from marketbrief.warehouse.rm_strategies import market_mockup, pick, scoreboard_rows
 
@@ -198,9 +199,11 @@ def portfolio_pages(ctx: BuildContext) -> dict[str, dict]:
             "open_trades": open_trades(ctx),
             "trade_checks": trade_checks(ctx),
             "owner": owner(ctx, context),
-            "all_trades": all_trades.all_trades(ctx, context),
+            "all_trades": {**all_trades.all_trades(ctx, context), **trade_pages.indexes(ctx, context)},
         },
         **all_trades.session_pages(ctx, context),
+        **trade_pages.open_pages(ctx, context),
+        **trade_pages.finished_pages(ctx, context),
     }
 
 

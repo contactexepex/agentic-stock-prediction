@@ -157,4 +157,9 @@ export interface StockStrategiesPayload extends PageBase {
 export interface LifecyclePayload {
   market: string; ticker: string; session_date: IsoDate; predictions: Prediction[]; head_to_head: HeadToHeadPick[];
   trade_checks: TradeCheck[]; settled: SettledTrade[]; reasons: AiReason[];
+  /** UX3's "Full story" additions (absent in read models built before UX3). */
+  checks_attribution?: Array<{ check_at: IsoTime; session_date: IsoDate; move_pct: number | null; market_pct: number | null; market_pull_pct?: number | null; sector_pct: number | null; own_pct: number | null; beta: number | null; sector_source: string | null }>;
+  deviation_notes?: Array<{ check_at: IsoTime; session_date: IsoDate; text: string }>;
+  lessons?: Array<{ id: string; prediction_id: string; ticker: string; horizon_days: number | null; lesson: string | null; written_at: IsoTime | null }>;
+  prediction_reasons?: Array<{ prediction_id: string; reason: string }>;
 }

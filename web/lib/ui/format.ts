@@ -4,7 +4,7 @@
 import { CURRENCY_SYMBOL, LOCALE, MARKET_ZONE } from "./constants.ts";
 
 export const DASH = "—";
-const MINUS = "−";
+export const MINUS = "−";
 export const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 export const DOW_LONG = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 export const MONTH = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];

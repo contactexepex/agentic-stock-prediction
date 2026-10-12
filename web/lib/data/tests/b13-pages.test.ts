@@ -4,7 +4,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { MARKET_PAGE_KEY } from "../constants.ts";
 import { readPage } from "../handler.ts";
-import { PAPER_PORTFOLIOS_PAGE, PORTFOLIO_SESSION_PAGE, portfolioSessionResponse } from "../paper-portfolios.ts";
+import { PAPER_PORTFOLIOS_PAGE, PORTFOLIO_SESSION_PAGE, portfolioFinishedResponse, portfolioHoldResponse, portfolioSessionResponse } from "../paper-portfolios.ts";
 import { REVIEW_PAGE } from "../review.ts";
 import { RULE_VS_AI_PAGE } from "../rule-vs-ai.ts";
 import { STRATEGY_LAB_PAGE } from "../strategy-lab.ts";
@@ -43,4 +43,26 @@ test("portfolio sessions: the page `trades:<date>` of rm.portfolio, verbatim; a 
   assert.equal((await portfolioSessionResponse(new Request("http://x"), "us", "12 Oct", deps)).status, 404);
   assert.deepEqual(store.reads, ["portfolio|us|trades:2026-10-12", "portfolio|us|trades:2026-10-09"]);
   assert.equal(PORTFOLIO_SESSION_PAGE.table, "portfolio");
+});
+
+test("portfolio holds (UX3): the page `open:<k>` of rm.portfolio, verbatim; a hold outside 1-5 or without a page is a 404", async () => {
+  const store = new MemoryRowStore().put("portfolio", row({ page_key: "open:3", payload: { market: "us", horizon_days: 3 } }));
+  const deps = { store, now: () => NOW };
+  const ok = await portfolioHoldResponse(new Request("http://x"), "us", "3", deps);
+  assert.equal(ok.status, 200);
+  assert.equal((await ok.json()).page_key, "open:3");
+  assert.equal((await portfolioHoldResponse(new Request("http://x"), "us", "2", deps)).status, 404);
+  for (const bad of ["0", "6", "12", "x", "3d"]) assert.equal((await portfolioHoldResponse(new Request("http://x"), "us", bad, deps)).status, 404);
+  assert.deepEqual(store.reads, ["portfolio|us|open:3", "portfolio|us|open:2"]);
+});
+
+test("portfolio finished sessions (UX3): the page `finished:<date>` of rm.portfolio, verbatim; a bad or unstored date is a 404", async () => {
+  const store = new MemoryRowStore().put("portfolio", row({ page_key: "finished:2026-10-13", payload: { market: "us", session_date: "2026-10-13" } }));
+  const deps = { store, now: () => NOW };
+  const ok = await portfolioFinishedResponse(new Request("http://x"), "us", "2026-10-13", deps);
+  assert.equal(ok.status, 200);
+  assert.equal((await ok.json()).page_key, "finished:2026-10-13");
+  assert.equal((await portfolioFinishedResponse(new Request("http://x"), "us", "2026-10-12", deps)).status, 404);
+  assert.equal((await portfolioFinishedResponse(new Request("http://x"), "us", "13 Oct", deps)).status, 404);
+  assert.deepEqual(store.reads, ["portfolio|us|finished:2026-10-13", "portfolio|us|finished:2026-10-12"]);
 });

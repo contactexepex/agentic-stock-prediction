@@ -1,4 +1,4 @@
-/* Paper portfolios page styles (B16), ported from the mockup's template.html <style> block and scoped under .p-portfolios
+/* Paper portfolio page styles (B16; the v3 layout by UX3 below), ported from the mockup's template.html <style> block and scoped under .p-portfolios
    so they never reach another page. Page-local layout only; every colour is a design-system token. */
 .p-portfolios .ctrls{display:flex;gap:10px 18px;flex-wrap:wrap;align-items:center;margin-top:16px}
 .p-portfolios .ctrls .c{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;color:var(--md-sys-color-on-surface-variant)}
@@ -21,13 +21,6 @@
 .p-portfolios .luck .cor{stroke:var(--mb-chart-1);stroke-width:5;stroke-linecap:round}
 .p-portfolios .luck .mean{fill:var(--md-sys-color-on-surface)}
 .p-portfolios .luck .cor.edge{stroke:var(--mb-color-up)}
-.p-portfolios .ot td{vertical-align:middle}
-.p-portfolios .ot .h-lab{font-size:11.5px}
-.p-portfolios .ot tr.grp td{background:var(--md-sys-color-surface-container-low);font-weight:600;padding:8px 12px;font-size:13px}
-.p-portfolios .ot tr.grp td small{font-weight:500;color:var(--md-sys-color-on-surface-variant);margin-left:8px}
-.p-portfolios .ot tr.grp td .tk,.p-portfolios .ot tr.grp td .mb-label,.p-portfolios .ot tr.grp td .mb-delta,.p-portfolios .ot tr.grp td small{display:inline-block;vertical-align:middle}
-.p-portfolios .ot .nm b{display:block;font-size:13px;font-weight:600}
-.p-portfolios .ot .nm small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:11.5px}
 .p-portfolios .own td{vertical-align:middle}
 .p-portfolios .own .pn b{font-weight:700}
 .p-portfolios .own .pn small{display:block;color:var(--md-sys-color-on-surface-variant);font-size:11px}
@@ -50,10 +43,8 @@
 .p-portfolios dialog .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .p-portfolios dialog .dact{display:flex;justify-content:flex-end;gap:8px;padding:0 24px 20px}
 @media (max-width:1359px){
-  .p-portfolios .ot .c3{display:none}
 }
 @media (max-width:1199px){
-  .p-portfolios .ot .cw{display:none}
   .p-portfolios .eur{grid-template-columns:1fr 1fr}
 }
 @media (max-width:1000px){
@@ -61,10 +52,6 @@
 }
 @media (max-width:760px){
   .p-portfolios .h2h{grid-template-columns:1fr}
-  .p-portfolios .ot .cm,.p-portfolios .own .cm{display:none}
-  .p-portfolios .ot th,.p-portfolios .ot td,.p-portfolios .own th,.p-portfolios .own td{padding:8px 6px;white-space:normal}
-  .p-portfolios .ot .st{white-space:normal;display:inline}
-  .p-portfolios .ot .mb-label{white-space:normal}
   .p-portfolios .luck svg{display:none}
   .p-portfolios .pr{grid-template-columns:1fr auto}
   .p-portfolios .pr .st{grid-column:1 / span 2}
@@ -73,25 +60,102 @@
   .p-portfolios .eur{grid-template-columns:1fr}
   .p-portfolios dialog .row2{grid-template-columns:1fr}
 }
-/* all paper trades in one place (owner request 2026-10-12) */
-.p-portfolios .at .ctrls{margin:4px 0 12px}
-.p-portfolios .at-top{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin:0 0 12px}
-.p-portfolios .at-h{background:var(--md-sys-color-surface-container-low);border-radius:var(--mb-panel-radius);padding:12px 14px;min-width:0}
-.p-portfolios .at-h .l{font-size:12px;color:var(--md-sys-color-on-surface-variant)}
-.p-portfolios .at-h .v{font-weight:700;font-size:16px;margin:2px 0 4px}
-.p-portfolios .at-h .s{font-size:12.5px;color:var(--md-sys-color-on-surface-variant)}
-.p-portfolios .at-fam tr.tot td{font-weight:600}
-.p-portfolios .at-list .whom small{display:block;font-size:11px;color:var(--md-sys-color-on-surface-variant)}
-.p-portfolios .at-list .whom .mb-label{margin-left:4px}
-.p-portfolios .at-list tr.few td{color:var(--md-sys-color-on-surface-variant)}
-.p-portfolios .at-list .st-ph{display:none}
-@media (max-width:599px){ .p-portfolios .at-list td.cw,.p-portfolios .at-list th.cw,.p-portfolios .at-list td.dt,.p-portfolios .at-list th.dt{display:none} .p-portfolios .at-list td,.p-portfolios .at-list th{padding-left:6px;padding-right:6px} .p-portfolios .at-list .whom .mb-label{display:none} .p-portfolios .at-list td.stc,.p-portfolios .at-list th.stc{display:none} .p-portfolios .at-list .st-ph{display:block;font-size:11px;color:var(--md-sys-color-on-surface-variant);white-space:normal;text-align:right} }
-.p-portfolios .at-sess select{font:inherit;padding:4px 8px;border-radius:8px;border:1px solid var(--md-sys-color-outline-variant);background:var(--md-sys-color-surface-container-lowest);color:var(--md-sys-color-on-surface);max-width:100%;min-width:0;flex:1 1 auto}
-.p-portfolios .at-sess .c{display:flex;flex-wrap:wrap;align-items:center;gap:6px;max-width:100%;min-width:0}
-.p-portfolios .at-list .st{display:inline-flex;align-items:center;gap:4px;font-size:12.5px;white-space:nowrap}
-.p-portfolios .at-list .st .ms{width:15px;height:15px}
-.p-portfolios .at-list .st.flag{color:var(--mb-color-down)} .p-portfolios .at-list .st.ok{color:var(--mb-color-up)}
-/* a narrower range bar than page.css's 100px, so the list fits its card at 1280 */
-.p-portfolios .at-list .rng svg{width:72px}
-/* the State column's words move under the result while the list also carries its range and check columns */
-@media (max-width:1439px){ .p-portfolios .at-list td.stc,.p-portfolios .at-list th.stc{display:none} .p-portfolios .at-list .st-ph{display:block;font-size:11px;color:var(--md-sys-color-on-surface-variant);white-space:normal;text-align:right} }
+/* ---- v3 (UX3, docs/ux/paper_portfolio_redesign.md): the reader's questions in order, on the 8 px grid; red and
+   green only for money results and the win/lose bars, always with an icon or sign ---- */
+.p-portfolios .pp-card{background:var(--md-sys-color-surface-container-lowest);border-radius:20px;padding:24px;box-shadow:var(--mb-card-shadow);min-width:0;margin-top:16px}
+.p-portfolios .pp-q{font:var(--md-sys-typescale-title-large);margin:40px 0 0;letter-spacing:-.01em}
+.p-portfolios .pp-q small{display:block;font:var(--md-sys-typescale-body-medium);color:var(--md-sys-color-on-surface-variant);margin-top:4px}
+.p-portfolios .ms.ok,.p-portfolios .ok{color:var(--mb-color-up)} .p-portfolios .ms.bad,.p-portfolios .bad{color:var(--mb-color-down)}
+.p-portfolios .pp-info{border:0;background:none;color:var(--md-sys-color-on-surface-variant);cursor:pointer;border-radius:999px;width:32px;height:32px;display:inline-grid;place-items:center;vertical-align:middle;padding:0;flex:none}
+.p-portfolios .pp-info:hover,.p-portfolios .pp-info:focus-visible{background:var(--md-sys-color-surface-container-high);color:var(--md-sys-color-primary)}
+.p-portfolios .pp-info .ms{width:18px;height:18px}
+.p-portfolios .pp-side{display:inline-flex;align-items:center;gap:8px;font:600 13px/20px var(--md-ref-typeface-plain);white-space:nowrap}
+.p-portfolios .pp-side i{width:10px;height:10px;border-radius:3px;display:inline-block;flex:none}
+.p-portfolios .pp-side.rule i{background:var(--mb-chart-1)} .p-portfolios .pp-side.baseline i{background:var(--mb-chart-2)} .p-portfolios .pp-side.ai i{background:var(--mb-chart-3)}
+.p-portfolios .pp-money-wrap{display:inline-flex;align-items:baseline;gap:8px;white-space:nowrap}
+.p-portfolios .pp-money{display:inline-flex;align-items:center;gap:2px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+.p-portfolios .pp-money .ms{width:16px;height:16px} .p-portfolios .pp-money.up{color:var(--mb-color-up)} .p-portfolios .pp-money.down{color:var(--mb-color-down)} .p-portfolios .pp-money.flat{color:var(--md-sys-color-on-surface-variant)}
+.p-portfolios .pp-money.big{font:600 28px/36px var(--md-ref-typeface-plain);letter-spacing:-.02em} .p-portfolios .pp-money.big .ms{width:24px;height:24px}
+.p-portfolios .pp-pct{font-size:12px;color:var(--md-sys-color-on-surface-variant);font-variant-numeric:tabular-nums}
+.p-portfolios .pp-wl{display:flex;gap:2px;height:8px;border-radius:999px;overflow:hidden;background:var(--md-sys-color-surface-container-high);margin:16px 0 8px}
+.p-portfolios .pp-wl .w{background:var(--mb-color-up)} .p-portfolios .pp-wl .l{background:var(--mb-color-down)} .p-portfolios .pp-wl .p{background:var(--md-sys-color-outline-variant)}
+.p-portfolios .pp-wlc{display:flex;gap:16px;flex-wrap:wrap;font:var(--md-sys-typescale-body-small)} .p-portfolios .pp-wlc span{display:inline-flex;align-items:center;gap:4px} .p-portfolios .pp-wlc .ms{width:16px;height:16px}
+/* hero: am I up or down? */
+.p-portfolios .pp-hero{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:32px;align-items:center;padding:32px;margin-top:24px}
+.p-portfolios .pp-hl{display:flex;align-items:center;gap:4px;font:var(--md-sys-typescale-label-large);color:var(--md-sys-color-on-surface-variant)}
+.p-portfolios .pp-hv{margin:8px 0 4px} .p-portfolios .pp-hv .pp-money.big{font-size:44px;line-height:52px} .p-portfolios .pp-hv .pp-money.big .ms{width:36px;height:36px}
+.p-portfolios .pp-hs{font:var(--md-sys-typescale-body-large);color:var(--md-sys-color-on-surface-variant)}
+.p-portfolios .pp-next{display:inline-flex;gap:8px;align-items:center;margin-top:16px;padding:8px 16px;border-radius:999px;background:var(--md-sys-color-surface-container);font:var(--md-sys-typescale-label-large)}
+.p-portfolios .pp-facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px} .p-portfolios .pp-facts.two{grid-template-columns:repeat(2,minmax(0,1fr));margin:8px 0}
+.p-portfolios .pp-facts b{display:block;font:600 24px/32px var(--md-ref-typeface-plain);font-variant-numeric:tabular-nums} .p-portfolios .pp-facts span{font:var(--md-sys-typescale-body-small);color:var(--md-sys-color-on-surface-variant)}
+/* which bets are working */
+.p-portfolios .pp-sides{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.p-portfolios .pp-sch{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.p-portfolios .pp-scl{font:var(--md-sys-typescale-body-small);color:var(--md-sys-color-on-surface-variant);margin-top:4px}
+.p-portfolios .pp-scf{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;margin-top:16px;padding-top:16px;border-top:1px solid var(--md-sys-color-surface-container-high);font:var(--md-sys-typescale-body-small)}
+.p-portfolios .pp-scf span{color:var(--md-sys-color-on-surface-variant)} .p-portfolios .pp-scf b{margin-right:16px}
+.p-portfolios .pp-sc.none .pp-sce{display:flex;gap:8px;align-items:flex-start;color:var(--md-sys-color-on-surface-variant);font:var(--md-sys-typescale-body-medium);min-height:96px}
+.p-portfolios .pp-duo{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:16px}
+.p-portfolios .pp-cardh{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:16px} .p-portfolios .pp-cardh h3{font:var(--md-sys-typescale-title-medium);margin:0}
+.p-portfolios .pp-picks{display:grid;grid-template-columns:1fr 1fr;gap:24px} .p-portfolios .pp-psv{margin-top:16px} .p-portfolios .pp-psn{margin-top:16px;font:var(--md-sys-typescale-body-medium)}
+.p-portfolios .pp-details{margin-top:24px;border-top:1px solid var(--md-sys-color-surface-container-high);padding-top:16px}
+.p-portfolios .pp-details summary{cursor:pointer;font:var(--md-sys-typescale-label-large);color:var(--md-sys-color-primary)}
+.p-portfolios .pp-details .card{box-shadow:none;padding:16px 0 0;background:none} .p-portfolios .pp-cost{margin-top:16px}
+.p-portfolios .pp-own .pp-ov{font:600 28px/36px var(--md-ref-typeface-plain);margin:8px 0 16px} .p-portfolios .pp-own .md-btn{margin-top:16px}
+/* empty states */
+.p-portfolios .pp-empty{display:flex;gap:16px;align-items:center;padding:16px;border-radius:16px;background:var(--md-sys-color-surface-container-low)}
+.p-portfolios .pp-ei{width:48px;height:48px;border-radius:16px;display:grid;place-items:center;flex:none;background:var(--md-sys-color-primary-container);color:var(--md-sys-color-on-primary-container)} .p-portfolios .pp-ei .ms{width:24px;height:24px}
+.p-portfolios .pp-empty b{display:block;font:var(--md-sys-typescale-title-small)} .p-portfolios .pp-empty span{font:var(--md-sys-typescale-body-medium);color:var(--md-sys-color-on-surface-variant)}
+/* finished and hold blocks */
+.p-portfolios .pp-chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.p-portfolios .pp-fin-sides{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:16px}
+.p-portfolios .pp-bh{display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap;margin-bottom:24px}
+.p-portfolios .pp-bh h3{display:flex;align-items:center;gap:4px;font:var(--md-sys-typescale-title-large);margin:0}
+.p-portfolios .pp-bs{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font:var(--md-sys-typescale-body-medium);color:var(--md-sys-color-on-surface-variant);margin-top:4px} .p-portfolios .pp-bs .ms{width:18px;height:18px}
+.p-portfolios .pp-bn{text-align:right} .p-portfolios .pp-bl{font:var(--md-sys-typescale-body-small);color:var(--md-sys-color-on-surface-variant)}
+.p-portfolios .pp-prog{display:inline-block;width:72px;height:6px;border-radius:999px;background:var(--md-sys-color-surface-container-high);overflow:hidden}
+.p-portfolios .pp-prog span{display:block;height:100%;background:var(--md-sys-color-primary)}
+.p-portfolios .pp-strip{display:grid;grid-template-columns:repeat(var(--n,3),minmax(0,1fr));gap:8px;margin-bottom:24px}
+.p-portfolios .pp-ss{background:var(--md-sys-color-surface-container-low);border-radius:16px;padding:16px;min-width:0} .p-portfolios .pp-ss .pp-wl{margin:8px 0}
+.p-portfolios .pp-ssh{display:flex;justify-content:space-between;align-items:center;gap:8px;font:var(--md-sys-typescale-body-small)} .p-portfolios .pp-ssh b{font:600 16px/24px var(--md-ref-typeface-plain);color:var(--md-sys-color-on-surface)}
+.p-portfolios .pp-ssc{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.p-portfolios .pp-ssv{font:var(--md-sys-typescale-body-small);margin-top:8px}
+.p-portfolios .pp-pl{display:flex;gap:16px;flex-wrap:wrap;margin-top:8px;font:var(--md-sys-typescale-body-small);color:var(--md-sys-color-on-surface-variant)} .p-portfolios .pp-pl .pp-money{font-size:12px}
+.p-portfolios .pp-trades{margin-top:0} .p-portfolios .pp-trades th{background:none;border-bottom:1px solid var(--md-sys-color-surface-container-high);text-transform:none;letter-spacing:.02em;font:500 12px/16px var(--md-ref-typeface-plain);padding:8px}
+.p-portfolios .pp-trades td{border-bottom:0;padding:12px 8px} .p-portfolios .pp-trades tbody.pp-row{border-top:1px solid var(--md-sys-color-surface-container-high)}
+.p-portfolios .pp-trades .tk{display:block;font-weight:600} .p-portfolios .pp-trades .nm{display:block;font-size:12px;color:var(--md-sys-color-on-surface-variant);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px}
+.p-portfolios .pp-trades .num{text-align:right;white-space:nowrap} .p-portfolios .pp-trades .num .bad .ms{width:16px;height:16px;margin-right:4px;vertical-align:-3px}
+.p-portfolios .pp-trades .rng svg{width:96px}
+.p-portfolios .pp-x{font:var(--md-sys-typescale-label-medium);background:var(--md-sys-color-surface-container-high);color:var(--md-sys-color-on-surface-variant);border-radius:999px;padding:0 8px;margin-left:8px}
+.p-portfolios .pp-gh td{padding:24px 8px 8px!important;font:var(--md-sys-typescale-title-small)} .p-portfolios .pp-ghl{display:inline-flex;align-items:center;gap:8px} .p-portfolios .pp-ghr{float:right}
+.p-portfolios .pp-ghl.ok{color:var(--mb-color-up)} .p-portfolios .pp-ghl.bad{color:var(--mb-color-down)} .p-portfolios .pp-ghl.muted{color:var(--md-sys-color-on-surface-variant)}
+.p-portfolios .pp-cnt{font:var(--md-sys-typescale-label-medium);background:var(--md-sys-color-surface-container-high);color:var(--md-sys-color-on-surface-variant);border-radius:999px;padding:0 8px}
+.p-portfolios .pp-why td{padding:0 8px 16px!important}
+.p-portfolios .pp-why-line{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;font:var(--md-sys-typescale-body-small);color:var(--md-sys-color-on-surface-variant);background:var(--md-sys-color-surface-container-low);border-radius:8px;padding:8px 12px}
+.p-portfolios .pp-why-line>span{flex:1 1 280px} .p-portfolios .pp-why-line>span>.ms{width:16px;height:16px;color:var(--md-sys-color-primary);margin-right:8px;vertical-align:-3px}
+.p-portfolios .pp-note{display:inline-flex;gap:4px;align-items:center;border:0;border-radius:999px;padding:2px 12px;background:var(--md-sys-color-secondary-container);color:var(--md-sys-color-on-secondary-container);font:var(--md-sys-typescale-label-medium);cursor:pointer} .p-portfolios .pp-note .ms{width:14px;height:14px}
+.p-portfolios .pp-story{display:inline-flex;align-items:center;font:var(--md-sys-typescale-label-large);color:var(--md-sys-color-primary);text-decoration:none;white-space:nowrap} .p-portfolios .pp-story .ms{width:18px;height:18px}
+.p-portfolios .pp-i{width:40px;text-align:right} .p-portfolios .pp-more td{padding:8px!important}
+.p-portfolios tbody.pp-row.flag>tr:first-child td{background:var(--mb-color-down-container)}
+.p-portfolios .pp-only-s{display:none}
+/* what the system learns */
+.p-portfolios .pp-learn{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.p-portfolios .pp-lc h4{display:flex;align-items:center;gap:8px;font:var(--md-sys-typescale-title-small);margin:0 0 8px} .p-portfolios .pp-lc h4 .ms{color:var(--md-sys-color-primary)}
+.p-portfolios .pp-lc p{font:var(--md-sys-typescale-body-medium);margin:0 0 16px} .p-portfolios .pp-lc .pp-who{font:var(--md-sys-typescale-body-small);color:var(--md-sys-color-on-surface-variant);margin:8px 0 0}
+.p-portfolios .pp-lc blockquote{margin:16px 0 0;padding:8px 16px;border-left:3px solid var(--md-sys-color-primary);font:var(--md-sys-typescale-body-medium)}
+.p-portfolios .pp-pill{font:var(--md-sys-typescale-label-medium);border-radius:999px;padding:2px 12px;display:inline-flex;gap:4px;align-items:center} .p-portfolios .pp-pill .ms{width:14px;height:14px}
+.p-portfolios .pp-pill.auto{background:var(--mb-color-up-container);color:var(--mb-color-on-up-container)} .p-portfolios .pp-pill.appr{background:var(--mb-color-warn-container);color:var(--mb-color-on-warn-container)} .p-portfolios .pp-pill.never{background:var(--md-sys-color-surface-container-high);color:var(--md-sys-color-on-surface-variant)}
+.p-portfolios .pp-note-line{display:flex;gap:8px;align-items:center;font:var(--md-sys-typescale-body-small);color:var(--md-sys-color-on-surface-variant);margin:16px 0 0} .p-portfolios .pp-note-line .ms{width:16px;height:16px}
+.p-portfolios .pp-legend{display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin-top:32px;font:var(--md-sys-typescale-body-small);color:var(--md-sys-color-on-surface-variant)}
+.p-portfolios .pp-legend .ms{width:16px;height:16px;vertical-align:-3px}
+.p-portfolios #own + .card,.p-portfolios #own + section{margin-top:16px}
+@media (max-width:1100px){ .p-portfolios .pp-sides,.p-portfolios .pp-learn{grid-template-columns:minmax(0,1fr)} .p-portfolios .pp-duo{grid-template-columns:minmax(0,1fr)} }
+@media (max-width:900px){ .p-portfolios .pp-hero{grid-template-columns:minmax(0,1fr);gap:24px} }
+@media (max-width:640px){
+  .p-portfolios .pp-card{padding:16px;border-radius:16px} .p-portfolios .pp-hero{padding:24px 16px}
+  .p-portfolios .pp-hv .pp-money.big{font-size:36px;line-height:44px} .p-portfolios .pp-money.big{font-size:24px;line-height:32px}
+  .p-portfolios .pp-hide-s{display:none} .p-portfolios .pp-only-s{display:flex;align-items:center;margin-top:4px}
+  .p-portfolios .pp-strip,.p-portfolios .pp-fin-sides,.p-portfolios .pp-picks{grid-template-columns:minmax(0,1fr)}
+  .p-portfolios .pp-trades .nm{max-width:120px} .p-portfolios .pp-pct{display:none} .p-portfolios .pp-bn{text-align:left}
+  .p-portfolios .pp-trades td,.p-portfolios .pp-trades th{padding-left:4px;padding-right:4px} .p-portfolios .pp-why td{padding:0 4px 16px!important}
+}

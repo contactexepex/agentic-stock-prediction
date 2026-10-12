@@ -2,7 +2,8 @@
 // Page 03's call history for one session D (SPEC section 2 "Lifecycle of a prediction": made -> checks -> settled ->
 // explained; no mockup of its own, built from the 03 mockup's parts): every prediction made for D on this company with
 // its path, the head-to-head picks of D, every intraday check of those trades, their settlements with the "why" split
-// and the analyst's notes. Reads GET .../stocks/{ticker}/lifecycle/{date} (B12, rm.lifecycle) and the company page
+// and the analyst's notes; with `#story=<prediction>&trade=<trade>` (the Paper portfolio's "Full story" link, UX3) it
+// opens with that trade's full story (story.tsx). Reads GET .../stocks/{ticker}/lifecycle/{date} (B12, rm.lifecycle) and the company page
 // (status, names, the dates around D). Research only: every signal is Paper, nothing trades.
 import Link from "next/link";
 import { CostLabels } from "../../../../../../../../components/blocks/costs.tsx";
@@ -27,6 +28,7 @@ import { pageCtx, type PageCtx } from "../../../_parts/context.ts";
 import { plural } from "../../../_parts/labels.ts";
 import { SettledCard } from "../../../_parts/trades.tsx";
 import "../../../_parts/company.css";
+import { StoryCard, useStoryHash } from "./story.tsx";
 import "./lifecycle.css";
 
 /** The path of one call in words: made, checked, settled, explained (each step says when it has not happened yet). */
@@ -131,12 +133,14 @@ function DayNav({ ctx, ticker, date, dates }: { ctx: PageCtx; ticker: string; da
 function LifecycleBody({ p, day }: { p: CompanyPayload; day: LifecyclePayload }) {
   const ctx = pageCtx(p), co = p.company;
   const dates = lifecycleDates(p.bars, p.status.session.session_date, 30);
+  const story = useStoryHash();
   return (
     <>
       <PageHead page={p} title={`${co.ticker} · calls for ${fmtDate(day.session_date)}`}
         subtitle={`${co.name} · ${p.name} · the predictions made for the session of ${fmtDateYear(day.session_date)} and what became of them · research only, nothing here trades`} />
       <DayNav ctx={ctx} ticker={co.ticker} date={day.session_date} dates={dates} />
       <SignalsBand page={p} goLive={p.go_live} strategies={Object.keys(p.strategies).length} />
+      {story.prediction ? <div style={{ marginTop: 16 }}><StoryCard day={day} ctx={ctx} benchmark={p.status.benchmark?.name ?? "the market"} companyName={co.name} ids={story} /></div> : null}
       <CallsCard day={day} ctx={ctx} paperLabel={p.status.paper_label} />
       <div style={{ marginTop: 16 }}><PicksCard picks={day.head_to_head} ctx={ctx} /></div>
       <div style={{ marginTop: 16 }}><ChecksCard checks={day.trade_checks} ctx={ctx} /></div>

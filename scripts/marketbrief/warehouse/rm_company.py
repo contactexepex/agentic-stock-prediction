@@ -26,7 +26,7 @@ from marketbrief.constants.rm_company import (COMPANY_FIELDS, EVENT_DAYS, FORECA
                                               TRADES_TICKER_SESSIONS)
 from marketbrief.constants.warehouse import MARKET_PAGE_KEY, REFERENCE_STRATEGY, RM_BARS, RM_STOCK, SERVE_VERBATIM
 from marketbrief.core import calendar
-from marketbrief.warehouse import rm_common
+from marketbrief.warehouse import rm_common, trade_why
 from marketbrief.warehouse.calendar_events import calendar_events
 from marketbrief.warehouse.company_payloads import (bars_payload, check_rows, company_news, lifecycle_payload,
                                                     market_trades_payload, pick, stock_payload,
@@ -154,10 +154,16 @@ def lifecycle_key(ticker: str, day: str) -> str:
 def lifecycle_pages(ctx: BuildContext) -> dict[str, dict]:
     """rm.lifecycle: one page per collected company and session D (the path of the predictions made for D), the last
     LIFECYCLE_SESSIONS sessions ending at the session being predicted (an older day has no page: the route answers
-    404). The rm.trades windows end at the as-of date instead: they count exit sessions, which are never after it."""
+    404). The rm.trades windows end at the as-of date instead: they count exit sessions, which are never after it.
+    UX3 adds the "Full story" fields of trade_why.lifecycle_additions (checks_attribution, deviation_notes, lessons)."""
     data = sources(ctx)
     days = sessions_back(ctx.cfg, rm_common.status_block(ctx)["session"]["session_date"], LIFECYCLE_SESSIONS)
-    return {lifecycle_key(ticker, day): lifecycle_payload(data, ticker, day) for ticker in tickers(ctx) for day in days}
+    pages = {}
+    for ticker in tickers(ctx):
+        for day in days:
+            page = lifecycle_payload(data, ticker, day)
+            pages[lifecycle_key(ticker, day)] = {**page, **trade_why.lifecycle_additions(ctx, ticker, day, page)}
+    return pages
 
 
 def trade_checks(ctx: BuildContext) -> list[dict]:
@@ -242,5 +248,6 @@ CONTRACT_CASES = (
                  mockup=MOCKUP_STOCK_STRATEGIES, mockup_payload=strategies_mockup,
                  map_paths=("$.strategies", "$.agreement")),
     ContractCase(path="/api/v1/markets/{market}/stocks/{ticker}/lifecycle/{date}", table=RM_LIFECYCLE,
-                 mockup=MOCKUP_COMPANY, mockup_payload=lifecycle_mockup),
+                 mockup=MOCKUP_COMPANY, mockup_payload=lifecycle_mockup,
+                 extra_keys=("checks_attribution", "deviation_notes", "lessons", "prediction_reasons")),  # UX3
 )

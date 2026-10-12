@@ -43,6 +43,56 @@
             schema: {$ref: '#/components/schemas/PortfolioSessionResponse'}
       '404': {$ref: '#/components/responses/NotFound'}
       '503': {$ref: '#/components/responses/Unavailable'}
+/api/v1/markets/{market}/portfolios/open/{hold}:
+  get:
+    tags: [portfolio]
+    operationId: getPortfolioHold
+    summary: >-
+      Every open accuracy-view paper trade of one hold (k sessions after the entry session) with the hold's split per
+      family (UX3); a hold without open trades has no page, so 404 (the index is all_trades.open_holds of GET /portfolios)
+    x-read-model: rm.portfolio
+    parameters:
+      - $ref: '#/components/parameters/Market'
+      - name: hold
+        in: path
+        required: true
+        description: The hold k (1-5); page_key = `open:<k>`
+        schema: {type: integer, minimum: 1, maximum: 5}
+    responses:
+      '200':
+        description: One hold's open accuracy-view trades
+        headers:
+          ETag: {$ref: '#/components/headers/ETag'}
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/PortfolioHoldResponse'}
+      '404': {$ref: '#/components/responses/NotFound'}
+      '503': {$ref: '#/components/responses/Unavailable'}
+/api/v1/markets/{market}/portfolios/finished/{date}:
+  get:
+    tags: [portfolio]
+    operationId: getPortfolioFinished
+    summary: >-
+      Every accuracy-view paper trade that exited on one session, with the session's counts per family (UX3); the last
+      10 sessions with such trades (the index is all_trades.finished_sessions of GET /portfolios), others 404
+    x-read-model: rm.portfolio
+    parameters:
+      - $ref: '#/components/parameters/Market'
+      - name: date
+        in: path
+        required: true
+        description: The exit session (YYYY-MM-DD); page_key = `finished:<date>`
+        schema: {$ref: '#/components/schemas/IsoDate'}
+    responses:
+      '200':
+        description: One exit session's accuracy-view trades
+        headers:
+          ETag: {$ref: '#/components/headers/ETag'}
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/PortfolioFinishedResponse'}
+      '404': {$ref: '#/components/responses/NotFound'}
+      '503': {$ref: '#/components/responses/Unavailable'}
 /api/v1/markets/{market}/paper-trades:
   post:
     tags: [portfolio]

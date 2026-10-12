@@ -1,22 +1,73 @@
-// UI cases of page 07, Paper portfolios (B16), at the mockup's widths (design/mockups/07-paper-portfolios/shot-*-full.png):
-// the mockup's data (India with open trades and checks; US with the euro view), the stored data of today, the
-// filters, the add-trade form against POST /paper-trades (pending, a refusal, a retry with the same key), and the
-// error state. The POST is answered in the test; nothing reaches any inbox.
-import { storedApi } from "../b16/stored.mjs";
+// UI cases of page 07, the Paper portfolio (B16's page, v3 by UX3: docs/ux/paper_portfolio_redesign.md). The real
+// stored data of India built at Mon 12 Oct 2026, 18:31 IST (tests/ui/ux3/, rm.portfolio `_` and `open:1`..`open:5`, LT's
+// company and lifecycle pages): the hero, the sides compared, the hold blocks with their reason lines (no tabs), the
+// Rule vs AI picks, what the system learns and the "Full story" view; a finished day made from the 1-day hold's trades
+// (an illustration of the layout: nothing had finished that day); the US with no trades (empty states); a read model
+// from before UX3; the add-trade form against POST /paper-trades (pending, a refusal, a retry with the same key); and
+// the error state. The POST is answered in the test; nothing reaches any inbox.
 import { readFileSync } from "node:fs";
-import { envelope, mockupPayload } from "../fixtures.mjs";
-
-/** B13's sample all_trades block (judged build/b13-all-trades 83887948, from tests/test_b13_all_trades.py's fixture): the
- * part B13 sent (its summary trimmed to family all and mine, its trades trimmed to 5 rows, so the head-to-head summary
- * has no trade behind it in the list), the not-entered row's prices nulled by B13 as in real data; on the US mockup page. */
-const SAMPLE = JSON.parse(readFileSync(new URL("../b16/all-trades-sample-us.json", import.meta.url), "utf8"));
-function withSample(rest, market) {
-  if (rest !== "portfolios") return undefined;
-  return { status: 200, body: envelope(market, "_", { ...mockupPayload("07-paper-portfolios", market), all_trades: SAMPLE }) };
-}
+import { storedApi } from "../b16/stored.mjs";
+import { envelope } from "../fixtures.mjs";
 
 const HTTP_ERROR_LINE = /^Failed to load resource: the server responded with a status of (422|503)/;
 const PAPER = "Not proven yet: these are tests, not tips.";
+const fixture = (name) => JSON.parse(readFileSync(new URL(`../ux3/${name}.json`, import.meta.url), "utf8"));
+const CUTOFF = "2026-10-12T13:01:00Z";
+const served = (p) => {
+  const out = { ...structuredClone(p), cutoff: CUTOFF, built_at: CUTOFF };
+  if (out.status) out.status = { ...out.status, freshness: { state: "fresh", built_at: CUTOFF, age_minutes: 0 } };
+  return out;
+};
+
+/** India's real pages; `edit` may change the market page and the hold pages before they are served. */
+function realApi({ edit = (p) => p, finished = null } = {}) {
+  return (rest, market) => {
+    if (rest === "portfolios") return { status: 200, body: envelope(market, "_", edit(served(fixture(`${market}-portfolio`)))) };
+    const hold = /^portfolios\/open\/([1-5])$/.exec(rest);
+    if (hold) {
+      try {
+        return { status: 200, body: envelope(market, `open:${hold[1]}`, served(fixture(`${market}-open-${hold[1]}`))) };
+      } catch {
+        return { status: 404, body: { title: "Not found", status: 404, detail: "No open trade of this hold." } };
+      }
+    }
+    const day = /^portfolios\/finished\/(\d{4}-\d{2}-\d{2})$/.exec(rest);
+    if (day) return finished && finished[day[1]] ? { status: 200, body: envelope(market, `finished:${day[1]}`, finished[day[1]]) } : { status: 404, body: { title: "Not found", status: 404, detail: "No such session." } };
+    if (rest === "stocks/LT") return { status: 200, body: envelope(market, "LT", served(fixture("india-stock-LT"))) };
+    if (rest === "stocks/LT/lifecycle/2026-10-12") return { status: 200, body: envelope(market, "LT:2026-10-12", fixture("india-lifecycle-LT-2026-10-12")) };
+    return undefined;
+  };
+}
+
+/** A finished day made from India's real 1-day hold (an illustration of the layout: those trades had not sold yet): as
+ * if each sold at its latest price, after a sample fee of 0.24%, with B2's automatic reason from its latest check;
+ * the biggest loss carries an end-of-day AI reason. */
+function finishedDay() {
+  const rows = fixture("india-open-1").trades.map((t) => {
+    const fee = Math.round(t.entry_price * t.quantity * 0.0024);
+    const net = Math.round((t.unrealised_pnl - fee) * 100) / 100;
+    const w = t.why ?? {};
+    return {
+      ...t, state: "closed", outcome: net > 0 ? "win" : net < 0 ? "loss" : "flat", pnl_market: net, pnl_your: net - 400,
+      return_pct_market: t.unrealised_pct, exit_date: "2026-10-13", settled_at: "2026-10-13T12:20:00Z", check: null, sessions: null,
+      why: { source: "settlement", check_at: null, session_date: "2026-10-13", move_pct: w.move_pct ?? null, market_pct: w.market_pct ?? null,
+        sector_pct: w.sector_pct ?? null, own_pct: null, news_pct: 0, company_pct: w.own_pct ?? null, beta: null, sector_source: null,
+        reason_code: w.own_pct !== undefined && Math.abs(w.own_pct) > Math.abs(w.market_pct ?? 0) ? "company" : "market", note: null,
+        ai_reason: null },
+    };
+  });
+  const worst = rows.reduce((a, b) => (b.pnl_market < a.pnl_market ? b : a));
+  for (const r of rows) if (r.ticker === worst.ticker) r.why.ai_reason = `${r.ticker} fell more than the market on the day: most of the drop was the company’s own.`;
+  const count = (rs) => {
+    const closed = rs.filter((r) => r.state === "closed"), sum = (xs) => (xs.length ? Math.round(xs.reduce((a, b) => a + b, 0) * 100) / 100 : null);
+    return { closed: closed.length, wins: closed.filter((r) => r.outcome === "win").length, losses: closed.filter((r) => r.outcome === "loss").length,
+      flat: closed.filter((r) => r.outcome === "flat").length, net_pnl_market: sum(closed.map((r) => r.pnl_market)), net_pnl_your: sum(closed.map((r) => r.pnl_your)) };
+  };
+  const summary = { session_date: "2026-10-13", not_entered: 0, ...count(rows), by_family: ["rule", "ai", "baseline"].map((family) => ({ family, ...count(rows.filter((r) => r.family === family)) })) };
+  return { summary, page: { market: "india", as_of: "2026-10-13", session_date: "2026-10-13", summary, trades: rows, paper: true } };
+}
+
+const textOf = (page, sel) => page.textContent(sel).catch(() => "");
 
 /** Answer POST /paper-trades with the given statuses in turn; returns the requests seen. */
 async function answerPosts(page, statuses) {
@@ -32,238 +83,113 @@ async function answerPosts(page, statuses) {
   return seen;
 }
 
-/** The mockup with an all_trades block in B13's fields (owner request 2026-10-12): two strategy trades in the accuracy
- * view (one open, one closed lost), one head-to-head win, one that never entered, and one of your own sells. */
-function withAllTrades(rest, market) {
-  if (rest !== "portfolios") return undefined;
-  const p = structuredClone(mockupPayload("07-paper-portfolios", market));
-  const base = { view: "accuracy", pick_rule: null, horizon_days: 3, side: null, not_entered_reason: null, price_pending: false, quantity: 84, amount: 100000, currency: "INR", return_pct_market: null, return_pct_your: null, settled_at: null, paper: true, last_price_source: null, last_price_time: null, last_price_date: null, unrealised_pnl: null, unrealised_pct: null };
-  const row = (over) => ({ ...base, ...over });
-  const sum = (scope, family, period, over = {}) => ({ scope, family, period, open: 1, closed: 1, wins: 0, losses: 1, flat: 0, win_rate: 0, net_pnl_market: -1200, net_pnl_your: -1650, pnl_your_missing: 0, currency: "INR", ...over });
-  p.all_trades = {
-    window: { sessions: 10, from: "2026-09-23", to: "2026-10-06" },
-    summary: [sum("all", "all", "to_date"), sum("all", "all", "window"), sum("all", "rule", "to_date"),
-      sum("head_to_head", "all", "to_date", { open: 0, wins: 1, losses: 0, win_rate: 100, net_pnl_market: 1016, net_pnl_your: 575 }),
-      sum("head_to_head", "all", "window", { open: 0, wins: 1, losses: 0, win_rate: 100, net_pnl_market: 1016, net_pnl_your: 575 }),
-      sum("head_to_head", "ai", "to_date", { open: 0, wins: 1, losses: 0, win_rate: 100, net_pnl_market: 1016, net_pnl_your: 575 }),
-      sum("mine", "mine", "to_date", { open: 0, wins: 1, losses: 0, win_rate: 100, net_pnl_market: null, net_pnl_your: 1800 }),
-      sum("mine", "mine", "window", { open: 0, wins: 1, losses: 0, win_rate: 100, net_pnl_market: null, net_pnl_your: 1800 })],
-    trades: [
-      row({ id: "acc:rule.model_news.v1:2026-10-05-RELIANCE-3d", scope: "all", strategy_id: "rule.model_news.v1", family: "rule", ticker: "RELIANCE", entry_date: "2026-10-06", exit_date: "2026-10-09", state: "open", outcome: null, entry_price: 1182, exit_or_last_price: 1218, last_price_source: "intraday_check", last_price_time: "2026-10-07T05:43:00Z", last_price_date: "2026-10-07", pnl_market: null, pnl_your: null, unrealised_pnl: 3024, unrealised_pct: 3.05 }),
-      row({ id: "acc:rule.model_news.v1:2026-09-29-HDFCBANK-3d", scope: "all", strategy_id: "rule.model_news.v1", family: "rule", ticker: "HDFCBANK", entry_date: "2026-09-30", exit_date: "2026-10-05", state: "closed", outcome: "loss", entry_price: 711.5, exit_or_last_price: 702, pnl_market: -1200, pnl_your: -1650, settled_at: "2026-10-05T12:15:00Z" }),
-      row({ id: "acc:base.always_up.v1:2026-10-01-TCS-1d", scope: "all", strategy_id: "base.always_up.v1", family: "baseline", horizon_days: 1, ticker: "TCS", entry_date: "2026-10-02", exit_date: "2026-10-02", state: "not_entered", outcome: null, not_entered_reason: "no_entry", entry_price: null, exit_or_last_price: null, quantity: null, pnl_market: null, pnl_your: null }),
-      row({ id: "h2h:highest_probability:ai.combined.opus.v1:2026-09-29-RELIANCE-3d", scope: "head_to_head", view: "head_to_head", strategy_id: "ai.combined.opus.v1", family: "ai", pick_rule: "highest_probability", ticker: "RELIANCE", entry_date: "2026-09-30", exit_date: "2026-10-06", state: "closed", outcome: "win", entry_price: 1182, exit_or_last_price: 1218, pnl_market: 1016, pnl_your: 575, settled_at: "2026-10-06T12:15:00Z" }),
-      row({ id: "pt-india-20261006-RELIANCE-2", scope: "mine", view: null, strategy_id: null, family: "mine", horizon_days: null, side: "sell", ticker: "RELIANCE", entry_date: null, exit_date: "2026-10-06", state: "closed", outcome: "win", entry_price: 1182, exit_or_last_price: 1218, quantity: 50, amount: null, pnl_market: null, pnl_your: 1800 }),
-    ],
-  };
-  return { status: 200, body: envelope(market, "_", p) };
-}
-
-/** Every visible list column lies inside the table's visible box (no column scrolled out of sight); fails when the
- * list has no header at all. */
-const clippedHeaders = (page) => page.$$eval(".p-portfolios .at-list", (tables) => {
-  if (!tables.length) return ["no trade list"];
-  const wrap = tables[0].closest(".md-table-wrap").getBoundingClientRect();
-  const ths = [...tables[0].querySelectorAll("th")].filter((th) => th.getBoundingClientRect().width > 0);
-  if (!ths.length) return ["no visible column header"];
-  return ths.filter((th) => th.getBoundingClientRect().right > wrap.right + 0.5).map((th) => `${th.textContent} ends at ${Math.round(th.getBoundingClientRect().right)}, box at ${Math.round(wrap.right)}`);
-});
-const press = (page, group, text) => page.click(`[aria-label="${group}"] button:has-text("${text}")`);
-const listText = (page) => page.textContent('[aria-label="All paper trades"] .at-list').catch(() => "");
-
-/** The mockup with one open trade and one all-trades row priced pending (B4: entered at D's open, no price stored or
- * checked yet; prices, quantity and unrealised figures null). The open trade carries no price_pending flag, as
- * rm.portfolio's open_trades served it at dbd85a32; the page must still say "price pending". */
-function withPricePending(rest, market) {
-  if (rest !== "portfolios") return undefined;
-  const p = structuredClone(mockupPayload("07-paper-portfolios", market));
-  Object.assign(p.open_trades[0], { entry_price: null, quantity: null, last_price: null, last_price_date: null, unrealised_pnl: null, unrealised_pct: null, to_target_pct: null });
-  p.all_trades = { window: { sessions: 10, from: "2026-09-23", to: "2026-10-06" },
-    summary: [{ scope: "all", family: "all", period: "to_date", open: 1, closed: 0, wins: 0, losses: 0, flat: 0, win_rate: null, net_pnl_market: null, net_pnl_your: null, pnl_your_missing: 0, currency: "INR" }],
-    trades: [{ id: "acc:rule.model_news.v1:2026-10-06-RELIANCE-1d", scope: "all", view: "accuracy", strategy_id: "rule.model_news.v1", family: "rule", pick_rule: null, side: null, ticker: "RELIANCE", horizon_days: 1, entry_date: "2026-10-07", exit_date: "2026-10-07", state: "open", not_entered_reason: null, outcome: null, entry_price: null, entry_price_source: null, exit_or_last_price: null, last_price_source: null, last_price_date: null, last_price_time: null, price_pending: true, quantity: null, amount: 100000, currency: "INR", unrealised_pnl: null, unrealised_pct: null, pnl_market: null, pnl_your: null, return_pct_market: null, return_pct_your: null, settled_at: null, paper: true }] };
-  return { status: 200, body: envelope(market, "_", p) };
-}
-
-/** B13's portfolio-size split (build/b13-portfolio-size d4e1cf8e): all_trades carries `sessions` and only head-to-head
- * and your own trades; the accuracy view is read per entry session from GET /portfolios/sessions/{date}. Hand-made in
- * those fields on the India mockup page: two sessions with pages (6 Oct: an open trade flagged outside its range with its
- * own range, one checked inside its 50% band, a closed loss; 5 Oct: one open trade, no check yet) and a third whose page
- * answers 503, to show the list's own error state. open_trades and trade_checks are emptied: the page must not need them. */
-const SESSION_ROW = { scope: "all", view: "accuracy", family: "rule", pick_rule: null, side: null, horizon_days: 3, not_entered_reason: null, entry_price_source: "daily_bar", price_pending: false, quantity: 84, amount: 100000, currency: "INR", return_pct_market: null, return_pct_your: null, settled_at: null, paper: true, last_price_source: "daily_close", last_price_time: null, last_price_date: "2026-10-06", pnl_market: null, pnl_your: null, unrealised_pnl: null, unrealised_pct: null, lo80: null, lo50: null, hi50: null, hi80: null, target_price: null, to_target_pct: null, check: null };
-const sessionSum = (session_date, over) => ({ session_date, entered: 3, not_entered: 0, open: 2, closed: 1, wins: 0, losses: 1, flat: 0, win_rate: 0, net_pnl_market: -1200, net_pnl_your: -1650, unrealised_pnl: 1400, flagged_open: 1, ...over });
-const SESSIONS = {
-  "2026-10-06": { summary: sessionSum("2026-10-06"), trades: [
-    { ...SESSION_ROW, id: "acc:rule.model_news.v1:2026-10-05-RELIANCE-3d", strategy_id: "rule.model_news.v1", ticker: "RELIANCE", entry_date: "2026-10-06", exit_date: "2026-10-09", state: "open", outcome: null, entry_price: 1182, exit_or_last_price: 1158, unrealised_pnl: -2016, unrealised_pct: -2.03, lo80: 1165, lo50: 1175, hi50: 1200, hi80: 1212, target_price: 1190, to_target_pct: 2.76, check: { check_at: "2026-10-06T08:43:00Z", band: "below80", flags: ["outside_range"], flagged: true, ret_since_entry_pct: -2.03 } },
-    { ...SESSION_ROW, id: "acc:rule.model_news.v1:2026-10-05-TCS-3d", strategy_id: "rule.model_news.v1", ticker: "TCS", entry_date: "2026-10-06", exit_date: "2026-10-09", state: "open", outcome: null, entry_price: 3010, exit_or_last_price: 3062, quantity: 33, unrealised_pnl: 1716, unrealised_pct: 1.73, lo80: 2950, lo50: 2990, hi50: 3080, hi80: 3120, target_price: 3040, to_target_pct: -0.72, check: { check_at: "2026-10-06T08:43:00Z", band: "inside50", flags: [], flagged: false, ret_since_entry_pct: 1.73 } },
-    { ...SESSION_ROW, id: "acc:rule.model_news.v1:2026-10-05-HDFCBANK-1d", strategy_id: "rule.model_news.v1", horizon_days: 1, ticker: "HDFCBANK", entry_date: "2026-10-06", exit_date: "2026-10-06", state: "closed", outcome: "loss", entry_price: 711.5, exit_or_last_price: 702, last_price_date: null, pnl_market: -1200, pnl_your: -1650, settled_at: "2026-10-06T12:15:00Z" },
-  ] },
-  "2026-10-05": { summary: sessionSum("2026-10-05", { entered: 1, open: 1, closed: 0, losses: 0, win_rate: null, net_pnl_market: null, net_pnl_your: null, unrealised_pnl: 300, flagged_open: 0 }), trades: [
-    { ...SESSION_ROW, id: "acc:rule.model_news.v1:2026-10-02-INFY-5d", strategy_id: "rule.model_news.v1", horizon_days: 5, ticker: "INFY", entry_date: "2026-10-05", exit_date: "2026-10-12", state: "open", outcome: null, entry_price: 1500, exit_or_last_price: 1504.5, quantity: 66, unrealised_pnl: 297, unrealised_pct: 0.3, lo80: 1440, lo50: 1475, hi50: 1540, hi80: 1570, target_price: 1515, to_target_pct: 0.7 },
-  ] },
-};
-function withSessions(rest, market) {
-  const m = /^portfolios\/sessions\/(\d{4}-\d{2}-\d{2})$/.exec(rest);
-  if (m) {
-    const s = SESSIONS[m[1]];
-    if (!s) return { status: 503, body: { title: "Data service unavailable", status: 503, detail: "The read models cannot be read right now; try again shortly." } };
-    return { status: 200, body: envelope(market, `trades:${m[1]}`, { market, as_of: "2026-10-06", session_date: m[1], summary: s.summary, trades: s.trades, paper: true }) };
-  }
-  if (rest !== "portfolios") return undefined;
-  const p = structuredClone(mockupPayload("07-paper-portfolios", market));
-  p.open_trades = [];
-  p.trade_checks = [];
-  const sum = (scope, family, period, over = {}) => ({ scope, family, period, open: 3, closed: 1, wins: 0, losses: 1, flat: 0, win_rate: 0, net_pnl_market: -1200, net_pnl_your: -1650, pnl_your_missing: 0, unrealised_pnl: -3, flagged_open: 1, currency: "INR", ...over });
-  p.all_trades = {
-    window: { sessions: 10, from: "2026-09-23", to: "2026-10-06" },
-    summary: [sum("all", "all", "to_date"), sum("all", "all", "window"), sum("all", "rule", "to_date"),
-      sum("head_to_head", "all", "to_date", { open: 1, closed: 0, losses: 0, win_rate: null, net_pnl_market: null, net_pnl_your: null, unrealised_pnl: 410, flagged_open: 0 })],
-    trades: [{ ...SESSION_ROW, id: "h2h:highest_probability:ai.combined.opus.v1:2026-10-05-RELIANCE-3d", scope: "head_to_head", view: "head_to_head", strategy_id: "ai.combined.opus.v1", family: "ai", pick_rule: "highest_probability", ticker: "RELIANCE", entry_date: "2026-10-06", exit_date: "2026-10-09", state: "open", outcome: null, entry_price: 1182, exit_or_last_price: 1187, unrealised_pnl: 410, unrealised_pct: 0.42 }],
-    sessions: [sessionSum("2026-10-06"), sessionSum("2026-10-05", { entered: 1, open: 1, closed: 0, losses: 0, win_rate: null, flagged_open: 0 }), sessionSum("2026-10-02", { entered: 2, open: 0, closed: 2, flagged_open: 0 })],
-  };
-  return { status: 200, body: envelope(market, "_", p) };
-}
-
 export const cases = [
   {
-    name: "paper-portfolios-sessions-phone",
+    name: "paper-portfolio-v3-india",
     path: "/india/paper-portfolios",
-    api: withSessions,
-    widths: [390],
-    waitFor: ".p-portfolios .at-list",
-    expectText: ["Entry session", "RELIANCE", "TCS", "head-to-head 1 open", "open · outside range"],
-    check: async (page) => (await clippedHeaders(page)).map((p) => `6 Oct list: ${p}`),
-  },
-  {
-    name: "paper-portfolios-sessions",
-    path: "/india/paper-portfolios",
-    api: withSessions,
-    widths: [1280],
-    allowConsole: [HTTP_ERROR_LINE],
-    waitFor: ".p-portfolios .at-list",
-    expectText: ["Entry session", "2 open · 1 closed · 0 won, 1 lost", "outside range", "inside 50%", "head-to-head 1 open", "one session at a time"],
+    market: "india",
+    api: realApi(),
+    widths: [1280, 390],
+    waitFor: ".pp-hold .pp-trades",
+    expectText: [PAPER, "Which bets are working?", "Rule strategies", "Simple benchmarks", "AI traders", "No trades today: the signal model saw no clear rise",
+      "Nothing finished yet — first results Tue 13 Oct", "Rule vs AI: the daily picks", "Open trades, by how long they’re held", "1-day hold", "2-day hold", "3-day hold", "4-day hold", "5-day hold",
+      "Going against the prediction", "Going as predicted", "Full story", "What the system learns", "Learns automatically", "Needs the owner’s approval", "2026-W41", "Your own paper trades"],
+    expectSelector: [".pp-hero .pp-money.big", ".pp-strip .pp-ss", ".pp-why-line", ".pp-trades .rng svg", ".pp-wl .w", ".pp-wl .l"],
     check: async (page) => {
       const problems = [];
-      for (const p of await clippedHeaders(page)) problems.push(`6 Oct list: ${p}`);
-      if ((await page.$$(".p-portfolios .at-list td.cw .rng svg")).length !== 2) problems.push("not one range per open row with bands");
-      const kpis = await page.textContent(".kpis");
-      if (!/Open paper trades\s*3/.test(kpis) || !kpis.includes("1 flagged")) problems.push(`open KPI not from the summary: ${kpis}`);
-      if ((await page.$$('[aria-label="Open paper trades by strategy"]')).length) problems.push("the open-trades card (open_trades) still shown");
-      let text = await listText(page);
-      if (!text.includes("RELIANCE") || !text.includes("TCS") || text.includes("INFY") || text.includes("Highest chance")) problems.push(`6 Oct list: ${text}`);
-      await page.selectOption('select[aria-label="Entry session"]', "2026-10-05");
-      await page.waitForFunction(() => document.querySelector('[aria-label="All paper trades"] .at-list')?.textContent.includes("INFY"));
-      text = await listText(page);
-      if (text.includes("RELIANCE")) problems.push(`5 Oct list still shows 6 Oct: ${text}`);
-      await press(page, "Whose trades", "Head-to-head");
-      text = await listText(page);
-      if (!text.includes("Highest chance") || text.includes("INFY") || (await page.$$('select[aria-label="Entry session"]')).length) problems.push(`head-to-head scope: ${text}`);
-      await press(page, "Whose trades", "All strategies");
-      await page.selectOption('select[aria-label="Entry session"]', "2026-10-02");
-      await page.waitForSelector('[aria-label="All paper trades"] [role="alert"]');
-      const card = await page.textContent('[aria-label="All paper trades"]');
-      if (!card.includes("Data service unavailable") || !card.includes("Since paper trading began")) problems.push("the session page's error did not stay inside the list");
+      await page.waitForFunction(() => document.querySelectorAll(".pp-hold .pp-trades").length >= 7, null, { timeout: 8000 }).catch(() => problems.push("not every hold block loaded its list"));
+      if ((await page.$$('[role="tab"]')).length) problems.push("a tab on the page: the holds must all be visible");
+      const blocks = await page.$$eval(".pp-hold h3", (hs) => hs.map((h) => h.textContent.trim()));
+      if (blocks.join("|") !== "1-day hold|2-day hold|3-day hold|4-day hold|5-day hold|3-day hold|5-day hold") problems.push(`hold blocks: ${blocks.join(" | ")}`);
+      const text = await textOf(page, ".p-portfolios");
+      if (/NaN|undefined|\bnull\b/.test(text)) problems.push("NaN, undefined or null printed");
+      if (/Baseline/.test(text.replace(/Baselines?\b(?= ·)/g, ""))) problems.push("the internal word Baseline shows");
+      // every losing line of the first block says why, with a market or own move in percent and a Full story link
+      const lines = await page.$$eval(".pp-hold:first-of-type .pp-why-line", (ls) => ls.map((l) => l.textContent));
+      if (!lines.length) problems.push("no reason line in the 1-day block");
+      for (const l of lines) if (!/(Fell|Rose) (mostly on its own|with the whole market)/.test(l) || !/−?\d+\.\d%/.test(l) || !l.includes("Full story")) problems.push(`reason line: ${l}`);
+      const story = await page.$eval(".pp-hold .pp-why-line a.pp-story", (a) => a.getAttribute("href")).catch(() => "");
+      if (!/^\/india\/stocks\/[A-Z&]+\/lifecycle\/2026-10-12#story=.+&trade=acc%3A/.test(story)) problems.push(`full story link: ${story}`);
+      // "Show N more" reveals the rest of a list and folds it back
+      const first = await page.$(".pp-hold .pp-more button");
+      if (!first) problems.push("no Show more button");
+      else {
+        const before = await page.$$eval(".pp-hold:first-of-type tbody.pp-row", (r) => r.length);
+        await first.click();
+        const after = await page.$$eval(".pp-hold:first-of-type tbody.pp-row", (r) => r.length);
+        if (after <= before) problems.push(`show more: ${before} -> ${after}`);
+        await first.click();
+      }
+      // identical trades of two benchmarks are one line marked ×2, with both strategies named
+      if (!(await page.$$eval(".pp-x", (xs) => xs.some((x) => x.textContent === "×2")))) problems.push("no merged ×2 line");
+      const tips = await page.$$eval(".pp-hold .pp-info", (bs) => bs.map((b) => b.getAttribute("data-tip") ?? ""));
+      if (!tips.some((t) => t.startsWith("Expected: ") && t.includes("Sells at the close of"))) problems.push("row popover words");
       return problems;
     },
   },
   {
-    name: "paper-portfolios-price-pending",
+    name: "paper-portfolio-v3-finished",
     path: "/india/paper-portfolios",
-    api: withPricePending,
-    widths: [1280],
-    waitFor: ".p-portfolios .ot",
-    expectText: ["price pending", "open, no price yet", "+₹30,219"],
+    market: "india",
+    widths: [1280, 390],
+    api: (() => {
+      const day = finishedDay();
+      return realApi({ finished: { "2026-10-13": day.page }, edit: (p) => ({ ...p, all_trades: { ...p.all_trades, finished_sessions: [day.summary] } }) });
+    })(),
+    waitFor: "[aria-label='Finished trades'] .pp-trades",
+    expectText: ["Finished trades", "Tue 13 Oct · 39", "Won", "Lost", "AI reason", "Nothing finished that day"],
     check: async (page) => {
-      const text = await page.textContent(".p-portfolios");
       const problems = [];
-      if (/NaN|undefined|null/.test(text)) problems.push("NaN, undefined or null printed");
-      if (text.includes("₹0 ") || /[^0-9,.]₹0(?![0-9,.])/.test(text.replace(/drawdown ₹0/g, ""))) problems.push("a ₹0 shown for a pending price");
+      const card = await textOf(page, "[aria-label='Finished trades']");
+      if (!/Moved −\d+\.\d%, mostly (the whole market|the company itself)/.test(card)) problems.push("no finished reason line");
+      if (!card.includes("won") || !card.includes("lost")) problems.push("no won / lost per side");
       return problems;
     },
   },
   {
-    name: "paper-portfolios-all-trades-sample",
+    name: "paper-portfolio-v3-us-empty",
     path: "/us/paper-portfolios",
     market: "us",
-    api: withSample,
+    api: realApi(),
     widths: [1280, 390],
-    waitFor: ".p-portfolios .at-list",
-    expectText: ["1 open · 4 closed · 2 won, 1 lost, 1 even", "1 open · 3 closed · 1 won, 1 lost, 1 even", "did not enter: no stored open price that day"],
+    waitFor: ".pp-hero",
+    expectText: [PAPER, "Nothing has finished yet", "No open paper trade right now", "No open daily pick right now", "What the system learns", "2026-W41"],
+  },
+  {
+    name: "paper-portfolio-v3-story",
+    path: "/india/stocks/LT/lifecycle/2026-10-12#story=ai.news_results.sonnet.v1%3A2026-10-09-LT-5d&trade=acc%3Aai.news_results.sonnet.v1%3A2026-10-09-LT-5d",
+    market: "india",
+    api: realApi(),
+    widths: [1280, 390],
+    waitFor: "[aria-label='The full story']",
+    expectText: ["Why is it going against the prediction?", "Whole market", "LT on its own", "What happened, step by step", "Chance of a rise 55%", "(its bar: 55%)",
+      "Exchange-confirmed large order wins", "AI note, checked against the stored data", "Sells at the close and is settled", "What the system learned",
+      "This strategy doesn’t get lessons", "Needs the owner’s approval"],
     check: async (page) => {
       const problems = [];
-      // every visible list column lies inside the table's visible box (no column scrolled out of sight), in each view
-      // that has rows: All strategies first, then Mine; fails when the list has no header at all
-      const clipped = () => clippedHeaders(page);
-      for (const p of await clipped()) problems.push(`All strategies: ${p}`);
-      await page.click('[aria-label="Whose trades"] button:has-text("Mine")');
-      for (const p of await clipped()) problems.push(`Mine: ${p}`);
-      const text = await page.textContent('[aria-label="All paper trades"]');
-      if (!text.includes("sold 9 Oct") || !text.includes("bought 9 Oct")) problems.push("your own trades' dates not in words");
-      if (text.includes("planned exit")) problems.push("a planned exit shown on your own open lot");
-      await page.click('[aria-label="Whose trades"] button:has-text("Head-to-head")');
-      if (!(await page.textContent('[aria-label="All paper trades"]')).includes("1 without your-cost figure yet")) problems.push("missing your-cost count not shown");
+      const story = await textOf(page, "[aria-label='The full story']");
+      if (/NaN|undefined|\bnull\b/.test(story)) problems.push("NaN, undefined or null printed");
+      if (!/Check: −\d+\.\d% since the buy/.test(story)) problems.push("no check step with the move since the buy");
+      const steps = await page.$$eval(".st-tl li", (ls) => ls.length);
+      if (steps < 5) problems.push(`steps: ${steps}`);
       return problems;
     },
   },
   {
-    name: "paper-portfolios-all-trades",
+    name: "paper-portfolio-old-read-model",
     path: "/india/paper-portfolios",
-    api: withAllTrades,
-    widths: [1280, 390],
-    waitFor: ".p-portfolios .at-list",
-    expectText: ["All paper trades in one place", "Since paper trading began", "Last 10 sessions", "1 open · 1 closed · 0 won, 1 lost", "closed, lost money", "did not enter: no stored open price that day", "so far, before costs", "checked 11:13 IST", "Closed trades older than the last 10 sessions are counted above but not listed."],
-    check: async (page) => {
-      const problems = [];
-      let text = await listText(page);
-      if (text.includes("Highest chance")) problems.push("a head-to-head trade is listed under All strategies (views pooled)");
-      await press(page, "Won or lost", "Lost");
-      text = await listText(page);
-      if (!text.includes("HDFCBANK") || text.includes("TCS")) problems.push(`Lost filter: ${text}`);
-      await press(page, "Won or lost", "Any");
-      await press(page, "Open or closed", "Open");
-      text = await listText(page);
-      if (!text.includes("RELIANCE") || text.includes("HDFCBANK")) problems.push(`Open filter: ${text}`);
-      await press(page, "Open or closed", "All");
-      await press(page, "Whose trades", "Head-to-head");
-      text = await listText(page);
-      if (!text.includes("Highest chance") || text.includes("HDFCBANK")) problems.push(`Head-to-head scope: ${text}`);
-      await press(page, "Whose trades", "Mine");
-      const card = await page.textContent('[aria-label="All paper trades"]');
-      if (!card.includes("You") || !card.includes("after your cost") || card.includes("Net after market cost")) problems.push("Mine scope: wrong words or a market-cost column");
-      return problems;
-    },
-  },
-  {
-    name: "paper-portfolios-india",
-    path: "/india/paper-portfolios",
-    mockup: "07-paper-portfolios",
-    widths: [1280, 390],
-    waitFor: ".p-portfolios .ot",
-    expectText: [PAPER, "The list of all paper trades is not in this page’s data yet.", "Head-to-head portfolios", "Open paper trades by strategy", "14 of 14 open", "Your own paper portfolio", "1 recorded trade", "Add own paper trade"],
-    expectSelector: [".p-portfolios .ot tr.grp", ".p-portfolios .rng svg", ".p-portfolios .fbox .tot"],
-  },
-  { name: "paper-portfolios-us", path: "/us/paper-portfolios", market: "us", mockup: "07-paper-portfolios", widths: [1280], waitFor: ".p-portfolios .eur", expectText: [PAPER, "Euro view of AAPL", "Euros paid"] },
-  {
-    name: "paper-portfolios-filters",
-    path: "/india/paper-portfolios",
+    api: storedApi,
     widths: [1280],
-    waitFor: ".p-portfolios .ot",
-    check: async (page) => {
-      const problems = [];
-      await page.click('.p-portfolios button.md-chip:has-text("AI traders")');
-      await page.click('.p-portfolios button.md-chip:has-text("Head-to-head")');
-      const end = await page.textContent('[aria-label="Open paper trades by strategy"] .head .end');
-      if (!end.startsWith("1 of 14 open")) problems.push(`filtered count: ${end}`);
-      const groups = await page.$$eval(".p-portfolios .ot tr.grp", (r) => r.map((x) => x.textContent));
-      if (groups.length !== 1 || !groups[0].includes("AI")) problems.push(`groups: ${groups.join(" | ")}`);
-      return problems;
-    },
+    waitFor: ".p-portfolios [aria-label='Your own paper portfolio']",
+    expectText: [PAPER, "This page fills after the next data sync of India (NSE)", "No own paper trade in India (NSE) yet."],
   },
+  { name: "paper-portfolio-us-euro", path: "/us/paper-portfolios", market: "us", mockup: "07-paper-portfolios", widths: [1280], waitFor: ".p-portfolios .eur", expectText: [PAPER, "Euro view of AAPL", "Euros paid"] },
   {
     name: "paper-portfolios-add-trade",
     path: "/india/paper-portfolios",
     widths: [1280, 390],
     allowConsole: [HTTP_ERROR_LINE],
-    waitFor: ".p-portfolios .own",
+    waitFor: ".p-portfolios [aria-label='Your own paper portfolio']",
     check: async (page) => {
       const problems = [];
       const seen = await answerPosts(page, [422, 503, 202]);
@@ -283,7 +209,6 @@ export const cases = [
       await page.waitForSelector("dialog[open]", { state: "detached" });
       const text = await page.textContent(".p-portfolios");
       if (!/Pending: buy 5 [A-Z]+ at the open/.test(text)) problems.push("no pending line after a 202");
-      if (!/Pending requests\s*1/.test(await page.textContent(".kpis"))) problems.push("pending KPI not 1");
       if (seen.length !== 3) problems.push(`requests sent: ${seen.length}`);
       else {
         if (seen.some((s) => s.method !== "POST" || !s.type.startsWith("application/json"))) problems.push("not a JSON POST");
@@ -295,14 +220,6 @@ export const cases = [
       }
       return problems;
     },
-  },
-  {
-    name: "paper-portfolios-stored-india",
-    path: "/india/paper-portfolios",
-    api: storedApi,
-    widths: [1280, 390],
-    waitFor: ".p-portfolios .own, .p-portfolios [aria-label='Your own paper portfolio']",
-    expectText: [PAPER, "No rule-vs-AI trade of this side has finished yet.", "No open paper trade: nothing has entered", "No own paper trade in India (NSE) yet."],
   },
   { name: "paper-portfolios-error", path: "/india/paper-portfolios", apiStatus: 503, allowConsole: [HTTP_ERROR_LINE], widths: [1280], waitFor: '[role="alert"]', expectText: ["Data service unavailable", "Try again"] },
 ];
