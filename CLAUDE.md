@@ -67,13 +67,15 @@ root as `MB_NOW=2026-10-09T23:59:00Z PYTHONPATH=scripts python docs/plan_volatil
   ranges as a fan on the last 20 closes, B10's model P(up) as "chance of going up", the lean, a plain-language why from
   the score's points per feature group, flags (results soon, BLOCKED, contradicted news) and the change since the
   previous run from B12's forecast_history; paper trades and signal tiers in lean words, SIMULATED, once a strategy is
-  live; everything as of the run's clock), then `dashboard` builds
-  `reports/<market>/dashboard.html` (decision-support dashboard, stored data only as of the run's clock:
+  live; everything as of the run's clock). `dashboard` built
+  `reports/<market>/dashboard.html` until the owner retired the file on 2026-10-10: the routine no longer runs it,
+  and the website shows the same data. Its code in `marketbrief/presentation/dashboard/` stays, because the
+  warehouse read models are built from its `gather_dashboard` (decision-support dashboard, stored data only as of the run's clock:
   watchlist, sector heatmap, candlesticks with the published ranges via the vendored TradingView
   Lightweight Charts in `marketbrief/presentation/dashboard/vendor/` (version and SHA-256 in its NOTICE),
   the signal model's P(up) with its points and formula, bull vs bear, news with status, track record;
   "Paper only — no proven edge yet" until the weekly review's `model_skill` is true), and `notify_slack` posts a thread
-  (summary, chart images, HTML file, dashboard) with `SLACK_BOT_TOKEN`, or the summary text alone through
+  (summary, chart images, HTML file) with `SLACK_BOT_TOKEN`, or the summary text alone through
   `SLACK_WEBHOOK_URL`. Processing data (data/, context pack, summaries) and presentation (HTML,
   PNGs, Slack) are separate: `view_data.py` only reads the data for both presentation outputs.
   `backtest` evaluates the
@@ -245,7 +247,8 @@ root as `MB_NOW=2026-10-09T23:59:00Z PYTHONPATH=scripts python docs/plan_volatil
   `strategy_abstentions` (gate_failed, timeout 15 minutes before the open, killed, blocked_quality, earnings_window,
   abstained). Post-close (`routine/POSTCLOSE_PROMPT.md`): B2's `scripts/lab.py settle`, the `eod-analyst` agent and
   its gate `eod-validate|add` -> `trade_reasons_ai`, `eod_analyses` (market-cost view), B6's close alerts. Weekly
-  (`routine/WEEKLY_PROMPT.md`, Saturday 09:51 local): the `research-director` agent and its gate
+  (`routine/WEEKLY_PROMPT.md`, Friday 19:30 New York time for both markets, owner decisions 2026-10-10
+  and 2026-10-12): the `research-director` agent and its gate
   `director-validate|add` (config diffs that apply to a copy, never applied) -> `research_reviews`,
   `reports/<market>/research-<week>.md`.
 - Tools and channels (B5, SPEC F10; docs/ws/b5.md): the `web/` Next.js project (App Router; `package.json`, lockfile,
@@ -448,6 +451,11 @@ root as `MB_NOW=2026-10-09T23:59:00Z PYTHONPATH=scripts python docs/plan_volatil
   checking, the reflector, the deviation explainer, the results-analyst, the researchers, the three Sonnet traders and
   the eod-analyst, Opus 5.5 for the forecaster (also the Opus trader), graph-builder, research-director and judge;
   table in DESIGN.md section 13).
+- `routine/EVENING_PROMPT.md` the evening forecast run (owner decision 2026-10-10; Mon-Fri, India 21:30 UTC, US 18:30
+  New York). On the day's final close it runs features, calibrate, `model_scores.py --evening`, `ranges.py --evening`
+  and `lab.py predict --evening`, which write preview rows to `ranges_evening`, `strategy_predictions_evening` and
+  model scores with `run: "evening"`. There are no AI agents and no Slack post. The rows are never traded or scored:
+  the next pre-open run writes the revision of record, and if it fails, nothing trades that day.
 - `routine/PROMPT.md` the routines' saved prompt (one per market). `routine/NEWS_PROMPT.md` the news-only light
   run (one combined session for both markets, India then the US, 31 a week: weekdays 10:45 and 13:45 IST and
   11:27, 14:27 and 17:27 New York time, weekends 10:45 IST, 11:27 and 17:27 New York time, holidays included;
