@@ -10,7 +10,7 @@ import {
   type RuleVsAiPayload, type SettledTrade,
 } from "../rule-vs-ai.ts";
 import {
-  groupOpenTrades, latestChecks, newIdempotencyKey, openSummary, positionsSummary, receiptState, tradeRequest,
+  groupOpenTrades, latestChecks, pricePending, newIdempotencyKey, openSummary, positionsSummary, receiptState, tradeRequest,
   type PaperPortfoliosPayload, type TradeForm,
 } from "../paper-portfolios.ts";
 
@@ -134,5 +134,10 @@ test("a price-pending open trade is counted as open but adds nothing to the unre
   assert.equal(after.open, before.open);
   assert.equal(Math.round((after.unrealised ?? 0) * 100), Math.round(((before.unrealised ?? 0) - was) * 100));
   const group = groupOpenTrades(p.open_trades, p.strategies, { family: null, view: null }).find((g) => g.trades.includes(first))!;
-  assert.ok(group.unrealised !== null && Number.isFinite(group.unrealised));
+  const others = group.trades.filter((t) => t !== first).reduce((total, t) => total + (t.unrealised_pnl ?? 0), 0);
+  assert.equal(Math.round(group.unrealised! * 100), Math.round(others * 100));
+  assert.equal(pricePending(first), true);
+  // a read model that leaves the flag out (rm.portfolio before B13 passes it through): the null entry price says so
+  assert.equal(pricePending({ ...first, price_pending: undefined }), true);
+  assert.equal(pricePending(p.open_trades[1]), false);
 });

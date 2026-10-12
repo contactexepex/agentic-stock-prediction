@@ -118,6 +118,10 @@ function sumKnown(values: ReadonlyArray<number | null>): number | null {
   return known.length ? known.reduce((total, value) => total + value, 0) : null;
 }
 
+/** An open trade with no price yet: B4's flag, or (when a read model leaves the flag out) a null entry price, which only a
+ * pending trade has. */
+export const pricePending = (trade: OpenTrade): boolean => trade.price_pending === true || trade.entry_price === null;
+
 export function openSummary(payload: PaperPortfoliosPayload): { open: number; unrealised: number | null; flagged: number } {
   return {
     open: payload.open_trades.length,

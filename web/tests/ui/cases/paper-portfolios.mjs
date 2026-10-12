@@ -63,11 +63,12 @@ const press = (page, group, text) => page.click(`[aria-label="${group}"] button:
 const listText = (page) => page.textContent('[aria-label="All paper trades"] .at-list').catch(() => "");
 
 /** The mockup with one open trade and one all-trades row priced pending (B4: entered at D's open, no price stored or
- * checked yet; prices, quantity and unrealised figures null). */
+ * checked yet; prices, quantity and unrealised figures null). The open trade carries no price_pending flag, as
+ * rm.portfolio's open_trades served it at dbd85a32; the page must still say "price pending". */
 function withPricePending(rest, market) {
   if (rest !== "portfolios") return undefined;
   const p = structuredClone(mockupPayload("07-paper-portfolios", market));
-  Object.assign(p.open_trades[0], { price_pending: true, entry_price: null, quantity: null, last_price: null, last_price_date: null, unrealised_pnl: null, unrealised_pct: null, to_target_pct: null });
+  Object.assign(p.open_trades[0], { entry_price: null, quantity: null, last_price: null, last_price_date: null, unrealised_pnl: null, unrealised_pct: null, to_target_pct: null });
   p.all_trades = { window: { sessions: 10, from: "2026-09-23", to: "2026-10-06" },
     summary: [{ scope: "all", family: "all", period: "to_date", open: 1, closed: 0, wins: 0, losses: 0, flat: 0, win_rate: null, net_pnl_market: null, net_pnl_your: null, pnl_your_missing: 0, currency: "INR" }],
     trades: [{ id: "acc:rule.model_news.v1:2026-10-06-RELIANCE-1d", scope: "all", view: "accuracy", strategy_id: "rule.model_news.v1", family: "rule", pick_rule: null, side: null, ticker: "RELIANCE", horizon_days: 1, entry_date: "2026-10-07", exit_date: "2026-10-07", state: "open", not_entered_reason: null, outcome: null, entry_price: null, entry_price_source: null, exit_or_last_price: null, last_price_source: null, last_price_date: null, last_price_time: null, price_pending: true, quantity: null, amount: 100000, currency: "INR", unrealised_pnl: null, unrealised_pct: null, pnl_market: null, pnl_your: null, return_pct_market: null, return_pct_your: null, settled_at: null, paper: true }] };
