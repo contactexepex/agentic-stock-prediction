@@ -45,6 +45,13 @@ This is the owner's personal research tool for deciding their own trades; wrong 
 - Hard lines stay: research only, no orders, no brokers, nothing illegal (no market manipulation), secrets never in
   files or chat.
 
+## Dashboard frozen (owner decision 2026-10-12)
+The dashboard has moved to `github.com/exepex/omenix-dashboard`. Until the owner says the cutover is done, nothing in
+`web/`, `api/` or `design/` of this repository changes: no edits, no new mockups, no dependency bumps. All dashboard
+and mockup work happens only in `exepex/omenix-dashboard`. Backend work (`data/`, `scripts/`, routines, warehouse
+sync) continues as normal; a backend change that would need an edit under `web/`, `api/` or `design/` (for example a
+new API field or a rebuilt catalogue example) is held and raised with the owner instead.
+
 ## Layout
 - `config/markets/<market>.yaml` per market: exchange calendar, timezone, market-level symbols
   (benchmark, vol index, cues, factors), regime thresholds, sectors, `company_meta` (per-company metadata: name,
