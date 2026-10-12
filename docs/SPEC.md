@@ -148,7 +148,7 @@ part already does it, the feature says "exists" and what changes.
    | India | GST | 18% on brokerage + exchange transaction charge + SEBI fee | market | owner-provided; verify |
    | India | STT | 0.1% each side | market | owner-provided (agrees with `config/costs.yaml`); verify |
    | India | Stamp duty | 0.015% on the buy side | market | owner-provided (agrees with `config/costs.yaml`); verify |
-   | India | NSE transaction charge, SEBI fee | 0.00307% and 0.0001% each side, as already in `config/costs.yaml` | market | as documented there (search-only sources) |
+   | India | NSE transaction charge (including the IPFT contribution), SEBI fee | 0.00307% and 0.0001% each side, as already in `config/costs.yaml` | market | NSE: circular NSE/FA/73061, read 2026-10-12; SEBI: as documented there (search only) |
    | India | NRI reporting charge | none (Axis Direct's ₹200 per trade date until 2026-10-12) | your | owner, 2026-10-12 |
    | India | DP charge per scrip sold | ₹20 (₹3.5 depository + ₹16.5 Groww) plus 18% GST = ₹23.60 (Axis Direct: ₹30 or 0.04%, the higher, no GST, until 2026-10-12) | your | Groww's published pricing, read 2026-10-12 |
    | India | Demat AMC | ₹0 (Axis Direct: about ₹885 a year): an account charge, in no trade's cost | none | Groww's published pricing, read 2026-10-12 |
