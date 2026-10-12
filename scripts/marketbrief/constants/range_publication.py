@@ -7,7 +7,7 @@ CALIBRATION_ID = "{id} ({source}, n={history}+{live})"
 MSG_NO_REGIME = "no regime snapshot; run features.py first"
 MSG_NOW_NEEDS_OFFSET = "--now needs a UTC offset, e.g. 2026-10-05T02:40:00+00:00"
 HELP_NOW = "made_at as ISO 8601 UTC with offset instead of now (tests only)"
-HELP_EVENING = ("the evening run: rank the day's close into ranges_evening (same ids, never scored or traded; no "
+HELP_EVENING = ("the evening run: range the day's close into ranges_evening (same ids, never scored or traded; no "
                 "overnight cue yet)")
 MSG_EVENING_NO_CUE = "evening: no overnight cue yet (the pre-open revision adds it)"
 MSG_INDEX_CUE_IGNORED = "index cue ignored: {symbol} quoted after {first} open"

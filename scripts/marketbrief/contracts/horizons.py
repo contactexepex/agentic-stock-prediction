@@ -18,6 +18,7 @@ from datetime import date, datetime
 from typing import TypedDict
 
 from marketbrief.analytics import horizon_records as records
+from marketbrief.constants.horizons import RUN_PRE_OPEN
 from marketbrief.core.horizons import horizons as horizon_list
 
 HORIZON_LABELS: tuple[str, ...] = ("n_plus_k", "legacy_cc", "legacy_5d_d4")   # = constants/horizons.HORIZON_LABELS
@@ -103,7 +104,7 @@ def scores_asof(market: str, as_of: datetime, horizon_days: int | None = None,
 
 
 def ranges_asof(market: str, as_of: datetime, horizon_days: int | None = None,
-                run: str = "pre_open") -> list[HorizonRange]:
+                run: str = RUN_PRE_OPEN) -> list[HorizonRange]:
     """The first published range per ticker and horizon for the session after the newest as-of date made by
     `as_of` (the range a strategy prediction copies; N+k rows only). run="pre_open" (default): the pre-open run's
     rows, the revision of record; run="evening": the evening run's preview of the same ids (ranges_evening), for

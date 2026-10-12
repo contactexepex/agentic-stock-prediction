@@ -1922,7 +1922,8 @@ Decision 37: horizon k is N+k, buy at the open of D and sell at the close of the
   ranges to the kind `ranges_evening`: the `ranges` columns plus `run: "evening"`, the same ids as the pre-open rows
   they preview, once per id there. It applies no overnight cue (the day's stored quotes are its own pre-open cue, whose
   session has closed) and no forecaster widening (the forecaster has not run). The pre-open rows in `ranges` stay
-  the revision of record: scoring, settlement, picks, trade checks and `ranges_asof` read only them.
+  the revision of record: scoring, settlement, picks, trade checks and `ranges_asof` read only them. An evening
+  row may reuse the option snapshot collected that morning (US implied vol): stale, not look-ahead.
   `ranges_asof(..., run="evening")` reads the evening rows for showing evening vs pre-open. Model scores stay in
   `model_scores`: an evening row is followed by a pre-open row only when the probability changed, and readers take
   the newest computed_at by their clock. New score rows carry `run` (`model_scores.py --evening` writes "evening",
