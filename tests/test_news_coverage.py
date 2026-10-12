@@ -422,6 +422,46 @@ def test_claims_window_reaches_back_to_the_last_enrichment():
     assert claim_sources.claims_window_hours(con, pd.Timestamp("2026-10-09T02:45:00+00:00"), clusters) == 144.0
 
 
+
+def test_weekend_scoring_leaves_monday_only_the_newer_items(weekend, monkeypatch):
+    """Weekend news-only runs score the news (routine/NEWS_PROMPT.md step 3a): Saturday's run scores f2, s1 and the
+    announcement; Sunday's evening run stores s2 and s2b in one collection and scores s2 only. Monday's pre-open
+    window starts at s2's first_seen_at: s2b (skipped, same run) and m1 are pending, nothing is asked twice, and
+    the news gate accepts exactly those."""
+    write_rows(weekend, "news", date(2026, 10, 4), [news_row("s2", "2026-10-04T21:30:00+00:00"),
+                                                    news_row("s2b", "2026-10-04T21:30:00+00:00")])
+    write_rows(weekend, "news_enriched", date(2026, 10, 3), [enriched(i, "2026-10-03T10:30:00+00:00")
+                                                             for i in ("f2", "s1", "nse-ann-1")])
+    write_rows(weekend, "news_enriched", date(2026, 10, 4), [enriched("s2", "2026-10-04T21:45:00+00:00")])
+    con = connect(MARKET)
+    since, rows = news_pending.pending_rows(con, NOW_MONDAY)
+    assert since == pd.Timestamp("2026-10-04T21:30:00+00:00")
+    assert [row["id"] for row in rows] == ["s2b", "m1"]
+    stamp = "2026-10-05T02:44:00+00:00"
+    out = validate_news(weekend, monkeypatch, [enriched(i, stamp) for i in ("s2b", "m1")])
+    assert out["ok"], out["failures"]
+    assert not [w for w in out["warnings"] if w["code"] == "ENRICH_MISSING"]
+    out = validate_news(weekend, monkeypatch, [enriched(i, stamp) for i in ("s2", "m1", "s2b")])
+    assert "ENRICH_ALREADY_STORED" in {f["code"] for f in out["failures"]}
+
+
+def test_claims_window_reaches_back_to_the_last_pre_open_run_after_weekend_scoring(root):
+    """A Friday holiday: Thursday's pre-open run wrote its ranges (and ran the claim-checker); only the weekend
+    news-only runs scored news since. Monday's claims window still reaches back to Thursday's run."""
+    write_rows(root, "news", date(2026, 10, 3), [news_row("s1", "2026-10-03T08:00:00+00:00")])
+    write_rows(root, "news_enriched", date(2026, 10, 3), [enriched("s1", "2026-10-03T08:10:00+00:00")])
+    clusters = {"window_hours": 72, "lookback_hours": 144}
+    assert claim_sources.claims_window_hours(connect(MARKET), NOW_MONDAY, clusters) == 72.0   # enrichment alone
+    thursday = {"id": "2026-09-30-HDFCBANK-1d", "made_at": "2026-10-01T02:45:00+00:00", "as_of_date": "2026-09-30",
+                "ticker": "HDFCBANK", "horizon_days": 1}
+    write_rows(root, "ranges", date(2026, 10, 1), [thursday])
+    # Thursday 02:45 to Monday 02:45 = 96 h, + 1 h
+    assert claim_sources.claims_window_hours(connect(MARKET), NOW_MONDAY, clusters) == pytest.approx(97.0)
+    later = {"id": "2026-10-05-HDFCBANK-1d", "made_at": "2026-10-05T03:00:00+00:00", "as_of_date": "2026-10-02",
+             "ticker": "HDFCBANK", "horizon_days": 1}
+    write_rows(root, "ranges", date(2026, 10, 5), [later])      # made after now: not seen
+    assert claim_sources.claims_window_hours(connect(MARKET), NOW_MONDAY, clusters) == pytest.approx(97.0)
+
 # ---------- the news-only light run ----------
 
 AGENT_STEPS = ("claims.py", "lessons.py", "agent_reasoning.py", "report.py", "notify_slack.py", "collect_prices.py",
@@ -584,11 +624,20 @@ def test_routine_step_7_uses_the_window_since_the_last_enrichment():
     assert "python scripts/news_pending.py" in step7 and "work/news_pending.jsonl" in step7
     assert "today's `data/<market>/news/` file" not in step7
     analyst = (REPO / ".claude" / "agents" / "news-analyst.md").read_text()
-    assert "work/news_pending.jsonl" in analyst and '"news-v12"' in analyst and "`background`" in analyst
+    assert "work/news_pending.jsonl" in analyst and '"news-v13"' in analyst and "`background`" in analyst
 
 
 def test_news_prompt_runs_no_agent_and_commits_data_only():
+    """Weekdays: news only. Weekends: also the news analyst on news_pending.py's input, gated, appended and pushed
+    on its own (step 3a); no other agent, never Slack."""
     text = (REPO / "routine" / "NEWS_PROMPT.md").read_text()
     assert "python scripts/collect_news_only.py" in text
-    assert "notify_slack" not in text and "subagent" not in text
+    assert "notify_slack" not in text and text.count("subagent") == 2
+    weekend = text[text.index("\n3a. Weekend news scoring"):text.index("\n3b. Warehouse")]
+    assert "news-analyst subagent" in weekend and "python scripts/news_pending.py" in weekend
+    assert "python scripts/validate.py --stage news" in weekend and "one retry" in weekend
+    assert "data/<market>/news_enriched/YYYY/MM/TODAY.jsonl" in weekend
+    assert "git add data/<market>/news_enriched" in weekend
+    for agent in ("claim-checker", "forecaster", "researcher", "reflector"):
+        assert agent not in weekend
     assert "commit_paths" in text and "git pull --rebase origin main" in text

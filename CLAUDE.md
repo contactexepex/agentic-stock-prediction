@@ -105,7 +105,8 @@ root as `MB_NOW=2026-10-09T23:59:00Z PYTHONPATH=scripts python docs/plan_volatil
   (`horizon_label` legacy_5d_d4); every summary shows the two bases apart, never pooled. An open-to-close
   call whose window has a session without a bar stays open (`session_gap_open`), never shifted.
   `validate` is the daily run's deterministic gate (`--stage collect|news_collect|news|features|context|forecast|report|all`,
-  settings in `config/validate.yaml`; prediction rules shared with `ai_replay` in `marketbrief/analytics/prediction_rules.py`);
+  settings in `config/validate.yaml`; `--stage report` also blocks a news status word that is not the cited id's
+  stored status or its event's, `REPORT_STATUS`, issue #460, `pipeline/validate/report_status.py`; prediction rules shared with `ai_replay` in `marketbrief/analytics/prediction_rules.py`);
   `spotcheck` picks the weekly judge sample.
   Schemas live in `scripts/marketbrief/core/schemas.py` (`scripts/common.py` is only the `ROOT`/`CONFIG` patch point).
   Where the code of the daily steps lives (each `scripts/<name>.py` is a thin entry point with the same flags): `marketbrief/pipeline/` (validate, review and lessons as packages, `context`, `score_predictions`, `spotcheck`, `market_status`), `marketbrief/replay/` (`backtest/`, `rule_replay/`, `ai_replay/`), `marketbrief/graph/` (`connection_map`, `news_hits`, `neo4j/`) `marketbrief/presentation/report/` (the report skeleton and Slack draft) and `marketbrief/presentation/dashboard/` (the dashboard: read helpers, data assembly, page build; `assets/` and `vendor/` hold its JS, CSS and the charting library). Messages and constants of each live in `marketbrief/constants/`.
@@ -472,9 +473,13 @@ root as `MB_NOW=2026-10-09T23:59:00Z PYTHONPATH=scripts python docs/plan_volatil
   11:27, 14:27 and 17:27 New York time, weekends 10:45 IST, 11:27 and 17:27 New York time, holidays included;
   owner decision 2026-10-12): `collect_news_only.py` runs `collect_news`,
   India's NSE announcements, `collect_articles`, `news_clusters` and `validate --stage news_collect`, then the
-  session commits and pushes the news data folders only; no agents, no Slack. The pre-open run's news analyst
+  session commits and pushes the news data folders only; no agents on weekdays, no Slack. Weekend sessions (a
+  Saturday or Sunday UTC start; owner decision 2026-10-12) then also run the news analyst on `news_pending.py`'s
+  input with the same `--stage news` gate (one retry) and append to `news_enriched` (NEWS_PROMPT.md step 3a), so
+  Monday's pre-open run finds only the items since. The pre-open run's news analyst
   scores `news_pending.py`'s output: every news/announcement id first seen since the last enrichment
-  (`marketbrief/pipeline/news_pending.py`; the news gate and `claims.py` use the same window; each line has a
+  (`marketbrief/pipeline/news_pending.py`; the news gate and `claims.py` use the same window, `claims.py` reaching
+  back also to the last pre-open `ranges` row; each line has a
   `priority`, watchlist lines first; the news gate warns `ENRICH_TEMPLATED` on templated watchlist summaries)
 - Intraday checks (WS5; `scripts/intraday_check.py`, code `marketbrief/intraday/`, settings `config/intraday.yaml`,
   `routine/INTRADAY_PROMPT.md`; schedules in DESIGN.md section 2): a few times per session, Yahoo 5-minute bars of
@@ -583,9 +588,24 @@ orchestrating session itself (its own edits and merge-conflict resolutions inclu
   - This supersedes, for all work from 2026-10-12, docs/SPEC.md section 10's session workflow where it
     differs: file ownership by session (the intro and step 5's shared-doc proposals), the full-suite runs
     of step 1 (for small changes), step 3 and the "Rule change" paragraph, and step 3's exemption of
-    `judgments/log.jsonl` conflicts from judging. Step 3's log-merge rule (main's lines kept as they are,
-    the branch's appended after them) still holds; every merge-conflict resolution, including one in
-    `judgments/log.jsonl`, is judged.
+    `judgments/log.jsonl` conflicts from judging. Every merge-conflict resolution is judged; the log's
+    merges follow the union rule below.
+- Delivery strategy (owner decision 2026-10-12, to avoid stale branches and repeated reviews):
+  - One build lane per area: the web app and its read models (`web/`, `api/`, `scripts/marketbrief/warehouse/`)
+    are one area, with at most one batch in flight there. Work in other areas runs in parallel only when
+    its files do not overlap; the orchestrator checks this before starting a session.
+  - One batch = one approved design or fix, built end to end (data, API, page, tests) by one builder,
+    with one judge review; a re-check covers only the blockers.
+  - Just before the judge review, the builder merges the latest main into the branch; the orchestrator
+    holds other merges into that area until the batch is merged, so what was judged is what lands.
+  - `judgments/log.jsonl` merges with git's union driver (`.gitattributes`): both sides' lines are kept
+    unchanged, so a log-only merge never conflicts and needs no judging; lines from the two sides may
+    interleave by side (no line is lost, edited or duplicated), and `tests/test_judgments.py` still checks
+    every line. Where GitHub's merge button reports a conflict anyway, merge locally with git.
+  - Merging main into a branch is not judged again when it has no conflict (for example only daily-run
+    `data/` commits came in); the green CI run on the merged commit is the evidence. A conflict in code
+    is judged.
+  - Owner-requested trivial changes (an icon, a wording fix) may skip the judge when the owner says so.
 - Daily runs are gated by `scripts/validate.py` (deterministic checks after each stage, settings
   in `config/validate.yaml`) and, for the reflector's lessons, by `scripts/lessons.py validate`, for the results-analyst's bullets by `scripts/results_digest.py validate`,
   for the deviation-explainer's notes by `scripts/intraday_check.py validate`, for the AI traders by

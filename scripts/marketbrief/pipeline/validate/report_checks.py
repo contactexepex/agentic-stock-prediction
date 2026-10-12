@@ -13,6 +13,9 @@ from marketbrief.constants.validation import (
     MSG_LOST_ITS_REPORT_DATA_LINE,
     MSG_NEWS_FEED_COUNT_UNAVAILABLE,
     MSG_NO_RANGE_AND_NO_SKIP_REASON,
+    MSG_REPORT_STATUS_EXAMPLE,
+    MSG_REPORT_STATUS_UNCITED,
+    MSG_REPORT_STATUS_WRONG,
     MSG_RANGE_SKIPPED_LATE_RUN,
     MSG_RANGE_SKIPPED_MID_SESSION,
     MSG_RANGE_SKIPPED_NO_FEATURES,
@@ -31,6 +34,7 @@ from marketbrief.core import calendar, database, market_config, paths
 from marketbrief.core.settings import load_settings
 from marketbrief.pipeline.validate.collect_checks import check_files
 from marketbrief.pipeline.validate.gate_result import Result, work_dir
+from marketbrief.pipeline.validate.report_status import wrong_statuses
 
 
 def records(con, sql: str, params=(), notes: list | None = None) -> list[dict]:
@@ -232,6 +236,26 @@ def check_signs(res, validate_config: dict, path: Path, lines: list[str], pool) 
         res.warn("NARRATIVE_SIGN", MSG_SIGN_ALARMS.format(name=path.name, count=len(alarms), examples=examples))
 
 
+def check_statuses(res, con, now, path: Path, lines: list[str], uncited_warning: bool) -> None:
+    """REPORT_STATUS (blocks): a news status word that is not the cited id's stored status as of now (issue #460);
+    REPORT_STATUS_UNCITED (warning, the report only): a status word with no news id after it in its sentence."""
+    wrong, uncited = wrong_statuses(con, lines, now)
+    if wrong:
+        examples = "; ".join(
+            MSG_REPORT_STATUS_EXAMPLE.format(
+                id=item["id"], word=item["word"], stored="/".join(item["stored"]), sentence=item["sentence"][:90]
+            )
+            for item in wrong[:6]
+        )
+        res.block("REPORT_STATUS", MSG_REPORT_STATUS_WRONG.format(name=path.name, count=len(wrong), examples=examples))
+    if uncited and uncited_warning:
+        examples = "; ".join(f"{item['word']!r} in \"{item['sentence'][:90]}\"" for item in uncited[:6])
+        res.warn(
+            "REPORT_STATUS_UNCITED",
+            MSG_REPORT_STATUS_UNCITED.format(name=path.name, count=len(uncited), examples=examples),
+        )
+
+
 def stage_report(  # noqa: PLR0913 (uniform stage signature)
     res, cfg, con, status, now, today, validate_config, report_path: Path | None = None, slack_path: Path | None = None
 ):
@@ -287,6 +311,7 @@ def stage_report(  # noqa: PLR0913 (uniform stage signature)
     checked = {}
     for path, lines in targets:
         check_signs(res, validate_config, path, lines, pool)
+        check_statuses(res, con, now, path, lines, path == report_path)
         bad = narrative_numbers.unmatched(lines, pool, small)
         checked[path.relative_to(paths.ROOT).as_posix() if path.is_relative_to(paths.ROOT) else str(path)] = {
             "agent_lines": len(lines),

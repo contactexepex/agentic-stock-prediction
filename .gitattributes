@@ -1,3 +1,6 @@
 # Issue #47: stored CSVs keep the CRLF line endings csv.writer writes. -text: git never converts them (a
 # checkout with core.autocrlf=input or a different eol would turn them into LF files that DuckDB's glob read drops).
 data/**/*.csv -text
+# judgments/log.jsonl is append-only: merge with git's union driver so both sides' lines are kept and a
+# log-only merge never conflicts (CLAUDE.md, "Delivery strategy").
+judgments/log.jsonl merge=union
