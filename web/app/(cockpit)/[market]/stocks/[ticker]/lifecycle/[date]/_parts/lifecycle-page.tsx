@@ -9,11 +9,12 @@ import { CostLabels } from "../../../../../../../../components/blocks/costs.tsx"
 import { PageFooter, PageHead, SignalsBand } from "../../../../../../../../components/blocks/page-head.tsx";
 import { RangeBar } from "../../../../../../../../components/charts/small.tsx";
 import { Icon } from "../../../../../../../../components/ui/icon.tsx";
-import { Card, CardHead, FamilyLabel, Label, MoneyDelta, Odds, PaperTag, Quiet } from "../../../../../../../../components/ui/primitives.tsx";
+import { Card, CardHead, ExpectedMoney, FamilyLabel, Label, MoneyDelta, Odds, PaperTag, Quiet } from "../../../../../../../../components/ui/primitives.tsx";
 import { ErrorState, LoadingState, PageState } from "../../../../../../../../components/ui/states.tsx";
 import { DataTable, type Column } from "../../../../../../../../components/ui/table.tsx";
 import { FAMILY_SHORT, MARKET_LABEL, PICK_RULE } from "../../../../../../../../lib/ui/constants.ts";
-import { fmtDate, fmtDateYear, price, signed } from "../../../../../../../../lib/ui/format.ts";
+import { finishesOn } from "../../../../../../../../lib/ui/empty.ts";
+import { fmtDate, fmtDateYear, holdLabel, price, signed } from "../../../../../../../../lib/ui/format.ts";
 import { companyPath, lifecyclePath } from "../../../../../../../../lib/ui/routes.ts";
 import { usePage } from "../../../../../../../../lib/ui/use-api.ts";
 import type { Market } from "../../../../../../../../lib/data/constants.ts";
@@ -41,7 +42,7 @@ function PathCell({ path, ctx }: { path: PredictionPath; ctx: PageCtx }) {
             {path.checks.length ? <>{path.checks.length} {plural(path.checks.length, "check")}{last.flagged ? <Icon name="warning" /> : null}</> : "no check yet"}
           </span>
           <span className={"step" + (done.length ? " on" : "")}>
-            {done.length ? <span tabIndex={0} data-tip={done.length > 1 ? `Net after costs of its ${done.length} settled trades together (${done.map((t) => t.view === "head_to_head" ? "head-to-head" : "accuracy view").join(" and ")}).` : `Net after costs of its ${done[0].view === "head_to_head" ? "head-to-head" : "accuracy-view"} trade.`}>settled <MoneyDelta currency={ctx.currency} value={net} decimals={ctx.decimals} /></span> : path.settled.length ? path.settled.map((t) => t.status.replace(/_/g, " ")).join(", ") : "not settled yet"}
+            {done.length ? <span tabIndex={0} data-tip={done.length > 1 ? `Net after fees of its ${done.length} finished trades together (${done.map((t) => t.view === "head_to_head" ? "rule vs AI" : "all trades").join(" and ")}).` : `Net after fees of its ${done[0].view === "head_to_head" ? "rule-vs-AI" : "all-trades"} trade.`}>finished <MoneyDelta currency={ctx.currency} value={net} decimals={ctx.decimals} /></span> : path.settled.length ? path.settled.map((t) => t.status.replace(/_/g, " ")).join(", ") : finishesOn(path.prediction.exit_date)}
           </span>
           <span className={"step" + (path.reasons.length ? " on" : "")}>{path.reasons.length ? `${path.reasons.length} ${plural(path.reasons.length, "note")}` : "no note"}</span>
         </>
@@ -56,7 +57,7 @@ function CallsCard({ day, ctx, paperLabel }: { day: LifecyclePayload; ctx: PageC
     { key: "strategy", header: "Strategy", render: (r) => <StrategyCell id={r.prediction.strategy_id} ctx={ctx} sub={`exit ${fmtDate(r.prediction.exit_date, false)}`} /> },
     { key: "call", header: "Call", render: (r) => (
       <span className="call">
-        <span className="h-lab">N+{r.prediction.horizon_days}</span>
+        <span className="h-lab" data-tip={`N+${r.prediction.horizon_days}`}>{holdLabel(r.prediction.horizon_days)}</span>
         {r.prediction.prob_up != null ? <Odds p={r.prediction.prob_up} /> : <span className="muted">{r.prediction.direction}</span>}
         {r.prediction.qualifies ? <Label tone="success" icon="check">would buy</Label> : <Label tone="neutral">{r.prediction.direction === "down" ? "down, no trade" : "no trade"}</Label>}
       </span>) },
@@ -83,16 +84,16 @@ function PicksCard({ picks, ctx }: { picks: HeadToHeadPick[]; ctx: PageCtx }) {
     { key: "strategy", header: "Strategy", render: (k) => (k.status === "picked" ? <StrategyCell id={k.strategy_id} ctx={ctx} /> : <span className="muted">no candidate</span>) },
     { key: "pick", header: "Pick", render: (k) => k.status !== "picked" ? <span className="muted">—</span> : (
       <span className="call">
-        <span className="h-lab">N+{k.horizon_days}</span>
+        <span className="h-lab" data-tip={`N+${k.horizon_days}`}>{holdLabel(k.horizon_days)}</span>
         <Odds p={k.prob_up} />
-        <MoneyDelta currency={ctx.currency} value={expectedGainMoney(k.expected_gain_pct, k.amount)} decimals={ctx.decimals} />
+        <ExpectedMoney currency={ctx.currency} value={expectedGainMoney(k.expected_gain_pct, k.amount)} decimals={ctx.decimals} />
         <CostLabels currency={ctx.currency} pick={k} />
       </span>) },
   ];
   return (
     <Card label="Head-to-head picks">
       <CardHead title="Head-to-head picks of the session"
-        help="The strongest rule strategy and the strongest AI trader each picked one horizon under two pick rules (decisions 41-42). Expected gain in money of the trade amount, after market costs; “viable at your cost” adds your own broker’s charges (decision 51)." />
+        help="The best rule strategy and the best AI trader each picked one holding period, in two ways (biggest expected gain, highest chance). Expected gain in money of the trade amount, after market fees: an average if the odds hold, not a result; “worth it after your fees” also counts your own broker’s extra charges." />
       {picks.length ? <DataTable columns={columns} rows={picks} rowKey={(k) => k.id} label="Head-to-head picks" className="lcy" /> : <Quiet>No head-to-head pick stored for this session.</Quiet>}
     </Card>
   );
@@ -102,7 +103,7 @@ function ChecksCard({ checks, ctx }: { checks: TradeCheck[]; ctx: PageCtx }) {
   const rows = [...checks].sort((a, b) => b.check_at.localeCompare(a.check_at) || a.trade_id.localeCompare(b.trade_id));
   const columns: Column<TradeCheck>[] = [
     { key: "at", header: "Checked", render: (c) => ctx.at(c.check_at, true) },
-    { key: "strategy", header: "Trade", render: (c) => <StrategyCell id={c.strategy_id ?? null} ctx={ctx} sub={`${c.view === "head_to_head" ? "head-to-head" : "accuracy view"}${c.horizon_days ? ` · N+${c.horizon_days}` : ""}${c.session_number != null ? ` · session ${c.session_number}` : ""}`} /> },
+    { key: "strategy", header: "Trade", render: (c) => <StrategyCell id={c.strategy_id ?? null} ctx={ctx} sub={`${c.view === "head_to_head" ? "rule vs AI" : "all trades"}${c.horizon_days ? ` · ${holdLabel(c.horizon_days)}` : ""}${c.session_number != null ? ` · day ${c.session_number}` : ""}`} /> },
     { key: "price", header: "Price", numeric: true, className: "cm", render: (c) => price(ctx.currency, c.last_price) },
     { key: "since", header: "Since entry", numeric: true, render: (c) => signed(c.ret_since_entry_pct) },
     { key: "state", header: "Check", render: (c) => <CheckState check={c} ctx={ctx} withDate /> },

@@ -5,8 +5,9 @@ Payload: the page shell; B4's Company records, Agreement (top 5 active companies
 settled trades; B12's latest trade checks by the cut-off; the head-to-head picks of the session being predicted
 (B2's stored picks); B13's newest end-of-day analysis and the head-to-head scoreboard rows per family and pick rule
 (all horizons: "to date"); the strategies; and the News window (the same items as the News page). Every signal
-stays Paper: the shell's `status.paper_label` and `go_live` say whether anything is proven. Everything is as of the
-cut-off; no build time is in the payload."""
+stays Paper: the shell's `status.paper_label` and `go_live` say whether anything is proven; `go_live_checks`,
+`go_live_nearest`, `skill` and `intraday_next_at` feed the "Can I rely on this yet?" block and the empty states
+(docs/ux/plain_language_review.md D1-D4). Everything is as of the cut-off; no build time is in the payload."""
 
 from __future__ import annotations
 
@@ -47,6 +48,8 @@ CHECK_FIELDS = WATCHLIST_CHECK_FIELDS + (
     "family", "pick_rule", "quality", "entry_source", "basis_factor", "entry_adj", "target_adj", "lo80_adj",
     "lo50_adj", "hi50_adj", "hi80_adj", "last_time", "sigma_1d", "elapsed_fraction", "sessions_held", "sessions_left",
     "z_since_entry", "target_reached", "target_reached_session", "high_since_entry_pct", "low_since_entry_pct", "notes")
+# Home's keys beyond its mockup (docs/ux/plain_language_review.md D1-D4)
+HOME_EXTRA_KEYS = ("go_live_checks", "go_live_nearest", "skill", "intraday_next_at")
 SCOPE_PICK_RULE = "pick_rule"
 VIEW_HEAD_TO_HEAD = "head_to_head"
 ALL_HORIZONS = "all"
@@ -109,8 +112,20 @@ def home_pages(ctx: BuildContext) -> dict[str, dict]:
         "strategies": rm_common.strategies(ctx, STRATEGY_FIELDS),
         "news": items,
         "settled_trades": [pick(row, SETTLED_FIELDS) for row in rm_common.settled_trades(ctx)],
+        # the "Can I rely on this yet?" block (docs/ux/plain_language_review.md section 3, D1-D4)
+        "go_live_checks": rm_common.go_live_checks(ctx),
+        "go_live_nearest": rm_common.go_live_nearest(ctx),
+        "skill": skill(ctx),
+        "intraday_next_at": rm_common.next_intraday(ctx.cfg, ctx.cutoff_time),
     }
     return {MARKET_PAGE_KEY: payload}
+
+
+def skill(ctx: BuildContext) -> dict:
+    """The weekly review's model_skill verdict: `state` (paper or shown) and `why`, its reason sentence (the
+    Track record page's `track.skill`, D3)."""
+    found = ctx.dashboard["skill"]
+    return {"state": found["state"], "why": found["why"]}
 
 
 BUILDERS = (PageBuilder(RM_HOME, "HomePayload", home_pages, owner="B11"),)
@@ -121,5 +136,6 @@ CONTRACT_CASES = (
         mockup="design/mockups/01-home/data.json",
         mockup_payload=market_mockup,
         map_paths=("$.strategies", "$.agreement"),
+        extra_keys=HOME_EXTRA_KEYS,
     ),
 )

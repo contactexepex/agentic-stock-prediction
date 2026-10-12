@@ -88,3 +88,5 @@
   .p-compare .vs .st{grid-template-columns:repeat(3,minmax(0,1fr))}
   .p-compare .mt .res small{white-space:normal}
 }
+/* the waiting verdict ("Too early to call: …", review section 4) wraps inside the middle column */
+.p-compare .vs .mid .who{max-width:24ch;white-space:normal}

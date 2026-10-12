@@ -3,7 +3,7 @@
 // an arrow and every status its word; every signal carries the Paper tag.
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { FAMILY, FAMILY_TONE, NEWS_STATUS, SENTIMENT_FLAT_BAND, type Family } from "../../lib/ui/constants.ts";
+import { EXPECTED_MEANS, FAMILY, FAMILY_TONE, NEWS_STATUS, PAPER_MEANS, SENTIMENT_FLAT_BAND, type Family } from "../../lib/ui/constants.ts";
 import { DASH, direction, money, oddsPosition, pct, sentimentClass, signed } from "../../lib/ui/format.ts";
 import { Icon } from "./icon.tsx";
 
@@ -17,6 +17,15 @@ export function Delta({ value, decimals = 2, unit = "%" }: { value: number | nul
 export function MoneyDelta({ currency, value, decimals = 0 }: { currency: string; value: number | null | undefined; decimals?: number }) {
   if (value === null || value === undefined) return <span className="muted">{DASH}</span>;
   return <span className={`mb-delta ${direction(value)}`}>{money(currency, value, decimals, true)}</span>;
+}
+
+/** An expected money amount: "Expected −₹1,160", in plain ink (never styled like a realised gain or loss; W2). */
+export function ExpectedMoney({ currency, value, decimals = 0 }: { currency: string; value: number | null | undefined; decimals?: number }) {
+  return (
+    <span className="mb-expected" data-tip={EXPECTED_MEANS}>
+      Expected <b>{value === null || value === undefined ? DASH : money(currency, value, decimals, true)}</b>
+    </span>
+  );
 }
 
 /** The odds meter: a probability of a rise on a 30%..70% track with the coin-flip mark in the middle. */
@@ -37,7 +46,7 @@ export function Odds({ p, tip }: { p: number | null | undefined; tip?: string })
 /** The Paper tag every signal carries; its tooltip is the payload's paper label. */
 export function PaperTag({ label }: { label: string }) {
   return (
-    <span className="mb-tag paper" data-tip={label}>
+    <span className="mb-tag paper" data-tip={`${label}. ${PAPER_MEANS}`} tabIndex={0}>
       paper
     </span>
   );

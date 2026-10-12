@@ -24,7 +24,10 @@ import {
   MARKET_LABEL,
   MIN_TRADES_TO_RANK,
   NEWS_STATUS,
+  NO_PROVEN_SIGNALS,
   REASON_MAX_WORDS,
+  WHY_NO_BUY_SELL,
+  WHY_NO_BUY_SELL_ANCHOR,
   type Family,
 } from "../../../../../lib/ui/constants.ts";
 import { horizonWords, money, moneyDecimals, pct } from "../../../../../lib/ui/format.ts";
@@ -34,7 +37,7 @@ import { usePage } from "../../../../../lib/ui/use-api.ts";
 import "./help.css";
 
 const SECTIONS: [string, string][] = [
-  ["paper", "Paper and the go-live bar"], ["horizons", "Horizons, chances and ranges"], ["strategies", "The strategies"],
+  [WHY_NO_BUY_SELL_ANCHOR, "Why no buy or sell"], ["when", "When will each page fill?"], ["paper", "Paper and the go-live bar"], ["horizons", "Horizons, chances and ranges"], ["strategies", "The strategies"],
   ["scores", "Scores and the luck test"], ["h2h", "Head-to-head and costs"], ["news", "News and its status"],
   ["intraday", "Intraday checks"], ["pages", "The pages"], ["numbers", "Where the numbers come from"], ["glossary", "Glossary"],
 ];
@@ -87,14 +90,14 @@ function Paper({ market, lab }: { market: Market; lab: LabForHelp | null }) {
         Everything in this cockpit is a <b>paper trade</b>: a record of what a strategy would have done, settled against the stored prices. Nothing is bought or sold, no broker is connected, and no page ever tells you to buy or sell. The <span className="mb-tag paper">paper</span> tag on a figure means &quot;measured, not acted on&quot;.
       </p>
       <p>
-        A strategy stays Paper until it meets the <b>go-live bar</b> (measured on your own costs, decision 50). Until one does, the pages that rank signals (
+        A strategy stays Paper until it meets the <b>go-live bar</b> (measured after your own fees). Until one does, the pages that rank signals (
         {signalPages.map(([t, key], i) => (
           <span key={t}>
             {i ? (i === signalPages.length - 1 ? " and " : ", ") : ""}
             {key ? <Link href={pagePath(market, key)}>{t}</Link> : <span data-tip="Opens from a company on the watchlist.">{t}</span>}
           </span>
         ))}
-        ) say &quot;No proven strong signals today&quot;. The bar has {checks.length} checks; here is where the reference strategy stands in {lab?.name ?? MARKET_LABEL[market]}:
+        ) say &quot;{NO_PROVEN_SIGNALS}&quot;. The bar has {checks.length} checks; here is where the reference strategy stands in {lab?.name ?? MARKET_LABEL[market]}:
       </p>
       <ul className="chk">
         {checks.map(({ key, passed }) => (
@@ -125,7 +128,7 @@ function Horizons({ lab, companies }: { lab: LabForHelp | null; companies: Compa
   return (
     <HelpCard id="horizons" title="Horizons, chances, targets and ranges">
       <p>
-        Every prediction names a <b>horizon</b>: buy at the open of the first market session after the prediction (called D, the entry session), sell at the close of the k-th market session after D. The pages write it N+k, for example <span className="h-lab">N+{horizons[2] ?? 3}</span>. Weekends and holidays are skipped. N+{first} is {horizonWords(first)}, N+{last} is {horizonWords(last)}. Every page with a horizon selector opens on N+{lab?.default_horizon ?? 1}.
+        Every prediction names a <b>horizon</b>: buy at the open of the first market session after the prediction (called D, the entry session), sell at the close of the k-th market session after D. The pages write it as a <b>k-day hold</b>, for example <span className="h-lab">{horizons[2] ?? 3}-day hold</span> (N+{horizons[2] ?? 3} in the tooltips). Weekends and holidays are skipped. N+{first} is {horizonWords(first)}, N+{last} is {horizonWords(last)}. Every page with a holding-period selector opens on the {lab?.default_horizon ?? 1}-day hold.
       </p>
       <p>
         The <b>chance of a rise</b> is the strategy’s probability that the close at the horizon is above the entry. The odds meter shows it against the 50% coin-flip mark:{" "}
@@ -242,16 +245,16 @@ function HeadToHead({ horizon }: { horizon: number }) {
         Besides the <b>accuracy view</b> (every qualifying prediction is its own paper trade), there is a <b>head-to-head view</b>: every session, for each company, the strongest rule strategy and the strongest AI trader each pick one horizon under two pick rules, <b>best expected gain</b> (chance × move up − (1 − chance) × move down − costs, per session held) and <b>highest probability</b>. Up to four paper trades a day per company, on identical company-days, so rule and AI compare fairly.
       </p>
       <p>
-        Each pick shows two cost labels: <span className="mb-label success">clears market costs</span> or <span className="mb-label neutral">below market costs</span> (the expected gain after the market charges, the ranking view), and <span className="mb-label success">viable at your cost</span> or <span className="mb-label warn">not viable at your cost</span> (after the charges only you pay too, decision 51). The flag never blocks a paper trade; it tells you whether the same trade would be worth it for you.
+        Each pick shows two cost labels: <span className="mb-label neutral">Expected +0.40% · likely gain beats the fees</span> or <span className="mb-label neutral">Expected −1.16% · costs are bigger than the likely gain</span> (the expected gain after the market fees, the ranking view), and <span className="mb-label success">Worth it after your broker’s fees</span> or <span className="mb-label warn">Not worth it after your broker’s fees</span> (after the charges only you pay too). <b>Expected is not a result</b>: nothing has happened yet; it is the average result if the stated chances hold. The flag never blocks a paper trade; it tells you whether the same trade would be worth it for you.
       </p>
       <div className="ex">
         <span className="l">Labels on a trade:</span>
-        <span className="h-lab">N+{horizon}</span>
-        the horizon
+        <span className="h-lab">{horizon}-day hold</span>
+        the holding period
         <span className="mb-label neutral mb-h2h" style={{ marginLeft: 0 }}>
-          H2H
+          Rule vs AI
         </span>
-        a head-to-head trade in a list of open trades
+        a rule-vs-AI pick in a list of open trades
       </div>
     </HelpCard>
   );
@@ -331,6 +334,35 @@ function Pages({ market }: { market: Market }) {
   );
 }
 
+function WhyNoBuySell() {
+  return (
+    <HelpCard id={WHY_NO_BUY_SELL_ANCHOR} title="Why the app does not tell you when to buy or sell">
+      {WHY_NO_BUY_SELL.map((line) => <p key={line}>{line}</p>)}
+    </HelpCard>
+  );
+}
+
+/** What fills each page and when (review section 4 as a table), with the routines' schedule. */
+function WhenFill() {
+  const rows: [string, string][] = [
+    ["Home: today’s picks and the agreement", "The morning run, before each session’s open."],
+    ["Alerts and intraday checks", `During the session, ${INTRADAY_CHECKS_PER_SESSION} checks (India 11:13 and 14:13 IST; US 12:27 and 14:57 New York time).`],
+    ["Finished paper trades, wins and losses", "After the close of a trade’s last day, at the after-close run (India 17:45 IST; US 18:15 New York time). A 1-day hold bought on a Monday finishes at Tuesday’s close."],
+    ["The after-close write-up (end-of-day analysis)", "At the after-close run, once the first trades have finished."],
+    ["Rule vs AI rankings", `After ${MIN_TRADES_TO_RANK} finished trades per side; before that each figure says “too early to tell”.`],
+    ["A strategy proven (the go-live bar)", `At the earliest ${GO_LIVE_MONTHS} months after paper testing starts, with about ${GO_LIVE_TRADES_ABOUT} finished trades and all the other checks passed.`],
+    ["The weekly research review and the replay on past years", "Every Friday evening, New York time."],
+    ["The daily forecast’s track record", "A 1-day forecast is checked after the next trading day’s close."],
+    ["News", "Several times a day, 31 runs a week for both markets, weekends and holidays included: daily at 10:45 IST and 11:27 and 17:27 New York time, weekdays also at 13:45 IST and 14:27 New York time."],
+  ];
+  return (
+    <HelpCard id="when" title="When will each page fill?">
+      <p>On the first days of paper testing many cards are empty. Each empty card says what fills it; this is the whole list.</p>
+      <Terms rows={rows} />
+    </HelpCard>
+  );
+}
+
 function Numbers() {
   return (
     <HelpCard id="numbers" title="Where the numbers come from">
@@ -355,16 +387,30 @@ function Glossary() {
             ["As of", "The newest trading date with stored indicators; every number on a page is computed to it."],
             ["Cut-off", "The time after which nothing is read for a page; stops look-ahead."],
             ["D", "The entry session: the first market session after the prediction is made; a trade enters at its open and N+k sells at the close of the k-th session after D."],
-            ["Regime", "The market mood label stored by the daily run: CALM, TRENDING, EVENT_HEAVY or UNSTABLE. Rule strategies either skip the last two or not; AI traders lower their probability in them."],
+            ["AUC", "Whether the model ranks risers above fallers better than chance (0.5 = no better). The pages say it as “yes”, “slightly” or “no”."],
+            ["Back-test / walk-forward (replay on past years)", "A replay on past years, trained only on earlier data each time. It says what would have happened, not what did."],
+            ["Brier score (honesty of the stated chances)", "How honest the stated chances were: 0 = perfect, 0.25 = a coin flip."],
+            ["Calibration", "When it says 70%, is it right about 70% of the time?"],
+            ["Drawdown", "The biggest fall from a high point."],
+            ["Expected gain", "The average result if the stated chances are right: chance × gain − (1 − chance) × loss − fees. Not a result: nothing has happened yet."],
+            ["Forward (real time)", "Paper trading in real time, since paper testing started; never mixed with a replay."],
+            ["Importance (materiality)", "How important a news story is: high, medium or low."],
+            ["k-day hold (N+k)", "Buy at the open of the trading day being predicted, sell at the close k trading days later."],
+            ["Luck test (edge / luck? / loss)", "Could this result be chance? “edge” = probably not luck, “luck?” = could be, “loss” = loses after fees, and that’s not luck."],
+            ["Market mood (regime)", "How the whole market has behaved lately: calm, trending, busy with events (EVENT_HEAVY) or jumpy (UNSTABLE). Rule strategies either sit out the last two or not; AI traders lower their chances in them."],
+            ["Paper long", "A pretend purchase, held for the stated days."],
+            ["Too early to tell", `Under ${MIN_TRADES_TO_RANK} finished trades: the numbers are mostly luck.`],
+            ["Wilson 95% interval", "The range the true hit rate is very likely in; it is wide when there are few calls."],
+            ["Win rate", "The share of finished trades that made money after fees."],
             ["Signal model", "The explainable up/down probability built from the stored indicators and verified news, refitted monthly; the reference rule strategy trades it as is."],
-            ["Baseline", "A yardstick strategy: always buy, follow yesterday, or the signal model without news."],
+            ["Baseline (simple benchmark)", "A deliberately simple strategy a clever one must beat after fees: always buy, follow yesterday, or the signal model without news. These are standard yardsticks in research, not inventions."],
             ["Pick rule", "How a family chooses one horizon for its head-to-head trade: best expected gain or highest probability."],
             ["Cost view", "Market cost (the ranking view) or your cost (market cost plus the charges only you pay)."],
-            ["Settled", "A paper trade whose exit close is stored; its profit after costs is final unless a later split correction re-settles it as a new record."],
+            ["Settled (finished)", "A paper trade whose exit close is stored; its profit after costs is final unless a later split correction re-settles it as a new record."],
             ["Unrealised", "The profit of an open paper trade at the latest stored close, before costs."],
             ["Reason split", "A settled trade’s move split into what the market explains, the sector, verified news, and the company itself."],
             ["EOD analyst", `The Claude agent that writes a reason of at most ${REASON_MAX_WORDS} words per head-to-head trade and the day’s biggest wins and misses, after the close.`],
-            ["Research director", "The Claude agent that writes the weekly research review (apart from the weekly review of the ranges) and proposes changes as config diffs; it changes nothing itself."],
+            ["Research director", "The Claude agent that writes the weekly research review (apart from the weekly review of the ranges) and proposes changes; nothing changes until the owner approves."],
             ["Inactive company", "Still collected, never predicted or traded; its open paper trades still settle."],
           ]}
         />
@@ -402,6 +448,8 @@ export function HelpPage({ market }: { market: Market }) {
           </a>
         ))}
       </nav>
+      <WhyNoBuySell />
+      <WhenFill />
       <Paper market={market} lab={lab} />
       <Horizons lab={lab} companies={companies} />
       <Strategies market={market} lab={lab} problem={problem} />

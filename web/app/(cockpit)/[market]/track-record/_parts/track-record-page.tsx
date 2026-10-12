@@ -2,6 +2,7 @@
 // Page 08, Track record (B16; design/mockups/08-track-record): the forecaster's calls scored per basis (never pooled),
 // calibration, ranges held, accuracy over time (the weekly series per basis), the signal model's back-test and the
 // historical replay, read from GET /api/v1/markets/{market}/track-record (B13's rm.track_record). Paper records only.
+import Link from "next/link";
 import { useState } from "react";
 import { PageFooter, PageHead } from "../../../../../components/blocks/page-head.tsx";
 import { Segmented } from "../../../../../components/ui/controls.tsx";
@@ -11,10 +12,11 @@ import { PageState } from "../../../../../components/ui/states.tsx";
 import type { Market } from "../../../../../lib/data/constants.ts";
 import { PAPER_LABEL } from "../../../../../lib/ui/constants.ts";
 import { DASH, fmtDate, fmtDateYear, fmtLocal, pct, signed } from "../../../../../lib/ui/format.ts";
+import { pagePath } from "../../../../../lib/ui/routes.ts";
 import type { PageBase } from "../../../../../lib/ui/types.ts";
 import { usePage } from "../../../../../lib/ui/use-api.ts";
 import {
-  BASELINE, BASIS_WORDS, calibrationLayout, groupByKey, horizonRows, intervalClass, keyWords, selectedBasis,
+  aucWords, BASELINE, BASELINES_ARE_STANDARD, BASIS_WORDS, brierWords, calibrationLayout, groupByKey, horizonRows, intervalClass, keyWords, selectedBasis,
   symmetricSpan, tooFew, verdictKind, weeklyOf,
 } from "../../../../../lib/strategy-pages/track-record.ts";
 import type { BacktestScore, CallBasisBlock, ReliabilityBand, TrackRecordPayload } from "../../../../../lib/strategy-pages/track-record-types.ts";
@@ -48,7 +50,11 @@ function TrackRecord({ p }: { p: Payload }) {
   const basis = selectedBasis(t.calls, basisKey);
   return (
     <>
-      <PageHead page={p} title="Track record" subtitle={`${p.name} · the forecaster’s calls scored per basis, never pooled · as of ${fmtDate(t.as_of, false)} · research only`} />
+      <PageHead page={p} title="Track record" subtitle={`${p.name} · how often the daily forecast was right · data up to ${fmtDate(t.as_of, false)} · research only`} />
+      <p className="tr-intro">
+        This page checks two things: (1) how often the daily AI forecast was right, and (2) whether the statistical model had any real skill when replayed on past years. The paper trades’ results are on{" "}
+        <Link href={pagePath(p.market, "strategies")}>Strategy lab</Link> and <Link href={pagePath(p.market, "compare")}>Rule vs AI</Link>.
+      </p>
       <SkillBand p={p} />
       <Kpis p={p} />
       <BasisCard p={p} basis={basis} onBasis={setBasisKey} />
@@ -63,10 +69,10 @@ function TrackRecord({ p }: { p: Payload }) {
       <ReplayCard p={p} />
       <div className="legend2" aria-label="Legend">
         <span><PaperTag label={p.status.paper_label || PAPER_LABEL} /> every call and range is a paper record</span>
-        <span><b>Wilson 95% interval</b> where the true hit rate most likely lies given this few calls</span>
-        <span><b>Brier</b> 0 perfect, 0.25 coin flip, lower is better</span>
+        <span><b>The thick line on a hit rate</b> the range the true hit rate is very likely in; it is wide when there are few calls</span>
+        <span><b>Honesty of the stated chances (Brier)</b> 0 perfect, 0.25 coin flip, lower is better</span>
         <span><b>not enough history yet</b> fewer than {t.min_sample} calls</span>
-        <span><b>legacy</b> an old scoring window, never pooled with N+k</span>
+        <span><b>legacy</b> an old scoring window, never mixed with the k-day holds</span>
       </div>
       <PageFooter page={p} endpoint="track-record" />
     </>
@@ -96,19 +102,19 @@ function Kpis({ p }: { p: Payload }) {
   const t = p.track, c = t.calls[0] ?? null, a = c ? c.all : null, min = t.min_sample, shown = t.skill.state === "shown";
   return (
     <KpiRow>
-      <Kpi icon="verified_user" tone={shown ? "success" : "paper"} label="Signal model" value={shown ? "Skill shown" : "No proven skill"} tip={t.skill.rule}
-        sub={<span className="labs"><PaperTag label={p.status.paper_label || PAPER_LABEL} />{t.skill.review ? ` review ${t.skill.review.id}` : " no review yet"}</span>} />
+      <Kpi icon="verified_user" tone={shown ? "success" : "paper"} label="Signal model" value={shown ? "Skill shown" : "No proven skill"} tip={`${t.skill.rule}${t.skill.review ? ` Weekly review ${t.skill.review.id}.` : ""}`}
+        sub={<span className="labs"><PaperTag label={p.status.paper_label || PAPER_LABEL} />{shown ? " replayed on past years, it beat the simple benchmarks" : t.skill.review ? " replayed on past years, it did not beat simple benchmarks" : " no weekly review yet"}</span>} />
       <Kpi icon="history" tone="info" label={c ? `Calls scored · ${c.label}` : "Calls scored"} value={a ? String(a.n) : "0"}
-        tip={a ? `${a.n} direction calls scored on the ${c!.label} basis, all horizons; ${a.hits} came true. The range ${pct(a.wilson_lo)}–${pct(a.wilson_hi)} is the Wilson 95% interval of the hit rate${tooFew(a.n, min) ? ": with this few calls it is wide" : ""}.` : "No call has been scored yet."}
+        tip={a ? `${a.n} direction calls scored on the ${c!.label} basis, all horizons; ${a.hits} came true. The true hit rate is very likely between ${pct(a.wilson_lo)} and ${pct(a.wilson_hi)} (Wilson 95% interval)${tooFew(a.n, min) ? ": with this few calls it is wide" : ""}.` : "No call has been scored yet."}
         sub={a ? <span className="labs">{`${plural(a.hits, "hit")} · ${pct(a.share)} `}{tooFew(a.n, min) ? <FewTag min={min} /> : <Label tone="neutral">{`${pct(a.wilson_lo)}–${pct(a.wilson_hi)}`}</Label>}</span> : "no call scored yet"} />
-      <Kpi icon="trending_flat" tone={a && !tooFew(a.n, min) && (a.edge ?? 0) > 0 ? "success" : "neutral"} label="Against always-up"
+      <Kpi icon="trending_flat" tone={a && !tooFew(a.n, min) && (a.edge ?? 0) > 0 ? "success" : "neutral"} label="vs. “it always goes up”"
         value={a && a.edge !== null ? <Delta value={a.edge * 100} decimals={1} unit=" pts" /> : DASH}
-        sub={a ? `always-up would have hit ${pct(a.always_up)}` : "no call scored yet"}
-        tip="The hit rate minus the share of calls whose stock simply went up (the always-up baseline). Positive means the calls beat a coin that always says up." />
-      <Kpi icon="query_stats" tone={a && !tooFew(a.n, min) && (a.scores.brier_skill ?? 0) > 0 ? "success" : "neutral"} label="Brier score"
-        value={a ? f3(a.scores.brier) : DASH}
-        sub={a ? <span className="labs">{`skill ${skill(a.scores.brier_skill)} vs the base rate · log loss ${f3(a.scores.log_loss)}`}</span> : "no call scored yet"}
-        tip="The Brier score is the mean squared error of the stated confidence (0 is perfect, 0.25 is a coin flip). Brier skill compares it with always predicting the base rate: positive is better than the base rate." />
+        sub={a ? `Stocks rise more often than they fall, so a forecast must beat always saying “up” (${pct(a.always_up)})` : "no call scored yet"}
+        tip="The hit rate minus the share of calls whose stock simply went up. Positive means the calls beat a forecaster that always says up." />
+      <Kpi icon="query_stats" tone={a && !tooFew(a.n, min) && (a.scores.brier_skill ?? 0) > 0 ? "success" : "neutral"} label="Honesty of the stated chances"
+        value={a ? brierWords(a.scores.brier) : DASH}
+        sub={a ? <span className="labs"><small>{`Brier ${f3(a.scores.brier)} (0 = perfect, 0.25 = coin flip) · skill ${skill(a.scores.brier_skill)} vs the usual rate`}</small><details className="mb-tech"><summary>Technical details</summary>{`log loss ${f3(a.scores.log_loss)}`}</details></span> : "no call scored yet"}
+        tip="The Brier score is the mean squared error of the stated confidence (0 is perfect, 0.25 is a coin flip). Brier skill compares it with always predicting the usual rate: positive is better." />
     </KpiRow>
   );
 }
@@ -119,13 +125,14 @@ function BasisCard({ p, basis, onBasis }: { p: Payload; basis: CallBasisBlock | 
     ? <Segmented label="Scoring basis" value={basis?.key ?? ""} onChange={onBasis} dense={false} light={false} options={t.calls.map((x) => ({ value: x.key, label: x.label }))} />
     : basis ? <span className="muted">{`${basis.label} only: no call on another basis yet`}</span> : undefined;
   return (
-    <Card label="Calls by scoring basis">
-      <CardHead title="Calls by scoring basis" end={end}
-        help={`A direction call is scored on one basis and the bases are never pooled: close→close ${BASIS_WORDS.close_to_close}; open→close ${BASIS_WORDS.open_to_close}. An old window is its own row (legacy) and is never pooled with N+k.`} />
+    <Card label="How often the daily forecast was right">
+      <CardHead title="How often the daily forecast was right" end={end}
+        help={`A direction call is scored on one basis and the bases are never pooled: close→close ${BASIS_WORDS.close_to_close}; open→close ${BASIS_WORDS.open_to_close}. An old window is its own row (legacy) and is never mixed with the k-day holds.`} />
+      <p className="note" style={{ margin: "4px 0 8px" }}>Older calls were scored from close to close, newer ones from the open to the close, so they are kept apart.</p>
       {t.example_parts.includes("calls") ? (
         <div className="chips2"><span className="ex"><Icon name="info" />example: no call is scored in the stored data yet, so this block is computed from the forecaster’s example calls by the same code</span></div>
       ) : null}
-      {!basis ? <Quiet>No direction call has been scored yet.</Quiet> : (
+      {!basis ? <Quiet>No daily forecast has been checked yet. A 1-day forecast is checked after the next trading day’s close.</Quiet> : (
         <>
           <div className="md-table-wrap">
             <table className="md-table tbl x">
@@ -173,7 +180,7 @@ function BasisCard({ p, basis, onBasis }: { p: Payload; basis: CallBasisBlock | 
 function CalibrationCard({ basis }: { basis: CallBasisBlock | null }) {
   return (
     <Card label="Calibration">
-      <CardHead title="Calibration" end={basis ? <span className="muted">{`${basis.label} · all horizons`}</span> : undefined}
+      <CardHead title="When it said 70%, was it right 70% of the time?" end={basis ? <span className="muted">{`${basis.label} · all horizons`}</span> : undefined}
         help="Calls are grouped by the confidence they were made with. A well-calibrated forecaster’s dots sit on the dashed diagonal: calls made with 60% confidence come true about 60% of the time. The vertical line is the Wilson 95% interval of each band’s hit rate." />
       {!basis ? <Quiet>No call scored yet, so no calibration.</Quiet> : (
         <>
@@ -239,8 +246,8 @@ function RangesCard({ p }: { p: Payload }) {
   const ranges = p.track.ranges;
   return (
     <Card label="Ranges held">
-      <CardHead title="Ranges held" help="How often the close at the horizon landed inside the published 50% and 80% ranges, per horizon, with Wilson intervals. A range is scored at its exit session." />
-      {!ranges.length ? <Quiet>No range is scored yet: the first published range settles at its exit session. Until then the page shows no range figure.</Quiet> : (
+      <CardHead title="Did the price land in the predicted range?" help="How often the close at the end of the hold landed inside the predicted 50% and 80% ranges, per holding period, with the range the true share is very likely in. A range is checked at the close of its last day." />
+      {!ranges.length ? <Quiet>No range is checked yet: the first predicted range is checked at the close of its last day. Until then the page shows no range figure.</Quiet> : (
         <div className="md-table-wrap">
           <table className="md-table tbl x">
             <thead><tr><th>Horizon</th><th className="num">Ranges</th><th className="num">Inside 50%</th><th className="num">Inside 80%</th></tr></thead>
@@ -301,10 +308,10 @@ function SkillTag({ r }: { r: BacktestScore }) {
 function BacktestCard({ p }: { p: Payload }) {
   const b = p.track.backtest, lt = p.status.session.local_time;
   const head = (
-    <CardHead title="Signal model back-test" end={b ? <span className="muted">{`computed ${fmtLocal(b.computed_at, p.market, lt, true)}`}</span> : undefined}
-      help="The weekly review’s walk-forward test of the signal model on the stored history: each month’s model is fitted on the past and scored on the next month, never on what it saw. Not live, and not a paper trade." />
+    <CardHead title="Replay on past years (not real trades)" end={b ? <span className="muted">{`computed ${fmtLocal(b.computed_at, p.market, lt, true)}`}</span> : undefined}
+      help="Each month the model was trained only on earlier data and then tested on the next month, as if in real time (a walk-forward test, run by the weekly review). Not live, and not a paper trade." />
   );
-  if (!b) return <Card label="Signal model back-test">{head}<Quiet>No back-test of the signal model stored by the cut-off.</Quiet></Card>;
+  if (!b) return <Card label="Signal model back-test">{head}<Quiet>No replay of the signal model yet. The weekly run on Friday evening (New York time) writes one.</Quiet></Card>;
   const d = b.data;
   return (
     <Card label="Signal model back-test">
@@ -326,7 +333,7 @@ function BacktestCard({ p }: { p: Payload }) {
               <th className="num c2">Rows <HelpTip tip="Company-days scored, and the number of days." /></th>
               <th className="num">Brier <HelpTip tip="Against the Brier of always predicting the base rate (its own column on wide screens, in each row’s tooltip otherwise); skill = the gap, positive is better." /></th>
               <th className="num c3">Base rate</th><th className="num">Skill</th>
-              <th className="num">AUC <HelpTip tip="Area under the curve: 0.5 is no ranking ability, 1 is perfect. The line is its 95% interval; skill needs the whole interval above 0.5." /></th>
+              <th className="num">Picks risers better than chance? <HelpTip tip="AUC (area under the curve): 0.5 is no better than chance, 1 is perfect. The line is its 95% interval; “yes” needs the whole interval above 0.5." /></th>
               <th className="cw">Skill shown</th>
             </tr>
           </thead>
@@ -338,7 +345,7 @@ function BacktestCard({ p }: { p: Payload }) {
                 <td className="num" data-tip={`Brier ${f4(r.brier)} against ${f4(r.brier_base_rate)} for always predicting the base rate, on ${r.n.toLocaleString("en-US")} rows over ${r.dates} days.`}>{f4(r.brier)}</td>
                 <td className="num c3">{f4(r.brier_base_rate)}</td>
                 <td className="num"><span className={`mb-delta ${tone(r.brier_skill)}`}>{skill(r.brier_skill)}</span></td>
-                <td className="num"><CiBar lo={r.auc95[0]} hi={r.auc95[1]} point={r.auc} min={0.4} max={0.6} mid={0.5} text={f3(r.auc)} cls={intervalClass(r.auc95[0], r.auc95[1], 0.5)}
+                <td className="num"><CiBar lo={r.auc95[0]} hi={r.auc95[1]} point={r.auc} min={0.4} max={0.6} mid={0.5} text={`${aucWords(r.auc, r.auc95[0])} · ${f3(r.auc)}`} cls={intervalClass(r.auc95[0], r.auc95[1], 0.5)}
                   tip={`AUC ${f4(r.auc)}, 95% interval ${f4(r.auc95[0])}–${f4(r.auc95[1])} (axis 0.40–0.60).`} /></td>
                 <td className="cw"><SkillTag r={r} /></td>
               </tr>
@@ -346,19 +353,20 @@ function BacktestCard({ p }: { p: Payload }) {
           </tbody>
         </table>
       </div>
-      <h3 className="sub2" style={{ marginTop: 12 }}>Paper long against the baselines</h3>
+      <h3 className="sub2" style={{ marginTop: 12 }}>A pretend purchase whenever the model said “likely up”, vs simple benchmarks</h3>
+      <p className="note" style={{ margin: "0 0 8px" }}>{BASELINES_ARE_STANDARD}</p>
       <div className="md-table-wrap" style={{ marginTop: 12 }}>
         <table className="md-table tbl x">
           <thead>
             <tr>
-              <th>Baseline</th><th className="num c2">Bar</th><th className="num c2">Positions</th><th className="num c3">Days</th>
-              <th className="num">Mean per entry date <HelpTip tip="The model’s paper long minus the baseline: the return over the whole window (1 or 5 sessions), averaged per entry date, in percent, with its 95% interval; the dashed tick is zero." /></th>
+              <th>Benchmark</th><th className="num c2">Would buy when chance ≥</th><th className="num c2">Times it would have bought</th><th className="num c3">Days tested</th>
+              <th className="num">Extra return per trade <HelpTip tip="Extra return per trade compared with the benchmark, for 1-day and 5-day holds, averaged per entry date, in percent, with its 95% interval; the dashed tick is zero. Positive = the model did better. (A “paper long” is a pretend purchase held for the stated days.)" /></th>
               <th className="cw">Verdict</th>
             </tr>
           </thead>
           <tbody>
             {groupByKey(b.strategy).map(([key, rows]) => [
-              <tr key={key} className="grp"><td colSpan={6}><b>{keyWords(key)}</b><small> · the model’s paper long (buy when the chance clears the bar) against each baseline</small></td></tr>,
+              <tr key={key} className="grp"><td colSpan={6}><b>{keyWords(key)}</b><small> · a pretend purchase whenever the model’s chance clears its threshold, against each benchmark</small></td></tr>,
               ...rows.map((r, i) => {
                 const lo = r.ci95_pct ? r.ci95_pct[0] : null, hi = r.ci95_pct ? r.ci95_pct[1] : null, span = symmetricSpan(lo, hi, r.mean_pct);
                 const verdict = <Label tone={verdictKind(r.verdict)}>{r.verdict}</Label>;
@@ -389,7 +397,7 @@ function ReplayCard({ p }: { p: Payload }) {
     <Card label="Historical replay">
       <CardHead title="Historical replay" end={<Label tone="neutral">not live</Label>}
         help="A rule-only replay re-runs the range formula and the direction baselines on past days (no AI). It is a test, never a live record, and is shown apart." />
-      <Quiet>{p.track.replay ? "A replay is stored; its headline numbers are kept apart from the live record." : "No rule-only replay stored by the cut-off."}</Quiet>
+      <Quiet>{p.track.replay ? "A replay is stored; its headline numbers are kept apart from the live record." : "No replay yet: it runs on request."}</Quiet>
     </Card>
   );
 }

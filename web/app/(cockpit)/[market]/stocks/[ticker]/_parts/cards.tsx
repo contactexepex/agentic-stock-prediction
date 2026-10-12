@@ -7,7 +7,8 @@ import type { ReactNode } from "react";
 import { strategyOf } from "../../../../../../components/blocks/records.tsx";
 import { Card, CardHead, Delta, GoLink, Label, Quiet, SentimentSquare, StatusBadge } from "../../../../../../components/ui/primitives.tsx";
 import { CURRENCY_SYMBOL, LOCALE } from "../../../../../../lib/ui/constants.ts";
-import { DOW, fmtDate, fmtDateYear, money, signed } from "../../../../../../lib/ui/format.ts";
+import { firstExit } from "../../../../../../lib/ui/empty.ts";
+import { DOW, fmtDate, fmtDateYear, holdLabel, money, signed } from "../../../../../../lib/ui/format.ts";
 import { lifecyclePath, pagePath } from "../../../../../../lib/ui/routes.ts";
 import { companyEventEffect, horizonOfId, nextCompanyEvent } from "../../../../../../lib/company-pages/company-logic.ts";
 import type { AiReason, CompanyPayload, NewsItem } from "../../../../../../lib/company-pages/types.ts";
@@ -15,13 +16,14 @@ import type { PageCtx } from "./context.ts";
 import { eventWords, NOTE_KIND, plural } from "./labels.ts";
 
 /** The EOD analyst's notes; `news` names the cited news ids in their tooltips. */
-export function ReasonsCard({ reasons, news, ctx }: { reasons: AiReason[]; news: NewsItem[]; ctx: PageCtx }) {
+export function ReasonsCard({ reasons, news, ctx, openHeadToHead = [] }: { reasons: AiReason[]; news: NewsItem[]; ctx: PageCtx; openHeadToHead?: readonly { exit_date?: string | null }[] }) {
+  const firstH2h = firstExit(openHeadToHead);
   const titles = new Map(news.map((n) => [n.id, n.title]));
   return (
     <Card label="Why it moved, in words">
       <CardHead
         title="In words: the end-of-day analyst"
-        help="After the close, the EOD analyst writes at most 60 words for every head-to-head trade settled that day and for the day’s 5 biggest wins and misses (F6.1). Each note rests on the trade’s automatic reason split and cites ids; a deterministic gate checks it. It explains, it never predicts."
+        help="After each close an AI writes a short, checked explanation (at most 60 words) for every rule-vs-AI trade that finished that day and for the day’s 5 biggest wins and misses. Each note rests on the trade’s automatic reason split and cites its sources; a check runs before it is stored. It explains, it never predicts."
       />
       {reasons.length ? (
         <ul className="rl">
@@ -33,7 +35,7 @@ export function ReasonsCard({ reasons, news, ctx }: { reasons: AiReason[]; news:
                 <div className="rh">
                   <Label tone={tone}>{words}{r.rank ? ` #${r.rank}` : ""}</Label>
                   {r.strategy_id ? <b>{strategyOf(ctx.strategies, r.strategy_id).name}</b> : null}
-                  {h ? <span className="h-lab">N+{h}</span> : null}
+                  {h ? <span className="h-lab" data-tip={`N+${h}`}>{holdLabel(h)}</span> : null}
                   <span>· settled {fmtDate(r.session_date)}</span>
                 </div>
                 <div>{r.text}</div>
@@ -47,7 +49,7 @@ export function ReasonsCard({ reasons, news, ctx }: { reasons: AiReason[]; news:
           })}
         </ul>
       ) : (
-        <Quiet>No analyst note on this company yet: notes are written for settled head-to-head trades and the day’s biggest wins and misses.</Quiet>
+        <Quiet>{`No analyst note on this company yet: notes are written for finished rule-vs-AI trades and the day’s biggest wins and misses.${firstH2h ? ` The first rule-vs-AI trade on it finishes on ${fmtDate(firstH2h)}.` : ""}`}</Quiet>
       )}
     </Card>
   );
@@ -58,7 +60,7 @@ export function NewsCard({ p, ctx }: { p: CompanyPayload; ctx: PageCtx }) {
     <Card label="News">
       <CardHead
         title="News with its status"
-        help="Stories about this company first seen in the last 30 days (the newest 50), newest first, with their verification status (DESIGN 3b): confirmed by a filing, corroborated by independent outlets, single source, unverified, rumour, promotional or contradicted. Only confirmed or corroborated items can be the main evidence of a call. The arrow is the news analyst’s sentiment."
+        help="Stories about this company first seen in the last 30 days (the newest 50), newest first, with their check status: confirmed by a filing, corroborated by independent outlets, single source, unverified, rumour, promotional or contradicted. Only confirmed or corroborated items can be the main reason for a prediction. The arrow is the news analyst’s sentiment."
         end={`${p.news.length} by the cut-off`}
       />
       {p.news.length ? (
@@ -121,7 +123,7 @@ export function ResultsCard({ p, ctx }: { p: CompanyPayload; ctx: PageCtx }) {
   const head = (end?: ReactNode) => (
     <CardHead
       title="Latest results"
-      help="The company’s latest quarterly results as reported at the release (never later restatements), with the consensus collected before the release (context only), the stock’s reaction against the market, and at most 5 quoted bullets from the filing text (WS6). India filings have numbers only until a PDF reader is added."
+      help="The company’s latest quarterly results as reported at the release (never later restatements), with the consensus collected before the release (context only), the stock’s reaction against the market, and at most 5 quoted bullets from the filing text. India filings have numbers only until a PDF reader is added."
       end={end}
     />
   );
@@ -180,7 +182,7 @@ export function EventsCard({ p }: { p: CompanyPayload }) {
     <Card label="Coming events">
       <CardHead
         title="Coming up"
-        help="What is scheduled from the session being predicted to 60 days after it, as known at the as-of time: this company’s results (they widen its ranges; no new call within a day of them) and ex-dividend dates (the ranges are centred lower by the dividend), the market’s major events (they raise the regime to EVENT_HEAVY two days before and widen every range whose window contains them) and closed days."
+        help="What is scheduled from the session being predicted to 60 days after it, as known at the as-of time: this company’s results (they widen its ranges; no new call within a day of them) and ex-dividend dates (the ranges are centred lower by the dividend), the market’s big events (the market’s mood counts as “busy with events” two days before, and the expected price ranges around them are wider) and closed days."
         end={`${p.events.length} in 60 days`}
       />
       {p.events.length ? (
@@ -200,7 +202,7 @@ export function EventsCard({ p }: { p: CompanyPayload }) {
                     {e.name}
                     {e.provisional ? <span style={{ marginLeft: 6 }}><Label tone="neutral" tip="The date is not confirmed yet.">provisional</Label></span> : null}
                     {effect ? <span style={{ marginLeft: 6 }}><Label tone={effect.tone} tip={effect.tip}>{effect.label}</Label></span>
-                      : e.major ? <span style={{ marginLeft: 6 }}><Label tone="neutral" tip="A major market event: the regime becomes EVENT_HEAVY within 2 days before it and every range whose window contains it is widened.">major</Label></span> : null}
+                      : e.major ? <span style={{ marginLeft: 6 }}><Label tone="neutral" tip="A big market event: the market’s mood counts as “busy with events” within 2 days before it, and the expected price ranges around it are wider.">big event</Label></span> : null}
                   </span>
                   <small>{detail}</small>
                 </div>
@@ -225,7 +227,7 @@ export function WatchlistCard({ p, ctx, onChangeAmount, pending, historyDates }:
     <Card label="Watchlist settings">
       <CardHead
         title="On the watchlist"
-        help="The company’s lifecycle (F8): when it was added, its state, the money per paper trade and every change, each an append-only event with who asked and from which channel. Changing the amount or the state records a request; the next run imports it. Nothing here places an order."
+        help="The company’s history on the list: when it was added, its state, the money per paper trade and every change, each an append-only event with who asked and from which channel. Changing the amount or the state saves a request; it takes effect at the next morning run. Nothing here places an order."
         end={<GoLink href={pagePath(ctx.market, "companies")}>All companies</GoLink>}
       />
       <div className="lc">

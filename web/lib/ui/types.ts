@@ -102,6 +102,29 @@ export interface GoLive {
   beats_best_baseline: boolean | null;
 }
 
+/** Home's extra go-live checks of the reference strategy (rm_common.go_live_checks; review D1). */
+export interface GoLiveChecks {
+  drawdown_within_limit: boolean | null;
+  holds_in_calm_and_volatile: boolean | null;
+  earliest_date: IsoDate | null;
+}
+
+/** The rule strategy or AI trader nearest the go-live bar (rm_common.go_live_nearest; review D2). */
+export interface GoLiveNearest extends GoLive {
+  strategy_id: string;
+  name: string;
+  family: Family;
+  trades: number;
+  drawdown_within_limit: boolean | null;
+  holds_in_calm_and_volatile: boolean | null;
+}
+
+/** The weekly review's model_skill verdict (rm_home.skill; review D3). */
+export interface SkillVerdict {
+  state: "paper" | "shown";
+  why: string;
+}
+
 export interface StrategyEntry {
   id: string;
   family: Family;

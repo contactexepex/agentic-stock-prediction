@@ -40,6 +40,8 @@ REFERENCE_STRATEGY = "rule.model_news.v1"
 DEFAULT_HORIZON = 1  # Home and the pages open on N+1 (decision 39)
 # Local start times of the scheduled runs (docs/SPEC.md section 7; the status block's next_at)
 POST_CLOSE_LOCAL = {"india": "17:45", "us": "18:15"}
+# The intraday checks' local start times (routine/INTRADAY_PROMPT.md, docs/DESIGN.md section 2; Home's next check)
+INTRADAY_LOCAL = {"india": ("11:13", "14:13"), "us": ("12:27", "14:57")}
 STRATEGY_FIELDS = (
     "id",
     "family",
@@ -55,6 +57,10 @@ STRATEGY_FIELDS = (
     "settled_trades",
 )
 GO_LIVE_FIELDS = ("proven", "months_forward", "trades_needed", "beats_best_baseline")
+# Home's extra go-live checks of the reference strategy (docs/ux/plain_language_review.md D1) and the fields of the
+# strategy nearest the bar (D2)
+GO_LIVE_CHECK_FIELDS = ("drawdown_within_limit", "holds_in_calm_and_volatile")
+GO_LIVE_NEAREST_FIELDS = GO_LIVE_FIELDS + GO_LIVE_CHECK_FIELDS
 # The app's cache revalidation after a sync (warehouse/revalidate.py; web/lib/data/revalidate.ts)
 ENV_REVALIDATE_SECRET = "REVALIDATE_SECRET"
 ENV_VERCEL_BYPASS = "VERCEL_AUTOMATION_BYPASS_SECRET"

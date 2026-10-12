@@ -5,7 +5,7 @@ import { storedApi } from "../b16/stored.mjs";
 import { envelope, mockupPayload } from "../fixtures.mjs";
 
 const HTTP_ERROR_LINE = /^Failed to load resource: the server responded with a status of 503/;
-const PAPER = "No proven strong signals today";
+const PAPER = "Not proven yet: these are tests, not tips.";
 
 /** /review from the mockup: its reviews (the handover's rm.review), the next Friday after its cut-off as review_due (the
  * weekly run is Friday evening New York time since 2026-10-10; the mockup still says Saturday), plus one news-impact row. */
@@ -35,7 +35,7 @@ export const cases = [
     api: mockupReview,
     widths: [1280, 390],
     waitFor: ".p-compare .rev .lead-row",
-    expectText: [PAPER, "Head-to-head: the strongest rule strategy vs the strongest AI trader", "Level", "Today’s picks for", "not viable at your cost", "Match by match", "draw", "Gain-pick vs probability-pick", "Per company", "Why: the end-of-day analyst", "The week’s research review", "No proposals this week.", "confirmed primary · high · 2026-W40", "too few"],
+    expectText: [PAPER, "Head-to-head: the strongest rule strategy vs the strongest AI trader", "Level", "Today’s picks for", "Not worth it after your broker’s fees", "Match by match", "draw", "Gain-pick vs probability-pick", "Per company", "Why: the end-of-day analyst", "The week’s research review", "No proposals this week.", "confirmed primary · high · 2026-W40", "too few"],
     expectSelector: [".p-compare .luck svg, .p-compare .vs", ".p-compare .mb-chart svg", ".p-compare .pk .mb-odds"],
   },
   { name: "rule-vs-ai-us", path: "/us/rule-vs-ai", market: "us", mockup: "06-rule-vs-ai", api: mockupReview, widths: [1280], waitFor: ".p-compare .rev h3", expectText: [PAPER, "$"] },
@@ -72,7 +72,7 @@ export const cases = [
     api: storedApi,
     widths: [1280, 390],
     waitFor: ".p-compare .rev",
-    expectText: [PAPER, "Nothing settled yet in the head-to-head view.", "No head-to-head picks stored for the session.", "No settled head-to-head trade yet.", "No end-of-day analysis stored by the cut-off.", "No weekly review written by the cut-off. The next one (2026-W41)", "No news-impact study computed by the cut-off."],
+    expectText: [PAPER, "No rule-vs-AI trade has finished yet.", "No head-to-head picks stored for the session.", "No rule-vs-AI trade has finished yet.", "The after-close write-up appears after the first trades finish", "No weekly review written by the cut-off. The next one (2026-W41)", "No news-impact study computed by the cut-off."],
   },
   {
     name: "rule-vs-ai-review-due-friday",

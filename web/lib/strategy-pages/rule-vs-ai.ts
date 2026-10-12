@@ -276,13 +276,13 @@ export function pickCandidate(pick: Pick): PickCandidate | null {
   return pick.candidates.find((candidate) => candidate.horizon_days === pick.horizon_days) ?? null;
 }
 
-/** "n clear(s) market costs · m viable at your cost" for the picked picks of a session. */
+/** "n expected to beat market fees · m worth it after your fees" for the picked picks of a session. */
 export function viableLine(picked: readonly Pick[]): string {
   const clears = picked.filter((pick) => (pick.expected_gain_pct ?? 0) > 0).length;
   const viable = picked.filter((pick) => pickCandidate(pick)?.cost_viable === true).length;
   const known = picked.filter((pick) => (pickCandidate(pick)?.cost_viable ?? null) !== null).length;
-  const market = clears ? `${clears} clear${clears === 1 ? "s" : ""} market costs` : "none clears market costs";
-  const your = known ? (viable ? `${viable} viable at your cost` : "none viable at your cost") : "your-cost view not stored";
+  const market = clears ? `${clears} expected to beat market fees` : "none expected to beat market fees";
+  const your = known ? (viable ? `${viable} worth it after your fees` : "none worth it after your fees") : "your fees not stored";
   return `${market} · ${your}`;
 }
 

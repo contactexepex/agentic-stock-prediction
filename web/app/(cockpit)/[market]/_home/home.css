@@ -76,3 +76,24 @@
 @media (max-width: 599px){ .mb-home .fams{grid-template-columns:1fr} .mb-home .agl li{grid-template-columns:auto auto minmax(0,1fr);padding:12px} .mb-home .agl .hz{grid-column:1 / span 3;display:flex;align-items:center;gap:12px;text-align:left} .mb-home .agl .hz small{margin:0} .mb-home .agl .right{grid-column:1 / span 3;text-align:left;display:flex;align-items:center;gap:8px} .mb-home .agl .right .l{margin:0} }
 .mb-home .mb-kpi .labs{display:inline-flex;flex-wrap:wrap;gap:4px;align-items:center}
 @media (max-width:599px){ .mb-home .mb-kpi .labs .mb-label{white-space:normal;text-align:left} }
+
+/* "Can I rely on this yet?" and "Today in 3 lines" (docs/ux/plain_language_review.md section 3) */
+.mb-home .top2{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:16px;margin:16px 0}
+@media (max-width:1023px){.mb-home .top2{grid-template-columns:minmax(0,1fr)}}
+.mb-home .rely,.mb-home .today{padding:18px 20px;min-width:0}
+.mb-home .rely-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.mb-home .rely-head h2,.mb-home .today h2{margin:0;font-size:17px}
+.mb-home .rely-head .verdict{font:800 22px/1.1 var(--md-ref-typeface-plain);letter-spacing:.02em;color:var(--md-sys-color-error)}
+.mb-home .rely.proven .rely-head .verdict{color:var(--mb-success,var(--md-sys-color-primary))}
+.mb-home .rely-head .why{margin-left:auto;display:inline-flex;align-items:center;font-size:13px}
+.mb-home .rely-lead{margin:8px 0 10px;font-size:14px}
+.mb-home .rely-sub{font-size:12.5px;color:var(--md-sys-color-on-surface-variant);margin-bottom:6px}
+.mb-home .rely-checks{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.mb-home .rely-checks li{display:grid;grid-template-columns:auto minmax(0,14em) minmax(0,1fr);gap:4px 10px;align-items:start;font-size:13.5px}
+.mb-home .rely-checks .w{font-weight:600}
+.mb-home .rely-checks .d{color:var(--md-sys-color-on-surface-variant)}
+@media (max-width:600px){.mb-home .rely-checks li{grid-template-columns:auto minmax(0,1fr)} .mb-home .rely-checks .d{grid-column:2}}
+.mb-home .rely-near{margin:10px 0 0;font-size:13px}
+.mb-home .rely-sofar{margin-top:12px;padding-top:10px;border-top:1px solid var(--md-sys-color-outline-variant);font-size:13.5px}
+.mb-home .today ol{margin:10px 0 12px;padding-left:20px;display:grid;gap:8px;font-size:14px}
+.mb-home .agl .right .l .cf{display:block;font-size:10.5px}

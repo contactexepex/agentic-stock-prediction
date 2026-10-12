@@ -16,7 +16,7 @@ function withSample(rest, market) {
 }
 
 const HTTP_ERROR_LINE = /^Failed to load resource: the server responded with a status of (422|503)/;
-const PAPER = "No proven strong signals today";
+const PAPER = "Not proven yet: these are tests, not tips.";
 
 /** Answer POST /paper-trades with the given statuses in turn; returns the requests seen. */
 async function answerPosts(page, statuses) {
@@ -149,14 +149,14 @@ export const cases = [
       if (!/Open paper trades\s*3/.test(kpis) || !kpis.includes("1 flagged")) problems.push(`open KPI not from the summary: ${kpis}`);
       if ((await page.$$('[aria-label="Open paper trades by strategy"]')).length) problems.push("the open-trades card (open_trades) still shown");
       let text = await listText(page);
-      if (!text.includes("RELIANCE") || !text.includes("TCS") || text.includes("INFY") || text.includes("Highest probability")) problems.push(`6 Oct list: ${text}`);
+      if (!text.includes("RELIANCE") || !text.includes("TCS") || text.includes("INFY") || text.includes("Highest chance")) problems.push(`6 Oct list: ${text}`);
       await page.selectOption('select[aria-label="Entry session"]', "2026-10-05");
       await page.waitForFunction(() => document.querySelector('[aria-label="All paper trades"] .at-list')?.textContent.includes("INFY"));
       text = await listText(page);
       if (text.includes("RELIANCE")) problems.push(`5 Oct list still shows 6 Oct: ${text}`);
       await press(page, "Whose trades", "Head-to-head");
       text = await listText(page);
-      if (!text.includes("Highest probability") || text.includes("INFY") || (await page.$$('select[aria-label="Entry session"]')).length) problems.push(`head-to-head scope: ${text}`);
+      if (!text.includes("Highest chance") || text.includes("INFY") || (await page.$$('select[aria-label="Entry session"]')).length) problems.push(`head-to-head scope: ${text}`);
       await press(page, "Whose trades", "All strategies");
       await page.selectOption('select[aria-label="Entry session"]', "2026-10-02");
       await page.waitForSelector('[aria-label="All paper trades"] [role="alert"]');
@@ -214,7 +214,7 @@ export const cases = [
     check: async (page) => {
       const problems = [];
       let text = await listText(page);
-      if (text.includes("Highest probability")) problems.push("a head-to-head trade is listed under All strategies (views pooled)");
+      if (text.includes("Highest chance")) problems.push("a head-to-head trade is listed under All strategies (views pooled)");
       await press(page, "Won or lost", "Lost");
       text = await listText(page);
       if (!text.includes("HDFCBANK") || text.includes("TCS")) problems.push(`Lost filter: ${text}`);
@@ -225,7 +225,7 @@ export const cases = [
       await press(page, "Open or closed", "All");
       await press(page, "Whose trades", "Head-to-head");
       text = await listText(page);
-      if (!text.includes("Highest probability") || text.includes("HDFCBANK")) problems.push(`Head-to-head scope: ${text}`);
+      if (!text.includes("Highest chance") || text.includes("HDFCBANK")) problems.push(`Head-to-head scope: ${text}`);
       await press(page, "Whose trades", "Mine");
       const card = await page.textContent('[aria-label="All paper trades"]');
       if (!card.includes("You") || !card.includes("after your cost") || card.includes("Net after market cost")) problems.push("Mine scope: wrong words or a market-cost column");
@@ -302,7 +302,7 @@ export const cases = [
     api: storedApi,
     widths: [1280, 390],
     waitFor: ".p-portfolios .own, .p-portfolios [aria-label='Your own paper portfolio']",
-    expectText: [PAPER, "No settled head-to-head trade for this family yet.", "No open paper trade: nothing has entered", "No own paper trade in India (NSE) yet."],
+    expectText: [PAPER, "No rule-vs-AI trade of this side has finished yet.", "No open paper trade: nothing has entered", "No own paper trade in India (NSE) yet."],
   },
   { name: "paper-portfolios-error", path: "/india/paper-portfolios", apiStatus: 503, allowConsole: [HTTP_ERROR_LINE], widths: [1280], waitFor: '[role="alert"]', expectText: ["Data service unavailable", "Try again"] },
 ];

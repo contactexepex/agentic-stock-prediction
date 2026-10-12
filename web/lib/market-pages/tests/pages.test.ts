@@ -39,8 +39,8 @@ test("home: pick summary, money gain, grouping, profit series, leaders and runs"
   const picks = [pick("1", "A", 0.5, false), pick("2", "A", -0.1, null), pick("3", "B", 0.2, true), pick("4", "C", null, null, "no_candidate")];
   const s = pickSummary(picks);
   assert.deepEqual(s, { picked: 3, clearMarket: 2, viableYours: 1 });
-  assert.equal(viableLineOf(picks), "2 clear market costs · 1 viable at your cost");
-  assert.equal(viableLineOf([pick("5", "D", 0.3, null)]), "1 clears market costs · your-cost view not stored");
+  assert.equal(viableLineOf(picks), "2 expected to beat market fees · 1 worth it after your fees");
+  assert.equal(viableLineOf([pick("5", "D", 0.3, null)]), "1 expected to beat market fees · your fees not stored");
   assert.equal(expectedGainMoney(picks[0]), 5);
   assert.deepEqual(groupBy(picks, (k) => k.ticker).map(([t, ks]) => [t, ks.length]), [["A", 2], ["B", 1], ["C", 1]]);
   const series = cumulativeProfit([

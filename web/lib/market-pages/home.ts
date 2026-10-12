@@ -1,8 +1,14 @@
 // The Home page's own computations (design/mockups/01-home/notes.md "Shown but computed by the page"): the KPI counts
 // and sums, the head-to-head grouping and cost lines, the cumulative profit per family, the alerts and the runs
-// count. Presentation only.
-import { INTRADAY_CHECKS_PER_SESSION } from "../ui/constants.ts";
+// count; the "Can I rely on this yet?" checklist and "Today in 3 lines" (docs/ux/plain_language_review.md section 3).
+// Presentation only.
+import {
+  GO_LIVE_MONTHS, GO_LIVE_TRADES_ABOUT, INTRADAY_CHECKS_PER_SESSION, NEWS_STATUS, REFERENCE_STRATEGY_WORDS, regimeWords,
+} from "../ui/constants.ts";
 import { viableLine, yourViable, type Pick as CostPick } from "../ui/costs.ts";
+import { firstExit } from "../ui/empty.ts";
+import { fmtDate, fmtDateYear, signed } from "../ui/format.ts";
+import type { GoLive, GoLiveChecks, GoLiveNearest, SkillVerdict } from "../ui/types.ts";
 
 export { INTRADAY_CHECKS_PER_SESSION };
 
@@ -51,7 +57,7 @@ export function pickSummary(picks: readonly HeadToHeadPick[]): PickSummary {
   const picked = picks.filter(isPicked);
   return { picked: picked.length, clearMarket: picked.filter(clearsMarketCosts).length, viableYours: picked.filter((k) => yourViableOf(k) === true).length };
 }
-/** "n clears market costs · m viable at your cost" of the picked picks (B7's viableLine). */
+/** "n expected to beat market fees · m worth it after your fees" of the picked picks (B7's viableLine). */
 export const viableLineOf = (picks: readonly HeadToHeadPick[]): string => viableLine(picks.filter(isPicked).map(asPick));
 
 /** Picks grouped by company in payload order. */
@@ -103,4 +109,78 @@ export interface Runs { pre_open: RunState; intraday: RunState[]; post_close: Ru
 export function runsOk(runs: Runs): { ok: number; total: number } {
   const all = [runs.pre_open, ...runs.intraday.slice(0, INTRADAY_CHECKS_PER_SESSION), runs.post_close, runs.news];
   return { ok: all.filter((r) => r.ok === true).length, total: 1 + INTRADAY_CHECKS_PER_SESSION + 1 + 1 };
+}
+
+/* ---- "Can I rely on this yet?" and "Today in 3 lines" (docs/ux/plain_language_review.md section 3) ---------------- */
+
+/** One line of the checklist: met (true), not met (false) or not measurable yet (null). */
+export interface RelyCheck { key: string; what: string; met: boolean | null; detail: string }
+
+const unknownWord = (met: boolean | null, yes: string, no: string, unknown: string) => (met === true ? yes : met === false ? no : unknown);
+
+/** The checklist of the go-live bar for the reference strategy, plus the weekly review's model skill. */
+export function relyChecks(goLive: GoLive, checks: GoLiveChecks | null | undefined, skill: SkillVerdict | null | undefined): RelyCheck[] {
+  const done = Math.max(0, GO_LIVE_TRADES_ABOUT - goLive.trades_needed);
+  const earliest = checks?.earliest_date ? ` (earliest: ${fmtDateYear(checks.earliest_date)})` : "";
+  return [
+    { key: "trades", what: "Enough finished trades", met: goLive.trades_needed === 0, detail: `${done} of about ${GO_LIVE_TRADES_ABOUT} (${REFERENCE_STRATEGY_WORDS.toLowerCase()})` },
+    { key: "months", what: "Long enough", met: goLive.months_forward >= GO_LIVE_MONTHS, detail: `${goLive.months_forward.toFixed(1)} of ${GO_LIVE_MONTHS} months${earliest}` },
+    { key: "baseline", what: "Beats “always buy” after your fees, beyond luck", met: goLive.beats_best_baseline, detail: unknownWord(goLive.beats_best_baseline, "yes", "not yet", "not measurable yet") },
+    { key: "drawdown", what: "Losses stay within the limit", met: checks?.drawdown_within_limit ?? null, detail: unknownWord(checks?.drawdown_within_limit ?? null, "yes", "no: the biggest fall is over the limit", "not measured yet") },
+    { key: "regimes", what: "Works in calm and jumpy markets", met: checks?.holds_in_calm_and_volatile ?? null, detail: unknownWord(checks?.holds_in_calm_and_volatile ?? null, "yes", "not in both", "not enough data yet") },
+    {
+      key: "skill", what: "The model shows real skill (weekly review)", met: skill ? skill.state === "shown" : null,
+      detail: skill ? (skill.state === "shown" ? `Yes. ${skill.why}` : `No. ${skill.why}`) : "no weekly review yet",
+    },
+  ];
+}
+
+/** "Closest to passing: Model + news (rule): 12 of about 300 finished trades" when it is not the reference itself. */
+export function nearestLine(nearest: GoLiveNearest | null | undefined, referenceId: string): string | null {
+  if (!nearest || nearest.strategy_id === referenceId) return null;
+  const done = Math.max(0, GO_LIVE_TRADES_ABOUT - nearest.trades_needed);
+  return `Closest to passing: ${nearest.name} (${nearest.family === "ai" ? "AI trader" : "rule strategy"}), ${done} of about ${GO_LIVE_TRADES_ABOUT} finished trades, ${nearest.months_forward.toFixed(1)} of ${GO_LIVE_MONTHS} months.`;
+}
+
+export interface SoFar { finished: number; won: number; lost: number; net: number | null }
+/** Finished paper trades with money (net after market fees): count, won (> 0), lost (< 0) and their net sum. */
+export function tradesSoFar(settled: readonly { net_pnl: number | null }[]): SoFar {
+  const rows = settled.filter((t) => t.net_pnl != null) as { net_pnl: number }[];
+  return {
+    finished: rows.length,
+    won: rows.filter((t) => t.net_pnl > 0).length,
+    lost: rows.filter((t) => t.net_pnl < 0).length,
+    net: rows.length ? rows.reduce((s, t) => s + t.net_pnl, 0) : null,
+  };
+}
+
+/** Line 1 of "Today in 3 lines": the market mood, the benchmark's last move and the followed companies up and down. */
+export function moodLine(
+  regime: string | null | undefined,
+  benchmark: { name: string; change_pct: number | null; close_date: string } | null | undefined,
+  companies: readonly { state: string; change_pct?: number | null }[],
+): string {
+  const active = companies.filter((c) => c.state === "active" && c.change_pct != null);
+  const up = active.filter((c) => (c.change_pct as number) > 0).length;
+  const down = active.filter((c) => (c.change_pct as number) < 0).length;
+  const index = benchmark && benchmark.change_pct != null ? ` ${benchmark.name} moved ${signed(benchmark.change_pct)} on ${fmtDate(benchmark.close_date)}` : "";
+  const moves = active.length ? `${index ? ";" : ""} ${up} of the ${active.length} companies you follow rose, ${down} fell.` : index ? "." : "";
+  return `Market mood: ${regimeWords(regime)}.${index}${moves}`;
+}
+
+/** Line 2: how many paper trades the session being predicted opens and when the first running ones finish. */
+export function tradesLine(openTrades: readonly { entry_date: string; exit_date: string }[], sessionDate: string | null | undefined): string {
+  if (!openTrades.length) return "No paper trade is running.";
+  const today = sessionDate ? openTrades.filter((t) => t.entry_date === sessionDate).length : 0;
+  const first = firstExit(openTrades);
+  const running = `${openTrades.length} paper trade${openTrades.length === 1 ? "" : "s"} running`;
+  const opened = today ? `, ${today} of them opened on ${fmtDate(sessionDate)}` : "";
+  return `${running}${opened}; the first finishes at the close on ${fmtDate(first)}.`;
+}
+
+/** Line 3: the top market mover's headline and its check status ("market-wide" when it has none). */
+export function storyLine(top: { title: string; status?: string | null } | undefined): string {
+  if (!top) return "No market-moving story in the last 3 days.";
+  const word = top.status ? (NEWS_STATUS[top.status] ?? [top.status])[0] : "market-wide";
+  return `The story that mattered: “${top.title}” (${word}).`;
 }

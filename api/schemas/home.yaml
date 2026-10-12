@@ -50,6 +50,53 @@ HomePayload:
         settled_trades:
           type: array
           items: {$ref: '#/components/schemas/HomeSettledTrade'}
+        go_live_checks: {$ref: '#/components/schemas/HomeGoLiveChecks'}
+        go_live_nearest:
+          oneOf: [{$ref: '#/components/schemas/HomeGoLiveNearest'}, {type: 'null'}]
+        skill: {$ref: '#/components/schemas/HomeSkill'}
+        intraday_next_at:
+          description: The next scheduled intraday check after the cut-off (UTC), null when none is found
+          oneOf: [{$ref: '#/components/schemas/IsoTime'}, {type: 'null'}]
+HomeGoLiveChecks:
+  type: object
+  x-source: warehouse/rm_common.go_live_checks
+  description: >-
+    The reference strategy's two other go-live checks (lab/scoreboard.go_live); null while it has no settled trade
+    (docs/ux/plain_language_review.md D1). `earliest_date`: its live_from (config/strategies.yaml) plus the bar's
+    2 months, the first day the months check can be met; null without a live_from
+  required: [drawdown_within_limit, holds_in_calm_and_volatile, earliest_date]
+  properties:
+    drawdown_within_limit: {type: ['boolean', 'null']}
+    holds_in_calm_and_volatile: {type: ['boolean', 'null']}
+    earliest_date:
+      oneOf: [{$ref: '#/components/schemas/IsoDate'}, {type: 'null'}]
+HomeGoLiveNearest:
+  type: object
+  x-source: warehouse/rm_common.go_live_nearest
+  description: >-
+    The rule strategy or AI trader nearest the go-live bar: fewest settled trades still needed, then most months
+    forward, then id (docs/ux/plain_language_review.md D2)
+  required: [strategy_id, name, family, trades, proven, months_forward, trades_needed, beats_best_baseline,
+             drawdown_within_limit, holds_in_calm_and_volatile]
+  properties:
+    strategy_id: {type: string}
+    name: {type: string}
+    family: {type: string, enum: [rule, ai]}
+    trades: {type: integer, minimum: 0}
+    proven: {type: boolean}
+    months_forward: {type: number}
+    trades_needed: {type: integer, minimum: 0}
+    beats_best_baseline: {type: ['boolean', 'null']}
+    drawdown_within_limit: {type: ['boolean', 'null']}
+    holds_in_calm_and_volatile: {type: ['boolean', 'null']}
+HomeSkill:
+  type: object
+  x-source: warehouse/rm_home.skill
+  description: The weekly review's model_skill verdict and its reason sentence (docs/ux/plain_language_review.md D3)
+  required: [state, why]
+  properties:
+    state: {type: string, enum: [paper, shown]}
+    why: {type: string}
 HomeToDateRow:
   type: object
   x-source: warehouse/rm_home.to_date (B13's rm_strategies.scoreboard_rows)

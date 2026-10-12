@@ -11,6 +11,25 @@ export const BASELINE: Readonly<Record<string, string>> = {
   "–": "(no baseline)",
 };
 
+/** Why the baselines are there: standard yardsticks, not invented (review section 2.9). */
+export const BASELINES_ARE_STANDARD =
+  "These benchmarks are standard yardsticks used in research to check whether a model adds anything: always saying “up”, following the last 5 days, buying after a dip (RSI), and simply holding the index.";
+
+/** A Brier score in words: 0 = perfect, 0.25 = a coin flip. */
+export function brierWords(brier: number | null | undefined): string {
+  if (brier === null || brier === undefined) return "not measured yet";
+  if (brier < 0.24) return "more honest than a coin flip";
+  if (brier <= 0.26) return "about as good as a coin flip";
+  return "worse than a coin flip";
+}
+
+/** Whether the model ranks risers above fallers better than chance, from the AUC's 95% interval (0.5 = chance). */
+export function aucWords(auc: number | null | undefined, lo: number | null | undefined): "yes" | "slightly" | "no" {
+  if (auc === null || auc === undefined) return "no";
+  if (lo !== null && lo !== undefined && lo > 0.5) return "yes";
+  return auc > 0.5 ? "slightly" : "no";
+}
+
 export const BASIS_WORDS: Readonly<Record<string, string>> = {
   close_to_close: "from the as-of close to the close h sessions later (calls made before the switch date in the settings)",
   open_to_close:

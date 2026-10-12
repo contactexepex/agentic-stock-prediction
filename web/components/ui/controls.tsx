@@ -2,7 +2,7 @@
 // Pill tabs (.md-segmented): a group of toggle buttons with aria-pressed, used for the horizon selector N+1..N+5
 // (decision 39: a page opens on N+1), cost views, switches. Keyboard: Tab to the group, arrows move between options.
 import type { KeyboardEvent, ReactNode } from "react";
-import { horizonLabel, horizonWords } from "../../lib/ui/format.ts";
+import { holdTab, horizonLabel, horizonWords } from "../../lib/ui/format.ts";
 
 export interface SegmentOption<V> {
   value: V;
@@ -45,8 +45,13 @@ export function Segmented<V extends string | number>({
   );
 }
 
-/** The horizon selector: N+1..N+5 from the payload's `horizons`. */
+/** The horizon selector: "Hold 1 day · 2 days … 5 days" (N+1..N+5) from the payload's `horizons`. */
 export function HorizonTabs({ horizons, value, onChange }: { horizons: readonly number[]; value: number; onChange: (k: number) => void }) {
-  const options = horizons.map((k) => ({ value: k, label: horizonLabel(k), tip: `N+${k}: sell at ${horizonWords(k)}.` }));
-  return <Segmented label="Horizon" options={options} value={value} onChange={onChange} />;
+  const options = horizons.map((k) => ({ value: k, label: holdTab(k), tip: `${horizonLabel(k)}: buy at the open, sell at ${horizonWords(k)}.` }));
+  return (
+    <span className="hold-tabs">
+      <span className="hold-l" aria-hidden="true">Hold</span>
+      <Segmented label="Horizon" options={options} value={value} onChange={onChange} />
+    </span>
+  );
 }

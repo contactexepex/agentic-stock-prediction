@@ -4,7 +4,8 @@
 // messages, e.g. the browser's own line for a 503 the case asked for), check?(page, {width, market}) -> string[]}.
 // Page sessions add their own file here (cases/<page>.mjs) with their page's cases at the mockup's widths.
 
-const PAPER = "No proven strong signals today";
+const PAPER = "Not proven yet: these are tests, not tips.";
+const HOME_VERDICT = "Can I rely on this yet?";
 const HTTP_ERROR_LINE = /^Failed to load resource: the server responded with a status of (404|503)/;
 
 /** The shell's own checks on any page: one current nav item, the market switch pressed on the market, Paper visible. */
@@ -20,8 +21,8 @@ async function shellChecks(page, { market }) {
 }
 
 export const cases = [
-  { name: "shell-home-india", path: "/india", mockup: "01-home", widths: [1280, 1024, 768, 390], waitFor: ".phead", expectText: [PAPER, "Regime", "Home"], check: shellChecks },
-  { name: "shell-home-us", path: "/us", market: "us", mockup: "01-home", widths: [1280], waitFor: ".phead", expectText: [PAPER], check: shellChecks },
+  { name: "shell-home-india", path: "/india", mockup: "01-home", widths: [1280, 1024, 768, 390], waitFor: ".phead", expectText: [HOME_VERDICT, "Market mood:", "Home"], check: shellChecks },
+  { name: "shell-home-us", path: "/us", market: "us", mockup: "01-home", widths: [1280], waitFor: ".phead", expectText: [HOME_VERDICT], check: shellChecks },
   { name: "shell-watchlist", path: "/india/watchlist", mockup: "02-watchlist", waitFor: ".phead", expectText: [PAPER, "Watchlist"], check: shellChecks },
   { name: "shell-company", path: "/india/stocks/RELIANCE", mockup: "03-company", waitFor: ".phead", expectText: ["Company"], check: shellChecks },
   { name: "state-error-503", path: "/india/watchlist", apiStatus: 503, allowConsole: [HTTP_ERROR_LINE], widths: [1280, 390], waitFor: '[role="alert"]', expectText: ["Data service unavailable", "Try again", "omenix.vercel.app/india"] },
@@ -33,7 +34,7 @@ export const cases = [
     path: "/india/gallery",
     widths: [1280, 390],
     waitFor: ".mb-candles canvas",
-    expectText: ["Component gallery", "viable at your cost"],
+    expectText: ["Component gallery", "after your broker’s fees"],
     check: async (page) => {
       const problems = [];
       if (await page.$('.mb-sidebar [aria-current="page"]')) problems.push("the gallery marks a sidebar page as current");

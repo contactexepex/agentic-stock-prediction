@@ -6,7 +6,8 @@ import { RangeBar } from "../../../../../../components/charts/small.tsx";
 import { Card, CardHead, Delta, GoLink, Label, MoneyDelta, PaperTag, Quiet } from "../../../../../../components/ui/primitives.tsx";
 import { DataTable, type Column } from "../../../../../../components/ui/table.tsx";
 import { PICK_RULE } from "../../../../../../lib/ui/constants.ts";
-import { fmtDate, money, pct, price, signed } from "../../../../../../lib/ui/format.ts";
+import { firstExit } from "../../../../../../lib/ui/empty.ts";
+import { fmtDate, holdLabel, money, pct, price, signed } from "../../../../../../lib/ui/format.ts";
 import { stockStrategiesPath } from "../../../../../../lib/ui/routes.ts";
 import { bandsOf, isSettled, settledSummary, whyScale, whySegments } from "../../../../../../lib/company-pages/company-logic.ts";
 import type { CompanyPayload, OpenTrade, SettledTrade, TradeCheck } from "../../../../../../lib/company-pages/types.ts";
@@ -30,7 +31,7 @@ export function OpenTradesTable({ p, ctx }: { p: CompanyPayload; ctx: PageCtx })
   const cur = ctx.currency;
   const columns: Column<OpenTrade>[] = [
     { key: "strategy", header: "Strategy", render: (r) => <StrategyCell id={r.strategy_id} ctx={ctx} sub={r.view === "head_to_head" ? "head-to-head pick" : "accuracy view"} /> },
-    { key: "horizon", header: "Horizon", render: (r) => (<><span className="h-lab">N+{r.horizon_days}</span><small className="muted cw dates"> {fmtDate(r.entry_date, false)} → {fmtDate(r.exit_date, false)}</small></>) },
+    { key: "horizon", header: "Hold", render: (r) => (<><span className="h-lab" data-tip={`N+${r.horizon_days}`}>{holdLabel(r.horizon_days)}</span><small className="muted cw dates"> {fmtDate(r.entry_date, false)} → {fmtDate(r.exit_date, false)}</small></>) },
     { key: "entry", header: "Entry", numeric: true, className: "cw", render: (r) => price(cur, r.entry_price) },
     { key: "last", header: "Last", numeric: true, className: "cw", render: (r) => <span data-tip={`Latest stored close (${fmtDate(r.last_price_date)}); unrealised and the distance to the target are measured at it.`}>{price(cur, r.last_price)}</span> },
     { key: "unrealised", header: "Unrealised", numeric: true, render: (r) => (<><MoneyDelta currency={cur} value={r.unrealised_pnl} decimals={ctx.decimals} /><span className="cw"> <Delta value={r.unrealised_pct} /></span></>) },
@@ -77,13 +78,19 @@ function skippedWords(skipped: SettledTrade[], cur: string): string {
 
 /** Settled trades with the summary strip and the "why" bars; `settled` is the company's (page 03) or one session's
  *  (the call history). */
-export function SettledCard({ settled, ctx, paperLabel, ticker }: { settled: SettledTrade[]; ctx: PageCtx; paperLabel: string; ticker: string }) {
+/** "The first on TCS finishes on Tue 13 Oct." from the company's open trades (review section 4). */
+const firstOn = (open: readonly { exit_date?: string | null }[] | undefined, ticker: string): string => {
+  const first = firstExit(open ?? []);
+  return first ? `The first on ${ticker} finishes on ${fmtDate(first)}.` : "";
+};
+
+export function SettledCard({ settled, ctx, paperLabel, ticker, openTrades }: { settled: SettledTrade[]; ctx: PageCtx; paperLabel: string; ticker: string; openTrades?: readonly { exit_date?: string | null }[] }) {
   const cur = ctx.currency, rows = settled.filter(isSettled), skipped = settled.filter((t) => !isSettled(t));
   const sum = settledSummary(settled), scale = whyScale(rows);
   const columns: Column<SettledTrade>[] = [
     { key: "exit", header: "Exit", render: (t) => (<>{fmtDate(t.exit_date_actual ?? t.exit_date, false)}{t.flags?.length ? <small className="muted" tabIndex={0} data-tip={t.flags.join(", ")}> *</small> : null}</>) },
     { key: "strategy", header: "Strategy", render: (t) => <StrategyCell id={t.strategy_id} ctx={ctx} sub={t.view === "head_to_head" ? `head-to-head · ${PICK_RULE[t.pick_rule ?? ""] ?? t.pick_rule ?? "pick"}` : "accuracy view"} /> },
-    { key: "horizon", header: "Horizon", render: (t) => <span className="h-lab">N+{t.horizon_days}</span> },
+    { key: "horizon", header: "Hold", render: (t) => <span className="h-lab" data-tip={`N+${t.horizon_days}`}>{holdLabel(t.horizon_days)}</span> },
     { key: "prices", header: "Entry → exit", numeric: true, className: "cw", render: (t) => (
       <span data-tip={`Bought ${t.quantity ?? "—"} ${plural(t.quantity ?? 0, "share")} at the open of ${fmtDate(t.entry_date)}, sold at the close of ${fmtDate(t.exit_date_actual ?? t.exit_date)}; chance given ${pct(t.prob_up, 1)}, target ${price(cur, t.target_price)} (${t.target_reached ? `reached in session ${t.target_reached_session}` : "not reached"}), best ${signed(t.max_favourable_pct)}, worst ${signed(t.max_adverse_pct)}.`}>
         {price(cur, t.entry_price)} → {price(cur, t.exit_price)}
@@ -97,7 +104,7 @@ export function SettledCard({ settled, ctx, paperLabel, ticker }: { settled: Set
       const main = reasonWords(t.reason_code);
       const also = (t.reason_codes ?? []).filter((c) => c !== t.reason_code).map((c) => reasonWords(c)[0]).join(", ");
       const d = t.reason_detail ?? {};
-      const tip = `Move ${signed(t.move_pct)} = market ${signed(t.market_pct)} (${d.benchmark ?? "benchmark"} × beta ${d.beta ?? "—"}) + sector ${signed(t.sector_pct)} (${d.sector_source ?? "sector"}) + news ${signed(t.news_pct)} + company ${signed(t.company_pct)}. Main cause: ${main[0]}${also ? `; also ${also}` : ""}. ${main[1]}`;
+      const tip = `Move ${signed(t.move_pct)} = market ${signed(t.market_pct)} (${d.benchmark ?? "the market"} moved, and this stock usually moves ${d.beta ?? "—"}× the market, so the market explains this part) + sector ${signed(t.sector_pct)} (${d.sector_source ?? "sector"}) + news ${signed(t.news_pct)} + company ${signed(t.company_pct)}. Main cause: ${main[0]}${also ? `; also ${also}` : ""}. ${main[1]}`;
       return <span className="why" data-tip={tip}><WhyBar t={t} scale={scale} /><Label tone="neutral">{main[0]}</Label></span>;
     } },
   ];
@@ -105,7 +112,7 @@ export function SettledCard({ settled, ctx, paperLabel, ticker }: { settled: Set
     <Card label="Settled paper trades">
       <CardHead
         title={<>Settled results and why each moved <PaperTag label={paperLabel} /></>}
-        help="Every paper trade on this company that has exited, newest first, both views (accuracy: one trade per qualifying prediction; head-to-head: the daily picks). Net = profit after the market-cost charges of config/costs.yaml. “Why” splits the move into what the market explains (beta × benchmark), the sector beyond the market, verified news inside the window, and what is left for the company (F1.10, decision 43): bars to the right of the centre line pushed the price up, to the left down."
+        help="Every paper trade on this company that has finished, newest first (all trades: one per qualifying prediction; rule vs AI: the daily picks). Net = profit after brokerage, taxes and fees. “Why” splits the move into: the whole market, the sector, verified news, and the company itself; bars to the right of the centre line pushed the price up, to the left down."
         end={<GoLink href={stockStrategiesPath(ctx.market, ticker)}>By strategy</GoLink>}
       />
       {rows.length ? (
@@ -129,7 +136,7 @@ export function SettledCard({ settled, ctx, paperLabel, ticker }: { settled: Set
           </div>
         </>
       ) : (
-        <Quiet>{skipped.length ? `No settled trade yet. ${skipped.length} predictions could not become trades: ${skippedWords(skipped, cur)}.` : "No settled paper trade yet."}</Quiet>
+        <Quiet>{`${skipped.length ? `No finished trade yet. ${skipped.length} predictions could not become trades: ${skippedWords(skipped, cur)}.` : "No finished paper trade yet."} ${firstOn(openTrades, ticker)}`}</Quiet>
       )}
     </Card>
   );

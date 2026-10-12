@@ -182,7 +182,10 @@ root as `MB_NOW=2026-10-09T23:59:00Z PYTHONPATH=scripts python docs/plan_volatil
   `news_items.news_items` (decision 12: a company deleted by the cut-off is never in an item's tags) and
   `news_window` (3 days, at most 50: up to 25 company and 25 market-wide, a share one scope leaves unused going to the
   other, each kept by market movers, high materiality, then newest; owner, 2026-10-08), `calendar_events.calendar_events`,
-  `company_records` (lifecycle events, commands with deleted companies masked). The Companies page's commands:
+  `company_records` (lifecycle events, commands with deleted companies masked). rm.home also carries the "Can I rely on
+  this yet?" fields `go_live_checks`, `go_live_nearest`, `skill` and `intraday_next_at` (rm_common, `extra_keys`;
+  docs/ux/plain_language_implementation.md); the pages' plain words live in `web/lib/ui/constants.ts` and the
+  "when will it fill" empty states in `web/lib/ui/empty.ts`. The Companies page's commands:
   `POST .../companies/preview` (summary, add_company's resolved identifiers; nothing written) and
   `.../companies/commands` (written through B5's tool layer only when `confirmed_summary` equals the server's own
   preview; delete typed; `web/lib/data/company-commands.ts`).

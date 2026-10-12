@@ -17,6 +17,7 @@ import {
   localDate, missingSummaries, movers, NEWS_MOVERS_MAX, NEWS_PAGE_SIZE, NEWS_RECENT_HOURS, offsetMinutes, paginate,
   stories, type NewsFilter, type NewsItem, type RailCompany,
 } from "../../../../../lib/market-pages/news.ts";
+import { eventTypeWords, importanceWords } from "../../../../../lib/ui/constants.ts";
 import { DOW, fmtDate, fmtLocal, MONTH } from "../../../../../lib/ui/format.ts";
 import { companyPath, pagePath } from "../../../../../lib/ui/routes.ts";
 import type { CompanyRecord, GoLive, PageBase } from "../../../../../lib/ui/types.ts";
@@ -62,9 +63,9 @@ function ItemBody({ c, n }: { c: Ctx; n: NewsItem }) {
         <span data-tip={`Published by ${n.source ?? "the outlet"} ${at(n.published_at)}; first stored here ${at(n.first_seen_at)}.`}>
           {`${n.source ?? "Unknown outlet"} · published ${agoWords(c.p.cutoff ?? c.p.window.to, n.published_at)}`}
         </span>
-        {n.status ? <StatusBadge status={n.status} /> : <Label tone="neutral" tip="Market-wide stories carry no verification status: verification is per company (DESIGN 3b).">not verified per company</Label>}
-        <span data-tip="The news analyst’s materiality: how much the story can move the price.">{`${n.enrichment.materiality ?? "unscored"} materiality`}</span>
-        {n.market_moving ? <Label tone="warn" icon="warning" tip="The engine’s market-moving flag: high materiality and market-wide or a results item.">market moving</Label> : null}
+        {n.status ? <StatusBadge status={n.status} /> : <Label tone="neutral" tip="Checking is done per company, so a market-wide story has no check status.">market-wide news</Label>}
+        <span data-tip="How important the story is: how much it can move the price.">{importanceWords(n.enrichment.materiality)}</span>
+        {n.market_moving ? <Label tone="warn" icon="warning" tip="Likely to move prices: an important market-wide story or a results announcement.">likely to move prices</Label> : null}
         {n.enrichment.geopolitical ? <Label tone="neutral" tip="The news analyst marked it geopolitical.">geopolitical</Label> : null}
         {(n.independent_origins ?? 0) > 1 ? <span data-tip="Independent vetted outlets carrying the same story (copies of one agency story count once).">{`${n.independent_origins} outlets`}</span> : null}
         {n.primary_tickers.map((t) => (
@@ -124,7 +125,7 @@ function FeedCard({ c, filter, ticker, page, onFilter, onPage }: {
     <section className="card" aria-label="All stories of the window" id={FEED_ID}>
       <CardHead
         title={`Last ${p.window.days} days`}
-        help={`Every story first seen in the ${p.window.days} days before the cut-off, the latest stored first (the time shown is the outlet's publish time; the day groups follow the day the story was stored), ${NEWS_PAGE_SIZE} a page and at most ${p.window.max_items} in all (the owner's rule: a short trading window needs no older news). Older stories stay in the data; the Company page shows every stored story about a company. Filters: published in the last ${NEWS_RECENT_HOURS} hours, market-wide, the engine's market-moving flag, one company, or only stories that can carry a call (confirmed or corroborated).`}
+        help={`Every story first seen in the ${p.window.days} days before the cut-off, the latest stored first (the time shown is the outlet's publish time; the day groups follow the day the story was stored), ${NEWS_PAGE_SIZE} a page and at most ${p.window.max_items} in all (the owner's rule: a short trading window needs no older news). Older stories stay in the data; the Company page shows every stored story about a company. Filters: published in the last ${NEWS_RECENT_HOURS} hours, market-wide, likely to move prices, one company, or checked news only (confirmed by a filing or reported by two or more independent outlets).`}
         end={<span className="muted">{`${stories(p.news.length)} · ${last24} in the last ${NEWS_RECENT_HOURS} h`}</span>}
       />
       <div className="toolbar">
@@ -136,8 +137,8 @@ function FeedCard({ c, filter, ticker, page, onFilter, onPage }: {
             { value: "all", label: "All", tip: "Every story of the window." },
             { value: "24h", label: `Last ${NEWS_RECENT_HOURS} h`, tip: `Published in the ${NEWS_RECENT_HOURS} hours before the cut-off.` },
             { value: "market", label: "Market-wide", tip: "Stories about no single company." },
-            { value: "moving", label: "Market moving", tip: "The engine’s flag: high materiality and market-wide or a results item." },
-            { value: "carry", label: "Can carry a call", tip: "Confirmed by a filing or corroborated by independent outlets: the only statuses that may be the main evidence of a call." },
+            { value: "moving", label: "Likely to move prices", tip: "An important market-wide story or a results announcement." },
+            { value: "carry", label: "Checked news only", tip: "Confirmed by an official filing or reported independently by two or more outlets. Only these can be the main reason for a prediction." },
           ]}
         />
         {withNews.length ? (
@@ -149,14 +150,14 @@ function FeedCard({ c, filter, ticker, page, onFilter, onPage }: {
       </div>
       {noSummary !== null ? (
         <p className="note" style={{ margin: "8px 0 0" }}>
-          {`${noSummary} of the ${p.news.length} stories have no summary line yet (the analyst’s summaries were templated), so they show the headline alone; the article is one click away.`}
+          {`${noSummary} of the ${p.news.length} stories have no summary yet; the headline links to the article.`}
         </p>
       ) : null}
       {!items.length ? (
         <div className="empty" style={{ marginTop: 12 }}>
           {p.news.length
             ? filter === "carry"
-              ? "No story in the window is confirmed by a filing or corroborated by independent outlets yet: the stored statuses so far are unverified, single source, rumour and promotional. Such stories lower a call’s confidence and never carry it."
+              ? "No story in the window is confirmed by an official filing or reported by two or more independent outlets yet. Unchecked stories lower a prediction’s confidence and are never its main reason."
               : "No story matches this filter in the window."
             : `No story first seen in the last ${p.window.days} days (${p.window.older_hidden} older ${p.window.older_hidden === 1 ? "story is" : "stories are"} hidden by the window; the Company page shows them).`}
         </div>
@@ -199,7 +200,7 @@ function CalendarCard({ c }: { c: Ctx }) {
     <Card label="Coming up">
       <CardHead
         title={`Coming up · ${p.calendar_days} days`}
-        help="Scheduled events from the session being predicted: the market’s own (policy decisions, inflation and jobs prints, expiries, holidays) and the active companies’ results and ex-dividend dates. A major market event raises the regime to EVENT_HEAVY within two days before it and widens every range whose window contains it; a company’s results widen its own ranges and block a new call within a day."
+        help="Scheduled events from the session being predicted: the market’s own (policy decisions, inflation and jobs prints, expiries, holidays) and the active companies’ results and ex-dividend dates. A big scheduled event (like a central-bank decision) makes the expected price ranges wider, because prices can jump; a company’s results widen its own ranges, and no new prediction is made for it within a day of them."
       />
       {!p.calendar.length ? (
         <div className="empty">{`Nothing scheduled in the next ${p.calendar_days} days.`}</div>
@@ -213,12 +214,12 @@ function CalendarCard({ c }: { c: Ctx }) {
                 <div>
                   <div className="nm">{e.name}</div>
                   <div className="sub">
-                    {e.major ? <Label tone="warn" icon="warning" tip="Major: widens every range of this market whose window contains it (F2, major_event_factor).">major</Label> : null}
-                    {e.widens === "company" ? <Label tone="neutral" tip="Widens this company’s ranges; no new call within a day of it.">widens its ranges</Label> : null}
+                    {e.major ? <Label tone="warn" icon="warning" tip="Big event: the expected price ranges are widened around it.">big event</Label> : null}
+                    {e.widens === "company" ? <Label tone="neutral" tip="Widens this company’s expected price ranges; no new prediction within a day of it.">widens its ranges</Label> : null}
                     {e.ticker ? <Link className="tk" href={companyPath(market, e.ticker)}>{e.ticker}</Link> : null}
                     {e.release ? <span>{`release ${e.release}`}</span> : null}
                     {e.provisional ? <Label tone="neutral">date provisional</Label> : null}
-                    <span className="muted" data-tip={`Source: ${e.source}.`}>{e.type.replace(/_/g, " ")}</span>
+                    <span className="muted" data-tip={`Source: ${e.source}.`}>{eventTypeWords(e.type)}</span>
                   </div>
                 </div>
               </div>
@@ -277,7 +278,7 @@ function Legend({ c }: { c: Ctx }) {
       <span>
         {"Statuses: "}
         {CAN_CARRY.map((s) => <StatusBadge key={s} status={s} />)}
-        {" can carry a call; the others (single source, unverified, rumour, promotional, contradicted) cannot ("}
+        {" checked: can be the main reason for a prediction; the others (single source, unverified, rumour, promotional, contradicted) cannot ("}
         <Link href={`${pagePath(c.market, "help")}#news`}>Help</Link>)
       </span>
       <span><b>Open article</b> opens the outlet’s page in a new tab; the cockpit stores headlines, scores and statuses, never the text</span>
