@@ -47,7 +47,9 @@ VIEW_HEAD_TO_HEAD = "head_to_head"
 REASON_KIND_HEAD_TO_HEAD = "head_to_head"
 RECORD_KIND_SETTLEMENT = "settlement"
 SCOPES = ("strategy", "pick_rule", "strategy_regime")
-FRIDAY = 4  # date.weekday(): the weekly research run, Friday evening New York time for both markets (owner, 2026-10-10)
+# The weekly research run: Friday evening New York time for both markets (owner, 2026-10-10; the schedule lives in the
+# triggers, routine/WEEKLY_PROMPT.md and docs/DESIGN.md section 2).
+FRIDAY = 4  # date.weekday()
 REVIEW_TIMEZONE = "America/New_York"
 DAYS_PER_WEEK = 7
 STRATEGY_PAGE_FIELDS = tuple(name for name in STRATEGY_FIELDS if name not in ("parameters", "live_from"))
@@ -142,7 +144,8 @@ def reviews(ctx: BuildContext) -> list[dict]:
 def review_due(ctx: BuildContext, written: list[dict]) -> dict:
     """The next weekly research review (F6.2): the first Friday (New York date, both markets) on or after the cut-off
     whose ISO week has no review stored yet, and that week (the director's week: that of the last completed session).
-    A Friday stays due until its week's review is stored, whatever the run's time of day."""
+    A Friday is due until the end of that day in New York, whatever the run's time; from Saturday 00:00 New York the
+    next Friday is due whether or not that week's review was stored (a late review then shows in the reviews list)."""
     day = ctx.cutoff_time.astimezone(ZoneInfo(REVIEW_TIMEZONE)).date()
     day += timedelta(days=(FRIDAY - day.weekday()) % DAYS_PER_WEEK)
     done = {row["iso_week"] for row in written}
