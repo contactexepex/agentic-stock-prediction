@@ -145,5 +145,10 @@ MSG_UNMATCHED_NUMBERS = (
     "(context pack, script-written report, cited news text, stored rows): {examples}"
 )
 MSG_UNMATCHED_NUMBER_EXAMPLE = '{token!r} in "{sentence}"'
+MSG_REPORT_STATUS_WRONG = ("{name}: {count} news status word(s) that differ from the cited id's stored status as of "
+                           "the run (news_status_ids_asof; issue #460): {examples}")
+MSG_REPORT_STATUS_EXAMPLE = '{id} called {word!r}, stored {stored} in "{sentence}"'
+MSG_REPORT_STATUS_UNCITED = ("{name}: {count} news status word(s) with no news id after them in the sentence, so "
+                             "unchecked (cite the id right after the word): {examples}")
 MSG_SIGN_ALARMS = ("{name}: {count} number(s) after a falling word (fell, dropped, down ...) whose sources are all "
                    "positive (optional sign check, issue #32): {examples}")

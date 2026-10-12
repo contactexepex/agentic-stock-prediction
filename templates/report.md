@@ -13,6 +13,18 @@ its sentence names, the market level, and the news ids it cites, so name the com
 in the sentence that quotes their number. It cannot tell an invented number that equals a real one;
 the weekly spot-check judge reads a sample for claims, ids and numbers.
 
+News verification status words (issue #460): `rumour`, `unverified`, `single_source` (single-source),
+`corroborated`, `promotional`, `contradicted` and `confirmed_primary` are stored statuses, never your judgement.
+Attach one to a news id only when it is that id's status as of this run: the id's own status
+(`SELECT news_id, ticker, status FROM news_status_ids_asof(now())` in DuckDB) or the status of the event that lists
+it in the context pack's "News events and verification status" table (the `cite` column holds the ids whose own
+status is the event's). An event's status is not each of its ids' status: an id in a `rumour` event can itself be
+`promotional` or `unverified`, so cite the id whose status you name. Write the word in the id's parentheses
+(`(<id>, unverified)`) or right before them (`only a rumour (<id>)`), never with no id; "X or Y" passes when the id
+has one of them. Write "confirmed" only for `confirmed_primary` (a filing or announcement that confirms the event).
+`validate.py --stage report` blocks a word that differs from the stored status (`REPORT_STATUS`) and warns on a
+status word with no news id after it in its sentence (`REPORT_STATUS_UNCITED`); plain "confirmed" it cannot check.
+
 The filled report is also the source of the HTML report (`scripts/html_report.py`, run after the
 report gate passes): it copies the narrative below verbatim from under each heading and turns every
 cited id into a link to its source. So write each section only under its own heading, cite ids

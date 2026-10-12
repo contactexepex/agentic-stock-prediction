@@ -105,7 +105,8 @@ root as `MB_NOW=2026-10-09T23:59:00Z PYTHONPATH=scripts python docs/plan_volatil
   (`horizon_label` legacy_5d_d4); every summary shows the two bases apart, never pooled. An open-to-close
   call whose window has a session without a bar stays open (`session_gap_open`), never shifted.
   `validate` is the daily run's deterministic gate (`--stage collect|news_collect|news|features|context|forecast|report|all`,
-  settings in `config/validate.yaml`; prediction rules shared with `ai_replay` in `marketbrief/analytics/prediction_rules.py`);
+  settings in `config/validate.yaml`; `--stage report` also blocks a news status word that is not the cited id's
+  stored status or its event's, `REPORT_STATUS`, issue #460, `pipeline/validate/report_status.py`; prediction rules shared with `ai_replay` in `marketbrief/analytics/prediction_rules.py`);
   `spotcheck` picks the weekly judge sample.
   Schemas live in `scripts/marketbrief/core/schemas.py` (`scripts/common.py` is only the `ROOT`/`CONFIG` patch point).
   Where the code of the daily steps lives (each `scripts/<name>.py` is a thin entry point with the same flags): `marketbrief/pipeline/` (validate, review and lessons as packages, `context`, `score_predictions`, `spotcheck`, `market_status`), `marketbrief/replay/` (`backtest/`, `rule_replay/`, `ai_replay/`), `marketbrief/graph/` (`connection_map`, `news_hits`, `neo4j/`) `marketbrief/presentation/report/` (the report skeleton and Slack draft) and `marketbrief/presentation/dashboard/` (the dashboard: read helpers, data assembly, page build; `assets/` and `vendor/` hold its JS, CSS and the charting library). Messages and constants of each live in `marketbrief/constants/`.
@@ -465,9 +466,13 @@ root as `MB_NOW=2026-10-09T23:59:00Z PYTHONPATH=scripts python docs/plan_volatil
   11:27, 14:27 and 17:27 New York time, weekends 10:45 IST, 11:27 and 17:27 New York time, holidays included;
   owner decision 2026-10-12): `collect_news_only.py` runs `collect_news`,
   India's NSE announcements, `collect_articles`, `news_clusters` and `validate --stage news_collect`, then the
-  session commits and pushes the news data folders only; no agents, no Slack. The pre-open run's news analyst
+  session commits and pushes the news data folders only; no agents on weekdays, no Slack. Weekend sessions (a
+  Saturday or Sunday UTC start; owner decision 2026-10-12) then also run the news analyst on `news_pending.py`'s
+  input with the same `--stage news` gate (one retry) and append to `news_enriched` (NEWS_PROMPT.md step 3a), so
+  Monday's pre-open run finds only the items since. The pre-open run's news analyst
   scores `news_pending.py`'s output: every news/announcement id first seen since the last enrichment
-  (`marketbrief/pipeline/news_pending.py`; the news gate and `claims.py` use the same window; each line has a
+  (`marketbrief/pipeline/news_pending.py`; the news gate and `claims.py` use the same window, `claims.py` reaching
+  back also to the last pre-open `ranges` row; each line has a
   `priority`, watchlist lines first; the news gate warns `ENRICH_TEMPLATED` on templated watchlist summaries)
 - Intraday checks (WS5; `scripts/intraday_check.py`, code `marketbrief/intraday/`, settings `config/intraday.yaml`,
   `routine/INTRADAY_PROMPT.md`; schedules in DESIGN.md section 2): a few times per session, Yahoo 5-minute bars of
