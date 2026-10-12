@@ -222,7 +222,7 @@ root as `MB_NOW=2026-10-09T23:59:00Z PYTHONPATH=scripts python docs/plan_volatil
   `design/system/tokens-dark.css` by `web/tools/sync-design.mjs`) and follows the device's prefers-color-scheme; the top
   bar's theme button (`components/shell/theme-toggle.tsx`, `lib/ui/theme.ts`) cycles System / Light / Dark, remembered
   in localStorage `mb-theme` and applied by a head script before the first paint. The few app roles that differ in dark
-  (heatmap fills, alert links, round marks) are in `web/styles/app.css`. The UI harness's dark cases (`tests/ui/cases/dark.mjs`,
+  (heatmap fills and its no-trade dot, alert links, round marks) are in `web/styles/app.css`. The UI harness's dark cases (`tests/ui/cases/dark.mjs`,
   `--theme dark`, `--contrast`) fail on text below WCAG AA (`tests/ui/contrast.mjs`).
 - Strategy lab and lifecycle formats (W1, docs/SPEC.md sections 3-4 and 10; field guide `docs/DATA_CATALOGUE.md`,
   example data `design/catalogue/*.json`, rebuilt by `design/catalogue/make_examples.py` with B2's engine code; notes
