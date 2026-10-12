@@ -1008,8 +1008,9 @@ always show the same numbers.
   Charts, each single-purpose and drawn as inline SVG: a price-and-fan chart per company (one
   % scale shared by every company), a range-per-company chart, a sector-move bar chart and a
   promised-vs-actual track-record chart once something was scored. `index.html` lists all days.
-- `reports/<market>/dashboard.html` (`dashboard.py`, after `html_report.py`; code in
-  `scripts/marketbrief/presentation/dashboard/`): the decision-support dashboard for the owner's two
+- `reports/<market>/dashboard.html` (`dashboard.py`; code in `scripts/marketbrief/presentation/dashboard/`). Retired
+  from the daily run on 2026-10-10 (owner decision): the routine no longer builds the file, and the website shows the
+  same data. The code stays because the warehouse read models are built from its `gather_dashboard`. As built: the decision-support dashboard for the owner's two
   questions (buy at the next open, sell at the close of D+1 or D+4). One self-contained light-theme
   file, phone and desktop, no network at view time: market overview (benchmark, volatility index,
   regime, cues), sector heatmap, sortable watchlist; per stock a TradingView Lightweight Charts
@@ -1950,8 +1951,8 @@ only through validated CLIs, from Slack or Claude Code now and from an append-on
 
 The warehouse copy is written by `scripts/warehouse_sync.py` (docs/ws/ws1.md): every table is rebuilt as
 of the run's clock with each view's own pick rule plus `<stored_at> <= cutoff`, so a replay with MB_NOW
-builds exactly what was known then; read models are the dashboard's own data sliced per page, so the app
-and `reports/<market>/dashboard.html` can never disagree.
+builds exactly what was known then; read models are the dashboard's own data (`gather_dashboard`) sliced per page,
+so the app and the dashboard data can never disagree (the static `dashboard.html` itself is retired, 2026-10-10).
 
 **Paper portfolio and tiers (WS4, built 2026-10-07).** Paper trades (`portfolio_trades`) and add-company requests
 (`watchlist_requests`) are append-only kinds written only by `scripts/portfolio.py` after validation against stored
