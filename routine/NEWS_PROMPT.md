@@ -50,8 +50,9 @@ a line or file there, and never run a tool that overwrites one. Only the collect
 3a. Warehouse (optional, non-blocking): after step 3 pushed a commit or found nothing to commit, run
     `python scripts/warehouse_sync.py --kind news`, so a quiet pass that collected nothing new still syncs. It
     refreshes the market's copy in MotherDuck, rebuilds the read models whose payload changed and (from B4's
-    status change, `build/b4-status-freshness`) writes the sync's start to the status page, from which the app counts freshness (needs `MOTHERDUCK_TOKEN`). Skip it when step 2 exited 1
-    or step 3 ended the pass on a failed push (the local rows are not on main then), so missed syncs show as stale.
+    status change, `build/b4-status-freshness`) writes the sync's start to the status page, from which the app
+    counts freshness (needs `MOTHERDUCK_TOKEN`). Skip it when step 2 exited 1 or step 3 ended the pass on a failed
+    push (the local rows are not on main then), so missed syncs show as stale.
     Name any failure or skip in the final message; never retry and never run `--full`.
 
 4. Final message (no Slack): the market, `new_items`, the `window` (`google_when`, `reason`), the
