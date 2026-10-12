@@ -18,7 +18,8 @@ points and accept them all; none needs a design change.
 - **Long-history rebuild (accepted with review 3's limits):** `auto_adjust=False` is not as-traded; DC-12's
   reconstruction, splits, bonuses and dividends still apply. "Would cover the full inventory" in response 3 was an
   intended outcome, not a guarantee: coverage is recomputed after the fetch and gaps reported. Re-fetched bars add
-  observations, not untouched evidence or new market regimes. These are already in sections 8 and 11.
+  observations, not untouched evidence or new market regimes. Most of this is already in sections 8 and 11;
+  recomputing coverage after the fetch and "no new market regimes" are new here and apply when the study runs.
 - **Subrahmanyam (2026) (accepted):** review 3's pushback is correct. A publisher's reputation lowers confidence but
   does not show the paper's computations are wrong, and agreement with Martineau does not validate them. Limited,
   provisional weight; no design consequence.
