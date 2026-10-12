@@ -255,7 +255,7 @@ class ArticleRun:
             self.emit_not_requested(candidate, url, why, domain)
             return
         self.pacer.wait()
-        page = fetch_page(session, url, self.src)
+        page = fetch_page(session, url, self.src, self.pacer.wait)
         self.requests_made["fetch"] += page.requests
         if page.html is None:
             self.emit_unread(candidate, page)

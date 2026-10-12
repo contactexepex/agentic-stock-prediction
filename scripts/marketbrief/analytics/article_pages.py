@@ -114,14 +114,17 @@ def read_page(response, url: str, selection: dict, requests: int) -> FetchResult
     return FetchResult(status=200, final_url=url, html=body.decode(encoding, errors="replace"), requests=requests)
 
 
-def fetch_page(session, url: str, src: Sources) -> FetchResult:
+def fetch_page(session, url: str, src: Sources, pace=None) -> FetchResult:
     """GET an allowlisted HTTPS page, following at most `max_redirects` redirects by hand so that
-    every hop is checked (HTTPS, allowlisted) before it is requested. TLS verification stays on."""
+    every hop is checked (HTTPS, allowlisted) before it is requested. TLS verification stays on.
+    `pace` (the run's article pacer) runs before each redirect hop; the caller paces the first request."""
     selection, requests = src.sel, 0
     for _ in range(int(selection.get("max_redirects", DEFAULT_MAX_REDIRECTS)) + 1):
         allowed, why, _domain = url_check(url, src)
         if not allowed:
             return FetchResult(final_url=url, error=why, requests=requests, skipped=why)
+        if requests and pace is not None:
+            pace()
         try:
             requests += 1
             response = get_article_page(session, url, selection)

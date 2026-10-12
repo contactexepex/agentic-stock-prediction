@@ -197,7 +197,7 @@ def test_director_gate_checks_diffs_and_changes_nothing():
     proposal = {"proposal_id": "p-2026-W41-1", "kind": "threshold", "file": "config/strategies.yaml",
                 "diff": new_strategy_diff(), "rationale": "A stricter bar to test.",
                 "cited_ids": ["rule.model_news.v1"]}
-    review = {"findings": [finding], "proposals": [proposal], "prompt_version": "director-v1"}
+    review = {"findings": [finding], "proposals": [proposal], "prompt_version": "director-v2"}
     assert director.validate(review, facts) == []
     assert (REPO / "config" / "strategies.yaml").read_text() == before
     broken = {**proposal, "diff": proposal["diff"].replace(" " + before.splitlines()[-1], " no such line")}
@@ -229,7 +229,7 @@ def test_director_report_and_row():
     review = {"findings": [], "proposals": [{"proposal_id": "p-2026-W41-1", "kind": "threshold",
                                              "file": "config/strategies.yaml", "diff": new_strategy_diff(),
                                              "rationale": "Test.", "cited_ids": ["rule.model_news.v1"]}],
-              "prompt_version": "director-v1"}
+              "prompt_version": "director-v2"}
     written = director_report.store(facts, review, "2026-10-10T14:20:00Z", date(2026, 10, 10))
     text = Path(written["report"]).read_text()
     assert "status: proposed" in text and "```diff" in text and "not investment advice" in text
@@ -281,7 +281,7 @@ def test_director_diff_may_touch_only_its_file():
     extra = ("--- /dev/null\n+++ b/scripts/evil.py\n@@ -0,0 +1 @@\n+print('x')\n")
     proposal = {"proposal_id": "p-2026-W41-1", "kind": "threshold", "file": "config/strategies.yaml",
                 "diff": new_strategy_diff() + extra, "rationale": "Test.", "cited_ids": ["rule.model_news.v1"]}
-    errors = director.validate({"findings": [], "proposals": [proposal], "prompt_version": "director-v1"}, facts)
+    errors = director.validate({"findings": [], "proposals": [proposal], "prompt_version": "director-v2"}, facts)
     assert any("must change only config/strategies.yaml" in e for e in errors)
     after, why = director.applied("config/costs.yaml", facts["config_files"]["config/costs.yaml"], extra)
     assert after is None and "must change only" in why

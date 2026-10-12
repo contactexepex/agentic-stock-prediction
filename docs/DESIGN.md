@@ -293,6 +293,15 @@ run lost a day, and busy outlet feeds rolled weekend items off before Monday. No
   (Google's days end at midnight Pacific time: the slice `after:2026-10-03 before:2026-10-04` held items
   from 07:00 UTC to 07:00 UTC), at most 200 such re-asks per run (`sliced_queries`, `slices_skipped`);
   items older than the window are dropped as usual and duplicates are stored once.
+- Request spacing and polite stop (owner decision 2026-10-12: spacing fix only; schedules, frequency, window and
+  query lists unchanged; `marketbrief/collectors/news_fetch.py`). Two Google News requests of a run (queries, per-day
+  re-asks, the one retry) start at least `news.google_news.pause_seconds` (1.5 s) apart, two outlet-feed requests at
+  least `news.outlet_pause_seconds` (0.5 s). When Google answers HTTP 429 or 503, its `/sorry/` captcha page, or an
+  HTML page instead of RSS, that answer is a failed query (not retried) and no further Google News request is sent in
+  the run: the queries and re-asks not asked are listed in the summary's `google_skipped` and counted in the
+  `news_runs` row (`google_stopped` = why, `google_skipped` = how many; null on older rows). Outlet feeds (other
+  hosts) are still read. A stopped run is never `ok`, so the next run's window still starts at the last `ok` run and
+  asks again for the period the stopped run missed (within the 7-day cap); the news gate warns `NEWS_RUN_NOT_OK`.
 - News-only light runs (`scripts/collect_news_only.py`, saved prompt `routine/NEWS_PROMPT.md`, run for each
   market in turn by one combined session, 31 sessions a week including weekends and holidays; section 2): `collect_news`, for India
   `collect_nse_india.py --only announcements` (one market-wide call), `collect_articles`, `news_clusters`
@@ -1190,6 +1199,11 @@ Later (parked): options for India and US, paper first, only once stock ranges ar
   than the market's previous session, or 7 days for cues and factors), a stale or unpriced quote,
   a ticker with no option snapshot, an empty calendar, missing dividends where some are expected,
   and earnings dates when every method raised.
+  Every Yahoo call goes through `marketbrief/sources/yahoo_pacing.py` (owner decision 2026-10-12): two calls of a
+  process start at least `yahoo.pause_seconds` (config/settings.yaml, 0.5 s) apart, and after yfinance's
+  `YFRateLimitError` (HTTP 429) no further Yahoo call is made in that process: each symbol not asked fails with a
+  "stopped for this run" error in `failed` (no bar, quote, event or chain is written for it), and the summary adds
+  `yahoo_stopped` and `yahoo_skipped`.
 - India price fallback, added 2026-10-06: Yahoo had no 2026-10-05 bar for SBILIFE, HDFCLIFE,
   DRREDDY, MARUTI and ULTRACEMCO (it jumped from 10-01 to 10-06 although NSE traded on 10-05).
   `collect_prices.py` now fills a watchlist stock's missing bar for any of the last
@@ -1579,7 +1593,8 @@ open-to-close from the `call_scoring` switch (section 6); reflect-v1 started wit
 medium frontmatter; news-v9 and reflect-v2 only reword the schema path and the lessons gate; forecast-v13 with
 the Opus trader protocol (B3); forecast-v14 with the N+k window wording (B10, decision 37); trader-news-v1,
 trader-pattern-v1, trader-combined-v1, eod-v1 and director-v1 start with B3; trader-news-v2, trader-pattern-v2,
-trader-combined-v2 and forecast-v15 read the trader input in parts and copy its `input_check`), and a
+trader-combined-v2 and forecast-v15 read the trader input in parts and copy its `input_check`; eod-v2 writes no
+summary once the day's is stored; director-v2 names the Friday evening weekly run), and a
 per-call `model` field on predictions is a planned follow-up.
 
 ## 14. Credits (ideas adopted from other projects)
@@ -1926,6 +1941,18 @@ Decision 37: horizon k is N+k, buy at the open of D and sell at the close of the
   `config/settings.yaml` (the moment B10 reached main) separates old and new 5-day calls. The context pack's
   "Signal model" section shows N+k scores only (#95); the AI replay scores calls recorded before that moment on
   their old window as `legacy_cc`, apart (section 7, #96).
+- **Evening run** (B17's post-go-live batch, option C; B10's part). `ranges.py --evening` publishes the day's-close
+  ranges to the kind `ranges_evening`: the `ranges` columns plus `run: "evening"`, the same ids as the pre-open rows
+  they preview, once per id there. It applies no overnight cue (the day's stored quotes are its own pre-open cue, whose
+  session has closed) and no forecaster widening (the forecaster has not run). The pre-open rows in `ranges` stay
+  the revision of record: scoring, settlement, picks, trade checks and `ranges_asof` read only them. An evening
+  row may reuse the option snapshot collected that morning (US implied vol): stale, not look-ahead.
+  `ranges_asof(..., run="evening")` reads the evening rows for showing evening vs pre-open. Model scores stay in
+  `model_scores`: an evening row is followed by a pre-open row only when the probability changed, and readers take
+  the newest computed_at by their clock. New score rows carry `run` (`model_scores.py --evening` writes "evening",
+  otherwise "pre_open"; null on older rows = pre_open). `contracts/horizons.range_runs` and `score_runs` return
+  every run's N+k rows of a window of as-of dates known by the clock, each labelled with its run, for showing how
+  a forecast changed between the evening and the pre-open run.
 - **Backtest per horizon** (`model_backtest.py --out DIR` on stored data, open-to-close, after costs; model long at
   p >= 0.55, % per date, 95% block bootstrap; vs = mean difference per date; full run 37 s):
 
@@ -1989,6 +2016,11 @@ is as of the run's clock (MB_NOW-aware): each lab kind by its time column, bars 
   (`registry.is_live`; null = not live). Settle never settles a prediction or pick whose strategy is not live on its
   D (also after the switch: D is fixed per row), pick lets only live strategies contend, and the forward summary
   counts only live settlements; predict runs regardless (a rehearsal before go-live).
+- **Evening preview.** `lab.py predict --evening` (after the close, option C with B17 and B10) writes the rows the
+  next pre-open predict will write (same D, same ids) from B10's evening ranges (`ranges_asof(..., run="evening")`)
+  to `strategy_predictions_evening` (`run` = "evening") only: no cost_views, abstentions or picks, and settle, pick,
+  scoring and the pages read only `strategy_predictions`, so a preview is never traded; the pre-open run appends
+  the revision of record (docs/ws/b2.md "Evening preview").
 - **Amount.** `contracts.watchlist.trade_amount` (B1): the `set_amount` override in force (higher or lower,
   decision 44), else the default (₹1,00,000 / $1,000), copied into each prediction at `made_at`.
 - **Quantity.** India `floor(amount / open)`; 0 gives `skipped_price_above_amount`. US `round(amount / open, 6)`.

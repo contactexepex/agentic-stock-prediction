@@ -14,7 +14,7 @@ from marketbrief.analytics.index_cue import clip_beta
 from marketbrief.analytics.range_context import HorizonContext, RangeContext
 from marketbrief.analytics.range_switches import enabled
 from marketbrief.analytics.scoring import percent
-from marketbrief.constants.horizons import LABEL_N_PLUS_K
+from marketbrief.constants.horizons import LABEL_N_PLUS_K, RUN_EVENING
 from marketbrief.constants.indicators import QUALITY_BLOCKED, TRADING_DAYS
 from marketbrief.constants.range_inputs import (
     INPUT_BETA_SPLIT,
@@ -27,6 +27,7 @@ from marketbrief.constants.range_publication import (
     MSG_AI_WIDENED,
     MSG_CUE,
     MSG_CUE_IGNORED,
+    MSG_EVENING_NO_CUE,
     MSG_EX_DIVIDEND,
     MSG_INDEX_CUE,
     MSG_LATE_CLOSED,
@@ -111,7 +112,11 @@ def adjust_sigma(ctx: RangeContext, ticker: str, sigma_h: float, notes: list) ->
 def cue_center(
     ctx: RangeContext, ticker: str, feature_row: pd.Series, use_split: bool, notes: list, inputs: list
 ) -> float:
-    """The centre shift of the overnight cue (beta split of the index cue and the own cue, or the own cue)."""
+    """The centre shift of the overnight cue (beta split of the index cue and the own cue, or the own cue); none in
+    the evening run, whose stored quotes are the day's own pre-open cue (that session has closed), not the next."""
+    if ctx.run == RUN_EVENING:
+        notes.append(MSG_EVENING_NO_CUE)
+        return 0.0
     ranges_config, center = ctx.ranges_config, 0.0
     cue = feature_row.get("cue_change_pct")
     own = math.log1p(float(cue)) if cue is not None and not pd.isna(cue) else None

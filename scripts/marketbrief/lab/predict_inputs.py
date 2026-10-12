@@ -32,11 +32,15 @@ def active_tickers(cfg: dict, now: datetime) -> list[str]:
         return portfolio_active_tickers(cfg)
 
 
-def horizon_rows(market: str, now: datetime) -> tuple[list[dict], list[dict], list[dict]]:
+def horizon_rows(market: str, now: datetime, run: str | None = None) -> tuple[list[dict], list[dict], list[dict]]:
     """(scores, ranges, cross_scores) of every horizon as of `now`: the base model's scores, the ranges and the
-    cross_market model variant's scores (B10); raises NotImplementedError until B10 has built them."""
-    return (horizons_contract.scores_asof(market, now), horizons_contract.ranges_asof(market, now),
-            horizons_contract.scores_asof(market, now, variant=VARIANT_CROSS))
+    cross_market model variant's scores (B10); raises NotImplementedError until B10 has built them. run None (the
+    pre-open predict) calls ranges_asof without `run`, as before; run "evening" reads B10's ranges_evening through
+    ranges_asof(..., run="evening") (a TypeError until B10's signature has `run`)."""
+    scores = horizons_contract.scores_asof(market, now)
+    ranges = (horizons_contract.ranges_asof(market, now) if run is None
+              else horizons_contract.ranges_asof(market, now, run=run))
+    return scores, ranges, horizons_contract.scores_asof(market, now, variant=VARIANT_CROSS)
 
 
 def feature_rows(con, now: datetime) -> dict[str, dict]:

@@ -47,6 +47,7 @@ from marketbrief.intraday.quotes import complete_bars, last_bar_time, session_qu
 from marketbrief.intraday.rows import CheckContext, ticker_row
 from marketbrief.intraday.settings import check_id, check_time
 from marketbrief.intraday.store import stored_ids, write_rows
+from marketbrief.sources.yahoo_pacing import stop_report
 
 
 def symbols_needed(cfg: dict) -> dict[str, str]:
@@ -179,7 +180,7 @@ def run_check(cfg: dict, settings: dict, con, fetcher, now: datetime, out_root: 
             "skipped_trades": {**refused, "price_above_amount": sorted(ctx.skipped_trades),
                                "not_on_watchlist": [row["ticker"] for row in rows_unwatched]},
             "alert_ids": [alert["id"] for alert in alerts],
-            "benchmark_ret": ctx.ret(benchmark_key(cfg)), "cue": ctx.market_moves["cue"]}
+            "benchmark_ret": ctx.ret(benchmark_key(cfg)), "cue": ctx.market_moves["cue"], **stop_report()}
 
 
 def print_summary(summary: dict) -> None:

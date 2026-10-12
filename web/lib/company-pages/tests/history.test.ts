@@ -5,7 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
-  centreMovePct, historyAt, historyEntries, historyGeometry, rangeChangeWords, scoreChangeWords, scoreParts, type HistoryEntry,
+  centreMovePct, hasEvening, historyAt, historyEntries, historyGeometry, rangeChangeWords, runName, scoreChangeWords, scoreParts, type HistoryEntry,
 } from "../history-logic.ts";
 import type { ForecastHistory, HistoryRange, HistoryScore } from "../types.ts";
 
@@ -85,4 +85,20 @@ test("geometry: one time axis for both panels, bands around the target, P(up) po
   assert.equal(historyGeometry([], [], 900), null);
   const one = historyGeometry(ranges.slice(0, 1), [], 390)!;
   assert.ok(one.QH === 0 && one.target[0].x > one.L && one.target[0].x < one.W - one.R, "a single run sits inside the plot");
+});
+
+test("evening runs (B17, schema ForecastRun): named once any run is one, null reads as pre-open, and the pre-open run says it revises the evening run", () => {
+  const { ranges, scores } = historyAt(hdfc, 5);
+  assert.equal(hasEvening(ranges, scores), false, "the stored sample predates the evening run");
+  assert.equal(runName(ranges[0], false), "", "no labels while no run is an evening run");
+  const evening = { ...ranges[1], made_at: "2026-10-08T14:30:00Z", run: "evening" } as HistoryRange;
+  const preOpen = { ...ranges[1], run: "pre_open", change: { from_id: evening.id, from_made_at: evening.made_at, target_pct: 0.1, width80_pct: -1, changed: [] } } as HistoryRange;
+  const older = { ...ranges[0], run: null } as HistoryRange;
+  assert.equal(hasEvening([older, evening, preOpen]), true);
+  assert.deepEqual([older, evening, preOpen].map((r) => runName(r, true)), ["pre-open", "evening", "pre-open"]);
+  const [top] = historyEntries([older, evening, preOpen], []);
+  assert.equal(asRange(top).row.made_at, preOpen.made_at);
+  assert.deepEqual(rangeChangeWords(asRange(top)), ["pre-open revision of the evening run", "target +0.10%", "80% range narrower by 1.00%"]);
+  const sameClose = { ...preOpen, made_at: "2026-10-09T03:00:00Z", change: { ...preOpen.change!, from_id: preOpen.id, from_made_at: preOpen.made_at } } as HistoryRange;
+  assert.equal(rangeChangeWords(asRange(historyEntries([preOpen, sameClose], [])[0]))[0], "revised for the same close", "two pre-open runs stay a plain revision");
 });

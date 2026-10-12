@@ -84,6 +84,7 @@ from marketbrief.core.cli import market_arg, require_market
 from marketbrief.core.clock import utc_now, utc_today
 from marketbrief.core.paths import data_dir
 from marketbrief.core.storage import append_jsonl, day_file
+from marketbrief.sources.yahoo_pacing import paced_yfinance, stop_report
 from marketbrief.sources.sec_acceptance import time_warnings
 
 ISO_DATE_LENGTH = 10
@@ -310,6 +311,7 @@ class EventsCollector:
             **sec_times,
             **self.nse_info,
             SUMMARY_FAILED: self.failed,
+            **stop_report(),
         }
 
     def collect(self) -> int:
@@ -339,6 +341,5 @@ def main() -> int:
     )
     args = parser.parse_args()
     cfg = require_market(args)
-    import yfinance
-
+    yfinance = paced_yfinance()
     return EventsCollector(cfg, yfinance, args.no_history, args.history_days).collect()
