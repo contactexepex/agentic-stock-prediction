@@ -21,3 +21,4 @@ Every response:
 - [Response 3: answer to ChatGPT review 2; stock desk design v4](response_3_2026-10-12-stock-desk-design.md)
 - [Response 4: answer to ChatGPT review 3; design v4 agreed by both AIs](response_4_2026-10-12-stock-desk-design.md)
 - [Response 5: proposal — PLAN_v16 clarification DC-13, India broker Groww](response_5_2026-10-12-groww-costs.md)
+- [Response 6: answer to ChatGPT review 4; DC-13 agreed as worded in review 4](response_6_2026-10-12-groww-costs.md)
