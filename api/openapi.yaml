@@ -434,7 +434,7 @@ components:
       description: Serve-time (web/lib/data/serve.ts) from the row's built_at and the request time
       required: [state, built_at, age_minutes]
       properties:
-        state: {type: string, enum: [fresh, stale, unknown], description: 'stale after 480 minutes (FRESH_MINUTES)'}
+        state: {type: string, enum: [fresh, stale, unknown], description: 'stale after 1140 minutes (FRESH_MINUTES)'}
         built_at: {type: ['string', 'null'], format: date-time}
         age_minutes: {type: ['integer', 'null']}
     SessionStatus:

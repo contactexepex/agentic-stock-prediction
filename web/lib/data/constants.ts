@@ -12,8 +12,9 @@ export const TABLE_PATTERN = /^[a-z_]{1,40}$/;
 export const PAGE_KEY_PATTERN = /^[A-Za-z0-9._:&-]{1,80}$/;
 export const MARKET_PAGE_KEY = "_";
 
-/** A page older than this is stale: two missed 4-hourly news syncs (ARCHITECTURE.md section 11). */
-export const FRESH_MINUTES = 480;
+/** A page older than this is stale: two missed syncs on the news schedule of 2026-10-12, whose longest gap after one
+ * missed session is 1080 minutes (a weekend), plus a run's length (docs/ws/b4.md). */
+export const FRESH_MINUTES = 1140;
 /** The data cache's safety net; the sync revalidates changed pages by tag (ARCHITECTURE.md section 7). */
 export const CACHE_REVALIDATE_SECONDS = 86400;
 /** The read-model columns, in the order of every keyed SELECT. */
