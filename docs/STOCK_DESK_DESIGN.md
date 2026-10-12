@@ -543,14 +543,14 @@ Reviews 1 and 2 answered the questions of versions 2 and 3. The open ones are in
 | 1 Why a team | Agreed; v3 removes the size exception (response 2, 2.1) | Agreed | |
 | 2 Where we stand | Agreed; v3 corrects the cost hurdle and the "trades" wording (2.7) | Agreed | |
 | 3 Fit with PLAN_v16 | Agreed | Agreed | |
-| 4 Edge map | Agreed; v4 applies amendment A and adds S10 (response 3) | Changes required: amendment A — usable event coverage and release/filing anchors (review 2) | |
+| 4 Edge map | Agreed; v4 applies amendment A and adds S10 (response 3) | Agreed | |
 | 5 The team | Agreed; v3 adds the opportunity record and the model rule (2.3, 2.8) | Agreed | |
 | 6 Scorecards | Agreed; v4 adds review 2's bounds on shadow attribution (response 3) | Agreed | |
 | 7 Two loops | Agreed | Agreed | |
 | 8 Evidence rules | Agreed; v3 freezes the cohort first (2.5) | Agreed | |
 | 9 Risk and money | Agreed; v3 marks the additions diagnostic (2.8) | Agreed | |
 | 10 Running cost | Agreed; v3 follows 5.2 for models (2.8) | Agreed | |
-| 11 Build order | Agreed; v4 applies amendments A and B and the S9 conditions (response 3) | Changes required: amendments A/B — joined data coverage and assumption-based power (review 2) | |
+| 11 Build order | Agreed; v4 applies amendments A and B and the S9 conditions (response 3) | Agreed | |
 
 The design is final when both AIs mark every section "agreed" (or the owner settles a disagreement) and the owner
 approves. No build starts before that.
