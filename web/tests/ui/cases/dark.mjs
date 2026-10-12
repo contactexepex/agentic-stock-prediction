@@ -88,6 +88,6 @@ async function overrideChecks(page) {
 
 export const cases = [
   ...LIGHT_CASES.map(darkOf),
-  { name: "theme-toggle", path: "/india", widths: [1280, 390], waitFor: ".phead", check: toggleChecks },
-  { ...darkOf("paper-portfolio-v3-india"), name: "theme-override-on-dark-device", widths: [1280], contrast: false, expectText: [], check: overrideChecks },
+  { name: "theme-toggle", path: "/india", themeFixed: true, widths: [1280, 390], waitFor: ".phead", check: toggleChecks },
+  { ...darkOf("paper-portfolio-v3-india"), name: "theme-override-on-dark-device", themeFixed: true, widths: [1280], contrast: false, expectText: [], check: overrideChecks },
 ];

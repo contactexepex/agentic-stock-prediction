@@ -11,7 +11,7 @@
 // `--theme dark` runs every case in dark. A case with `contrast: true`, every case of a dark run, and every case with
 // `--contrast` also fails on text below WCAG AA contrast (tests/ui/contrast.mjs).
 // Usage (from web/): node tests/ui/harness.mjs [--only <case-name-substring>] [--port 3123] [--out ../work/ui]
-//   [--theme light|dark] [--contrast]
+//   [--theme light|dark] [--contrast]   (cases with `themeFixed: true` keep their own scheme)
 // Cases live in tests/ui/cases/*.mjs (one file per page session; each exports `cases`, an array, see cases/shell.mjs).
 // Playwright is the machine's global 1.56.1 (CI installs it the same way), launched on the preinstalled Chromium.
 // Fonts: the app self-hosts the design's face Inter (styles/fonts.css), so text widths do not depend on the machine;
@@ -90,7 +90,8 @@ async function loadCases() {
     for (const c of mod.cases ?? []) all.push({ file, ...c });
   }
   const picked = all.filter((c) => !only || c.name.includes(only));
-  return forcedTheme ? picked.map((c) => ({ ...c, theme: forcedTheme, contrast: c.contrast || forcedTheme === "dark", name: forcedTheme === (c.theme ?? "light") ? c.name : `${c.name}@${forcedTheme}` })) : picked;
+  // A case that tests the theme itself (`themeFixed`) keeps its own device scheme.
+  return forcedTheme ? picked.map((c) => c.themeFixed ? c : ({ ...c, theme: forcedTheme, contrast: c.contrast || forcedTheme === "dark", name: forcedTheme === (c.theme ?? "light") ? c.name : `${c.name}@${forcedTheme}` })) : picked;
 }
 
 async function startServer() {
