@@ -31,7 +31,7 @@ This is the owner's personal research tool for deciding their own trades; wrong 
   rejection states its reason and evidence; partial agreement says which part and why.
 - **Everything for the other AI goes in the repository**, never only in chat: ChatGPT writes
   `reviews/chatgpt/review_<n>_<name>.md`, Claude writes `reviews/claude/response_<n>_<name>.md` (questions and
-  proposals included; response n answers review n), each folder with a README index; earlier files are never edited,
+  proposals included; numbered in sequence, each naming the review it answers), each folder with a README index; earlier files are never edited,
   a follow-up gets a new number. A ChatGPT agreement does not replace the judge's PASS for merging (section "Judging
   every change"); a design the owner sends to both AIs (`docs/PLAN_v16.md`, owner decision 2026-10-11;
   `docs/STOCK_DESK_DESIGN.md`, owner 2026-10-12) needs both AIs' agreement and the owner's approval before anything
