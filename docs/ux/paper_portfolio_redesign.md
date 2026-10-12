@@ -1,87 +1,84 @@
 # Paper portfolio page: redesign proposal (UX3)
 
-Status: **proposal, waiting for the owner's approval.** Nothing is built yet.
+Status: **revised proposal (v2), waiting for the owner's approval.** Nothing is built yet.
 
-Mockup: `docs/ux/paper_portfolio_redesign/mockup.html`, with screenshots `shot-desktop.png` (a row expanded) and
-`shot-phone.png` (390 px). It uses real India data as built at Mon 12 Oct 2026, 18:31 IST: 209 strategy trades
-entered on 12 Oct, 14 Rule vs AI picks and no own trades. The blue notes in the mockup explain the design and are not
-part of the page. The US has no trades yet, so the US page shows the empty states.
+This version applies the owner's feedback on v1, given on 2026-10-12. v1 (`paper_portfolio_redesign/mockup.html`,
+`shot-*.png`) is kept for reference.
 
-## The problem
+Mockup v2: `paper_portfolio_redesign/mockup-v2.html`. It uses the app's own `web/styles/tokens.css`,
+`components.css` and fonts, and the icon sprite from `design/system/icons.svg`. Screenshots:
+- `v2-desktop-top.png` and `v2-desktop-hold.png` (one row's popover open)
+- `v2-phone-top.png` and `v2-phone-hold.png`
+- `*-full.png` for the whole page
 
-Today the page stacks five blocks: a KPI row, "All paper trades in one place", the head-to-head scoreboard,
-"Open paper trades by strategy" and your own portfolio. "All paper trades" puts every hold (N+1 to N+5), every state
-and every result in one 9-column table, opened by *entry* session. A 5-day hold therefore sits on a different entry
-session page than a 1-day hold that sells on the same day. The page never answers the plain question: "which of
-these are working?"
+The data is the real India `rm.portfolio`, built at Mon 12 Oct 2026, 18:31 IST: 209 strategy trades and 14 Rule vs
+AI picks, all open. To rebuild the mockup, run `make_mockup_v2.py <repo> <payload.json> <out.html>`. Tinted notes on
+the page explain the design and are not part of it. Nothing has finished yet, so "What finished recently" shows a
+labelled **illustration with sample numbers**; these are not stored results.
 
-## The new page: five sections, in the order a reader asks
+## Page, top to bottom
 
-1. **How are the paper trades doing?** Three tiles that are never added together: *Every strategy's trades*
-   (the accuracy view), *Rule vs AI picks* (the head-to-head view) and *Your own trades*. Each tile reads:
-   "N open · N finished · W won, L lost", then the net after fees, then the open trades' result so far before fees.
-2. **What finished recently?** This section shows finished trades only, grouped by the day they **sold** (chips
-   for the last 10 sessions, newest first). Each row has 5 columns: Company, Who, Hold, Result, Net after fees
-   (✓ made money or ✗ lost money: an icon and words, not colour alone). Tapping a row shows the buy and sell prices,
-   both fee views and the automatic reason. Empty state: "The first 1-day holds sell at the close of Tue 13 Oct;
-   their results show here after the after-close run (about 17:45 IST)."
-3. **What is still open?** There is one tab per hold length, for example "1-day hold · 39". A tab appears only when
-   that hold has trades; the baselines also hold for 2 and 4 days. Each tab opens with a line such as "Bought at the
-   open of Mon 12 Oct · sells at the close of Tue 13 Oct", then the split "✓ 4 going as predicted · ✗ 35 going
-   against (7 ⚠ well against) · … 0 no price yet". It then shows **three separate lists**:
-   - ✓ **Going as predicted**: the price is above the buy price. Every paper trade is bought on an "up"
-     prediction, so a rise means the prediction is holding so far.
-   - ✗ **Going against the prediction**: the price is at or below the buy price. ⚠ marks the trades whose latest
-     intraday check is flagged "against the prediction" (more than a usual day's move below the buy price). These
-     are listed first and tinted.
-   - … **No price yet**: the trade was bought at the open but has no check or close yet.
+1. **How are the paper trades doing?** Each box is split by side, and the sides sit next to each other:
+   - **Every strategy's trades**: one table with a row each for Rule, Baseline and AI. The columns are Open, Finished,
+     Won, Lost, Net after fees, and Open so far (before fees).
+   - **Rule vs AI picks**: a Rule side card and an AI side card, each showing open, finished, won and lost, net after
+     fees, and open so far.
+   - **Your own trades**: open and finished counts, plus the add-trade button.
 
-   Each list shows 8 rows, then "Show N more". The columns are Company, Who, Bought at, Now and So far, plus the
-   expand arrow. On a phone only Company, Who and So far are shown. Tapping a row shows the shares and the amount,
-   the sell date, the price's source and time, the expected range at the sale (a bar with "bought" and "now"
-   marked), the latest check in words, why the trade was bought (the strategy's chance of going up, and the AI
-   trader's own words), and links to the company and the strategy. A "Who" filter (All · Rule · Baselines · AI)
-   sits above the tabs.
-4. **Rule vs AI picks.** This keeps today's head-to-head scoreboard, with the cost switch, the luck test and the
-   per-pick-rule rows. Below it are its open picks, in the same tab and list layout as section 3. These picks come
-   from the same predictions as section 3, so the two sections are never added together.
-5. **Your own paper trades.** The content is unchanged: positions, the euro view for US positions, recorded trades,
-   the "Add own paper trade" form and its pending receipts. It now starts with a one-line summary.
+   These views are never added together.
+2. **What finished recently?** Filter chips for the day the trades sold, covering the last 10 sessions. Below them, a
+   comparison strip for Rule, Baseline and AI (won, lost, net after fees), then a lean table: Company, Who (a side
+   tag and the strategy), Hold, Won or Lost (a label with an icon), Net after fees, and ⓘ. The ⓘ popover gives the
+   stored reason: the automatic reason saying whether the market, the sector, the news or the company drove the
+   move. It also gives the buy and sell prices and the result after your fees.
+3. **Still open: every strategy's trades.** There are **no tabs**. Each hold length that has trades (1, 2, 3, 4 and
+   5 days) gets its own block, always visible and stacked. Each block has:
+   - a header: "N-day hold", when it sells, the number open, and the result so far before fees
+   - chips: ✓ as predicted, ✗ against (with ⚠ for trades far against at the latest check), and no price yet
+   - a **Rule · Baseline · AI comparison**: open, as predicted, against, profit so far, loss so far and net so far
+     (the profit and loss columns are hidden on a phone)
+   - the trade table, split into "✓ Going as predicted" and "✗ Going against the prediction", each with its count
+     and net. It shows 3 rows, then "Show N more". Its columns are Company, Who, Bought at, Now, So far and ⓘ; a
+     phone shows Company, Who, So far and ⓘ. The ⓘ popover holds the shares, the sell date, the expected range, the
+     latest check and why the trade was bought.
+4. **Still open: Rule vs AI picks.** The same blocks, with a Rule vs AI comparison only, because the baselines never
+   pick. The head-to-head scoreboard (luck test, the two pick rules, the cost switch) moves into an ⓘ or "details"
+   area of this section's summary.
+5. **Your own paper trades.** Positions, the euro view, recorded trades and the add form, all as now.
 
-The page loses the KPI row, the "All paper trades in one place" card (its 9-column table, the entry-session picker
-and the filter chips), and the "Open paper trades by strategy" card. The cost switch moves into section 4, the only
-section it changes. The header, the signals band, the Paper label and the "Technical details" footer stay.
+Explanations sit in ⓘ popovers and header tooltips instead of paragraphs. The page leads with numbers.
 
-## Data changes (additive only; nothing is removed from the contract)
+"Going as predicted" means above the buy price, before fees, for an "up" call; a "down" call flips the test (owner,
+2026-10-12). Every paper trade today is bought on an "up" call, so the build adds `direction` to the rows and the
+test reads it.
 
-The page needs open trades by hold and finished trades by sell day. Today the accuracy view is only paged by entry
-session, so the read model gains these, as of the cut-off as now:
+## Visual design
 
-- **`rm.portfolio` page `open:<k>`**: every open accuracy-view trade of hold k, whatever its entry session. It is
-  served by `GET /api/v1/markets/{market}/portfolios/open/{k}` and indexed by a new `all_trades.open_holds`:
-  `[{horizon_days, open, going_with, going_against, flagged, pending, exit_dates}]`. The tab counts come from this
-  index without fetching every list.
+The design follows Material 3 through the app's own tokens and components (B7):
+- `md-card` surfaces on `surface-container-low`, with the type scale (headline-small, title-large and
+  title-medium, body, label)
+- `md-chip` for the chips (filter chips for the sell day), `md-table` for the tables, `mb-label`
+  success and danger for won and lost, `mb-delta` for money, and `md-tooltip-rich` for the popovers
+- the side colours from the chart tokens (Rule = chart-1, Baseline = chart-2, AI = chart-3), always shown with
+  the side's name
+- Material Symbols from the sprite, so the icons are never colour alone
+
+Both themes work through the existing tokens. At 390 px the page has no horizontal scroll (measured: `scrollWidth`
+is 390).
+
+## Data changes (additive only)
+
+- **`rm.portfolio` page `open:<k>`**: every open accuracy-view trade of hold k, served by
+  `GET /api/v1/markets/{market}/portfolios/open/{k}`. Its index `all_trades.open_holds` holds, per hold: the counts
+  and the profit, loss and net so far per side, so the comparison strips render without loading the lists.
 - **`rm.portfolio` page `finished:<D>`**: every accuracy-view trade that sold on session D, for the last 10
-  sessions. It is served by `GET /api/v1/markets/{market}/portfolios/finished/{date}` and indexed by
-  `all_trades.finished_sessions`. The head-to-head trades and your own trades already sit whole on page `_`.
-- **New optional row fields**: `prob_up` and `reason` (from the prediction: the AI trader's own words, null for rule
-  strategies), and `reason_code` on finished rows (the automatic reason, F1.10).
-- The `trades:<D>` pages, `all_trades.sessions` and their route stay, so nothing that reads them breaks.
-
-The contract gains `api/paths|schemas/paper-portfolios.yaml` entries for the two routes and the new optional
-fields. `tests/test_openapi.py` and `tests/test_api_contract.py` stay green, because the new keys are added to the
-page's `extra_keys`.
+  sessions, served by `GET .../portfolios/finished/{date}`. Its index `all_trades.finished_sessions` holds the
+  per-side won, lost and net.
+- **New optional row fields**: `direction`, `prob_up`, `reason` (the AI trader's words), and on finished rows
+  `reason_code` with the automatic reason's parts (market, sector, news and company %).
+- `trades:<D>`, `all_trades.sessions` and their route stay. The head-to-head and own trades stay on page `_`.
 
 ## Rules kept
 
-Every figure is labelled Paper, and nothing on the page says buy or sell. Times are in the market's zone (IST or ET).
-"Won" means the trade made money after fees: market fees for strategies, your fees for your own trades. Open trades
-are before fees. The two views are never pooled. No table has more than 6 columns. Every empty section says when it
-fills.
-
-## Questions for the owner
-
-1. Are tabs for every hold that has trades (1 to 5 days) right, rather than only 1, 3 and 5? The baselines trade all
-   five holds.
-2. Is "above / below the buy price, before fees" the right test for "going as predicted"? The stricter "⚠ well
-   against" mark comes from the intraday check.
+Paper on every figure and never buy or sell advice; times in IST or ET; the views are never pooled; at most 7
+columns on desktop and 4 to 5 on a phone; every empty section says when it fills.
