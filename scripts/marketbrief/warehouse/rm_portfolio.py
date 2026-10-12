@@ -2,7 +2,7 @@
 GET /api/v1/markets/{market}/portfolios. Payload PaperPortfolios = design/mockups/07-paper-portfolios/data.json per
 market (notes.md there names every key and its selection rule): the shared blocks of rm_common, the companies with
 their last stored close, the head-to-head portfolios (scoreboard rows of scopes strategy and pick_rule), the open
-trades and the latest intraday trade checks (B4's and B12's derivations, the same rows as rm.trades `_`), and the
+head-to-head trades and their rows of the latest intraday trade check (B4's and B12's derivations), and the
 owner's own paper trades and FIFO positions with the EUR view of US positions (WS4/B2's portfolio service), and every
 paper trade in one place (`all_trades`, all_trades.py: open and closed, wins and losses; the accuracy view on one page
 per entry session, `trades:<D>`), all as of the cut-off.
@@ -104,16 +104,19 @@ def h2h_rows(ctx: BuildContext) -> list[dict]:
 
 
 def open_trades(ctx: BuildContext) -> list[dict]:
-    """Every open paper trade of the market (B4's shared derivation, rm_common.open_trades: the same rows as B12's
-    rm.trades `_` and the Company records' counts), in its page fields. Kept whole while B16's page still counts it;
-    trimmed to the head-to-head view once the page reads all_trades and the session pages (docs/ws/b13.md)."""
-    return [pick(trade, OPEN_TRADE_FIELDS) for trade in rm_common.open_trades(ctx)]
+    """The open head-to-head paper trades of the market (B4's shared derivation, rm_common.open_trades), in its page
+    fields. The accuracy view's open trades are on the session pages (all_trades.session_pages; size fix step 2,
+    docs/ws/b13.md)."""
+    return [
+        pick(trade, OPEN_TRADE_FIELDS) for trade in rm_common.open_trades(ctx) if trade["view"] == VIEW_HEAD_TO_HEAD
+    ]
 
 
 def trade_checks(ctx: BuildContext) -> list[dict]:
-    """The rows of the market's latest intraday trade check by the cut-off: B12's rm_company.market_trade_checks
-    (schema TradeCheck), the same list as rm.trades `_`, whole (the 07 page reads its subset of the fields)."""
-    return rm_company.market_trade_checks(ctx)
+    """The head-to-head rows of the market's latest intraday trade check by the cut-off: B12's
+    rm_company.market_trade_checks (schema TradeCheck), whole (the accuracy view's checks are on the session pages, in
+    each open row's `check`)."""
+    return [row for row in rm_company.market_trade_checks(ctx) if row["view"] == VIEW_HEAD_TO_HEAD]
 
 
 def portfolio_context(ctx: BuildContext) -> PortfolioContext:
