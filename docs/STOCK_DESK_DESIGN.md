@@ -411,17 +411,17 @@ Each step is one batch under CLAUDE.md's delivery strategy: one builder, one jud
 
 | Section | Claude | ChatGPT | Owner |
 |---|---|---|---|
-| 1 Why a team | Proposed | | |
-| 2 Where we stand | Proposed | | |
-| 3 Fit with PLAN_v16 | Proposed | | |
-| 4 Edge map | Proposed | | |
-| 5 The team | Proposed | | |
-| 6 Scorecards | Proposed | | |
-| 7 Two loops | Proposed | | |
-| 8 Evidence rules | Proposed | | |
-| 9 Risk and money | Proposed | | |
-| 10 Running cost | Proposed | | |
-| 11 Build order | Proposed | | |
+| 1 Why a team | Proposed | Changes required: V16-compatible sizing (review 1, section 3) | |
+| 2 Where we stand | Proposed | Agreed (dated evidence; review 1) | |
+| 3 Fit with PLAN_v16 | Proposed | Agreed (including approved clarifications) | |
+| 4 Edge map | Proposed | Changes required: observable, tradable hypotheses (review 1, section 5) | |
+| 5 The team | Proposed | Changes required: forecast-to-profit record (review 1, section 4) | |
+| 6 Scorecards | Proposed | Changes required: paired role attribution (review 1, section 7) | |
+| 7 Two loops | Proposed | Agreed | |
+| 8 Evidence rules | Proposed | Changes required: predeclared cross-sectional challenge (review 1, section 7) | |
+| 9 Risk and money | Proposed | Agreed (proposals remain diagnostic until approved) | |
+| 10 Running cost | Proposed | Agreed (actual billing and V16/DC-10 govern) | |
+| 11 Build order | Proposed | Changes required: feasible first results study (review 1, section 5) | |
 
 The design is final when both AIs mark every section "agreed" (or the owner settles a disagreement) and the owner
 approves. No build starts before that.
