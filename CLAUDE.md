@@ -360,7 +360,11 @@ root as `MB_NOW=2026-10-09T23:59:00Z PYTHONPATH=scripts python docs/plan_volatil
   N+1. Legacy rows are never pooled with N+k; the context pack's signal-model section shows N+k scores only, and
   `ai_replay score` scores calls recorded before `n_plus_k_from` on their old window apart (`legacy_cc`).
   `contracts/horizons.py` `scores_asof` (`variant=base|cross_market`) and `ranges_asof` give the N+k records as of
-  a time (no look-ahead).
+  a time (no look-ahead). The evening run (B17, option C): `ranges.py --evening` writes the day's-close ranges to
+  `ranges_evening` (same ids as the pre-open rows, `run: "evening"`, no overnight cue), never scored or traded;
+  `ranges_asof(..., run="evening")` reads them, its default stays the pre-open rows in `ranges`; new `model_scores`
+  rows carry `run` (`model_scores.py --evening`; null on older rows = pre_open); `range_runs` and `score_runs` give
+  every run of a window of as-of dates, labelled by run (B12's forecast history).
 - Paper portfolio and signal tiers (WS4; `scripts/portfolio.py --market india|us`, logic in `marketbrief/portfolio/`,
   settings `config/portfolio.yaml`, notes `docs/ws/ws4.md`): research only, a paper trade is a record, never an order.
   `add-trade` validates (watchlist ticker, a session, price = the stored bar's open/close or a manual price inside its
@@ -382,7 +386,8 @@ root as `MB_NOW=2026-10-09T23:59:00Z PYTHONPATH=scripts python docs/plan_volatil
   `config/strategies.yaml` (`registry.is_live`: settle, pick and the forward summary skip pre-live rows, predict
   rehearses)): `predict` (pre-open, rule strategies and baselines from B10's
   per-horizon scores and ranges -> `strategy_predictions`, blocks as `strategy_abstentions`, the cost-viable rows
-  of decision 51 of the new qualifying ones -> `cost_views`), `pick` (pre-open,
+  of decision 51 of the new qualifying ones -> `cost_views`; `predict --evening` after the close ->
+  `strategy_predictions_evening` (preview from B10's evening ranges, never traded)), `pick` (pre-open,
   refused at or after D's open: the head-to-head picks per company, family and pick rule -> `head_to_head_picks`,
   and the cost-viable rows of every pick and of each qualifying prediction without one yet -> `cost_views`; "best expected gain" = the horizon with the highest
   expected gain per session held), `settle` (post-close: every due trade of both views -> `paper_trades_settled` in

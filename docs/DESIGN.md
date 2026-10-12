@@ -1933,6 +1933,18 @@ Decision 37: horizon k is N+k, buy at the open of D and sell at the close of the
   `config/settings.yaml` (the moment B10 reached main) separates old and new 5-day calls. The context pack's
   "Signal model" section shows N+k scores only (#95); the AI replay scores calls recorded before that moment on
   their old window as `legacy_cc`, apart (section 7, #96).
+- **Evening run** (B17's post-go-live batch, option C; B10's part). `ranges.py --evening` publishes the day's-close
+  ranges to the kind `ranges_evening`: the `ranges` columns plus `run: "evening"`, the same ids as the pre-open rows
+  they preview, once per id there. It applies no overnight cue (the day's stored quotes are its own pre-open cue, whose
+  session has closed) and no forecaster widening (the forecaster has not run). The pre-open rows in `ranges` stay
+  the revision of record: scoring, settlement, picks, trade checks and `ranges_asof` read only them. An evening
+  row may reuse the option snapshot collected that morning (US implied vol): stale, not look-ahead.
+  `ranges_asof(..., run="evening")` reads the evening rows for showing evening vs pre-open. Model scores stay in
+  `model_scores`: an evening row is followed by a pre-open row only when the probability changed, and readers take
+  the newest computed_at by their clock. New score rows carry `run` (`model_scores.py --evening` writes "evening",
+  otherwise "pre_open"; null on older rows = pre_open). `contracts/horizons.range_runs` and `score_runs` return
+  every run's N+k rows of a window of as-of dates known by the clock, each labelled with its run, for showing how
+  a forecast changed between the evening and the pre-open run.
 - **Backtest per horizon** (`model_backtest.py --out DIR` on stored data, open-to-close, after costs; model long at
   p >= 0.55, % per date, 95% block bootstrap; vs = mean difference per date; full run 37 s):
 
@@ -1996,6 +2008,11 @@ is as of the run's clock (MB_NOW-aware): each lab kind by its time column, bars 
   (`registry.is_live`; null = not live). Settle never settles a prediction or pick whose strategy is not live on its
   D (also after the switch: D is fixed per row), pick lets only live strategies contend, and the forward summary
   counts only live settlements; predict runs regardless (a rehearsal before go-live).
+- **Evening preview.** `lab.py predict --evening` (after the close, option C with B17 and B10) writes the rows the
+  next pre-open predict will write (same D, same ids) from B10's evening ranges (`ranges_asof(..., run="evening")`)
+  to `strategy_predictions_evening` (`run` = "evening") only: no cost_views, abstentions or picks, and settle, pick,
+  scoring and the pages read only `strategy_predictions`, so a preview is never traded; the pre-open run appends
+  the revision of record (docs/ws/b2.md "Evening preview").
 - **Amount.** `contracts.watchlist.trade_amount` (B1): the `set_amount` override in force (higher or lower,
   decision 44), else the default (₹1,00,000 / $1,000), copied into each prediction at `made_at`.
 - **Quantity.** India `floor(amount / open)`; 0 gives `skipped_price_above_amount`. US `round(amount / open, 6)`.

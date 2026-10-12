@@ -3,8 +3,10 @@ trade is a record, never an order. Conventions as in core/schema_lab.py (money i
 percent points)."""
 from __future__ import annotations
 
-from marketbrief.constants.kinds import KIND_COST_VIEWS, KIND_LAB_BACKTESTS
+from marketbrief.constants.kinds import (KIND_COST_VIEWS, KIND_LAB_BACKTESTS, KIND_STRATEGY_PREDICTIONS,
+                                         KIND_STRATEGY_PREDICTIONS_EVENING)
 from marketbrief.core.schema_base import Schemas
+from marketbrief.core.schema_lab import LAB_SCHEMAS
 
 B2_SCHEMAS: Schemas = {
     # The two cost views (decision 50) and the cost-viable flag (decision 51) of one lab record, in the day file of
@@ -50,5 +52,14 @@ B2_SCHEMAS: Schemas = {
         "worst_losing_streak": "INTEGER", "max_drawdown": "DOUBLE", "your_net_pnl": "DOUBLE",
         "your_mean_return_pct": "DOUBLE", "luck_test": "JSON", "sample_badge": "VARCHAR", "first_entry": "DATE",
         "last_exit": "DATE",
+    }),
+    # The evening preview (`lab.py predict --evening`, option C agreed with B17 and B10; docs/ws/b2.md "Evening
+    # preview"): the rows the pre-open predict would write, computed after the close on the day's close with B10's
+    # evening ranges (ranges_asof run="evening") and the scores as of the evening clock, in the day file of made_at.
+    # The columns of strategy_predictions (derived, so they cannot drift) plus run = "evening"; the same ids as the
+    # pre-open rows they preview (first row per id). Never traded: settle, pick, trade checks, scoring and the
+    # warehouse pages read only strategy_predictions; no cost_views, abstentions or picks are written for them.
+    KIND_STRATEGY_PREDICTIONS_EVENING: ("jsonl", {
+        **LAB_SCHEMAS[KIND_STRATEGY_PREDICTIONS][1], "run": "VARCHAR",
     }),
 }
