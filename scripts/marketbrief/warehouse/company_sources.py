@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 
 from marketbrief.analytics.horizon_records import ranges_asof
+from marketbrief.constants.horizons import RUN_EVENING, RUN_PRE_OPEN
 from marketbrief.constants.rm_company import BAR_LOOKBACK_DAYS, BAR_SESSIONS
 from marketbrief.core.schemas import SCHEMAS
 from marketbrief.lab import reads as lab_reads
@@ -104,12 +105,19 @@ def bar_rows(con, as_of: str, cutoff: datetime) -> dict[str, list[dict]]:
 def published_ranges(ctx: BuildContext, as_of: str) -> list[dict]:
     """ranges.py's published range per ticker and horizon of the as-of date, stored by the cut-off (B10's
     horizon_records.ranges_asof), of the collected companies; published for every company whatever a strategy's
-    live_from, so the page shows them before go-live too."""
-    rows = ranges_asof(ctx.market, ctx.cutoff_time, con=ctx.con)
-    return [{**row, "as_of_date": str(row["as_of_date"]), "session_date": str(row["session_date"]),
-             "exit_date": str(row["exit_date"]), "made_at": iso(row["made_at"]),
-             "target_price": target_price(row, None)}
-            for row in rows if row["ticker"] in ctx.collected and str(row["as_of_date"]) == as_of]
+    live_from, so the page shows them before go-live too. `run` = "pre_open" (the revision of record); a company
+    with no pre-open range of the as-of date yet (the evening run moved the as-of date to the day's close) shows that
+    date's evening preview instead, `run` = "evening" (B17's evening run; never traded)."""
+    def of_as_of(run: str) -> list[dict]:
+        rows = ranges_asof(ctx.market, ctx.cutoff_time, con=ctx.con, run=run)
+        return [{**row, "as_of_date": str(row["as_of_date"]), "session_date": str(row["session_date"]),
+                 "exit_date": str(row["exit_date"]), "made_at": iso(row["made_at"]),
+                 "target_price": target_price(row, None), "run": run}
+                for row in rows if row["ticker"] in ctx.collected and str(row["as_of_date"]) == as_of]
+
+    pre_open = of_as_of(RUN_PRE_OPEN)
+    ranged = {row["ticker"] for row in pre_open}
+    return pre_open + [row for row in of_as_of(RUN_EVENING) if row["ticker"] not in ranged]
 
 
 def read_sources(ctx: BuildContext, as_of: str | None, session_date: str | None) -> CompanySources:
