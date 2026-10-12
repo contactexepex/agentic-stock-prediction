@@ -141,7 +141,7 @@ function TradeList({ p, rows }: { p: Props["p"]; rows: AllTradesRow[] }) {
   return (
     <div className="md-table-wrap">
       <table className="md-table tbl at-list">
-        <thead><tr><th>Company</th><th>Whose</th><th className="dt">Dates</th><th className="num cw">Bought at</th><th className="num cw">Sold at / last</th><th>State</th><th className="num">Result</th></tr></thead>
+        <thead><tr><th>Company</th><th>Whose</th><th className="dt">Dates</th><th className="num cw">Bought at</th><th className="num cw">Sold at / last</th><th className="stc">State</th><th className="num">Result</th></tr></thead>
         <tbody>
           {rows.map((row) => {
             const cur = row.currency ?? p.currency, d = moneyDecimals(cur), res = resultFigure(row);
@@ -154,8 +154,9 @@ function TradeList({ p, rows }: { p: Props["p"]; rows: AllTradesRow[] }) {
                 <td className="nowrap dt">{row.scope === "mine" ? (row.side === "sell" ? `sold ${fmtDate(row.exit_date, false)}` : `bought ${fmtDate(row.entry_date, false)}`) : <>{row.entry_date ? fmtDate(row.entry_date, false) : DASH}{" → "}{row.exit_date ? fmtDate(row.exit_date, false) : DASH}</>}{row.state === "open" && row.exit_date ? <small className="muted" style={{ display: "block", fontSize: 11 }}>planned exit</small> : null}</td>
                 <td className="num cw">{row.price_pending ? DASH : price(cur, row.entry_price)}</td>
                 <td className="num cw">{row.price_pending ? DASH : price(cur, row.exit_or_last_price)}{lastWords ? <small className="muted" style={{ display: "block", fontSize: 11 }}>{lastWords}</small> : null}</td>
-                <td>{stateWords(row)}</td>
-                <td className="num">
+                <td className="stc">{stateWords(row)}</td>
+                <td className="num res">
+                  <span className="st-ph">{stateWords(row)}</span>
                   {res.value === null ? <span className="muted">{row.state === "closed" ? "not stored yet" : DASH}</span> : <MoneyDelta currency={cur} value={res.value} decimals={d} />}
                   {res.value !== null ? <small className="muted" style={{ display: "block", fontSize: 11 }}>{COST_WORDS[res.cost]}{row.state === "open" && row.unrealised_pct !== null && row.unrealised_pct !== undefined ? ` · ${signed(row.unrealised_pct)}` : ""}</small> : null}
                 </td>

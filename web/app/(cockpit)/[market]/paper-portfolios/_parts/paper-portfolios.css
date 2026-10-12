@@ -84,4 +84,5 @@
 .p-portfolios .at-list .whom small{display:block;font-size:11px;color:var(--md-sys-color-on-surface-variant)}
 .p-portfolios .at-list .whom .mb-label{margin-left:4px}
 .p-portfolios .at-list tr.few td{color:var(--md-sys-color-on-surface-variant)}
-@media (max-width:599px){ .p-portfolios .at-list td.cw,.p-portfolios .at-list th.cw,.p-portfolios .at-list td.dt,.p-portfolios .at-list th.dt{display:none} .p-portfolios .at-list td,.p-portfolios .at-list th{padding-left:6px;padding-right:6px} .p-portfolios .at-list .whom .mb-label{display:none} }
+.p-portfolios .at-list .st-ph{display:none}
+@media (max-width:599px){ .p-portfolios .at-list td.cw,.p-portfolios .at-list th.cw,.p-portfolios .at-list td.dt,.p-portfolios .at-list th.dt{display:none} .p-portfolios .at-list td,.p-portfolios .at-list th{padding-left:6px;padding-right:6px} .p-portfolios .at-list .whom .mb-label{display:none} .p-portfolios .at-list td.stc,.p-portfolios .at-list th.stc{display:none} .p-portfolios .at-list .st-ph{display:block;font-size:11px;color:var(--md-sys-color-on-surface-variant);white-space:normal;text-align:right} }

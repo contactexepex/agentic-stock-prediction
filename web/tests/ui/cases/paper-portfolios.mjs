@@ -6,9 +6,9 @@ import { storedApi } from "../b16/stored.mjs";
 import { readFileSync } from "node:fs";
 import { envelope, mockupPayload } from "../fixtures.mjs";
 
-/** B13's sample all_trades block (judged build/b13-all-trades 83887948, from tests/test_b13_all_trades.py's fixture): a
- * subset B13 sent (4 of its 18 summary rows, 5 of its 9 trades, so the head-to-head summary has no trade behind it in
- * the list), the not-entered row's prices nulled by B13 as in real data; on the US mockup page. */
+/** B13's sample all_trades block (judged build/b13-all-trades 83887948, from tests/test_b13_all_trades.py's fixture): the
+ * part B13 sent (its summary trimmed to family all and mine, its trades trimmed to 5 rows, so the head-to-head summary
+ * has no trade behind it in the list), the not-entered row's prices nulled by B13 as in real data; on the US mockup page. */
 const SAMPLE = JSON.parse(readFileSync(new URL("../b16/all-trades-sample-us.json", import.meta.url), "utf8"));
 function withSample(rest, market) {
   if (rest !== "portfolios") return undefined;
@@ -73,14 +73,23 @@ export const cases = [
     expectText: ["1 open · 4 closed · 2 won, 1 lost, 1 even", "1 open · 3 closed · 1 won, 1 lost, 1 even", "did not enter: no stored open price that day"],
     check: async (page) => {
       const problems = [];
+      // every visible list column lies inside the table's visible box (no column scrolled out of sight), in each view
+      // that has rows: All strategies first, then Mine; fails when the list has no header at all
+      const clipped = () => page.$$eval(".p-portfolios .at-list", (tables) => {
+        if (!tables.length) return ["no trade list"];
+        const wrap = tables[0].closest(".md-table-wrap").getBoundingClientRect();
+        const ths = [...tables[0].querySelectorAll("th")].filter((th) => th.getBoundingClientRect().width > 0);
+        if (!ths.length) return ["no visible column header"];
+        return ths.filter((th) => th.getBoundingClientRect().right > wrap.right + 0.5).map((th) => `${th.textContent} ends at ${Math.round(th.getBoundingClientRect().right)}, box at ${Math.round(wrap.right)}`);
+      });
+      for (const p of await clipped()) problems.push(`All strategies: ${p}`);
       await page.click('[aria-label="Whose trades"] button:has-text("Mine")');
+      for (const p of await clipped()) problems.push(`Mine: ${p}`);
       const text = await page.textContent('[aria-label="All paper trades"]');
       if (!text.includes("sold 9 Oct") || !text.includes("bought 9 Oct")) problems.push("your own trades' dates not in words");
       if (text.includes("planned exit")) problems.push("a planned exit shown on your own open lot");
       await page.click('[aria-label="Whose trades"] button:has-text("Head-to-head")');
       if (!(await page.textContent('[aria-label="All paper trades"]')).includes("1 without your-cost figure yet")) problems.push("missing your-cost count not shown");
-      const hidden = await page.$$eval(".p-portfolios .at-list th", (ths) => ths.filter((th) => th.getBoundingClientRect().right > window.innerWidth + 1).map((th) => th.textContent));
-      if (hidden.length) problems.push(`columns past the screen edge: ${hidden.join(", ")}`);
       return problems;
     },
   },
