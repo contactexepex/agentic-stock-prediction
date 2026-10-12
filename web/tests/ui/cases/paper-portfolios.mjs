@@ -3,7 +3,16 @@
 // filters, the add-trade form against POST /paper-trades (pending, a refusal, a retry with the same key), and the
 // error state. The POST is answered in the test; nothing reaches any inbox.
 import { storedApi } from "../b16/stored.mjs";
+import { readFileSync } from "node:fs";
 import { envelope, mockupPayload } from "../fixtures.mjs";
+
+/** B13's sample all_trades block (judged build/b13-all-trades 83887948, from tests/test_b13_all_trades.py's fixture; the
+ * not-entered row's prices nulled by B13 as in real data), on the US mockup page. */
+const SAMPLE = JSON.parse(readFileSync(new URL("../b16/all-trades-sample-us.json", import.meta.url), "utf8"));
+function withSample(rest, market) {
+  if (rest !== "portfolios") return undefined;
+  return { status: 200, body: envelope(market, "_", { ...mockupPayload("07-paper-portfolios", market), all_trades: SAMPLE }) };
+}
 
 const HTTP_ERROR_LINE = /^Failed to load resource: the server responded with a status of (422|503)/;
 const PAPER = "No proven strong signals today";
@@ -53,6 +62,25 @@ const press = (page, group, text) => page.click(`[aria-label="${group}"] button:
 const listText = (page) => page.textContent('[aria-label="All paper trades"] .at-list').catch(() => "");
 
 export const cases = [
+  {
+    name: "paper-portfolios-all-trades-sample",
+    path: "/us/paper-portfolios",
+    market: "us",
+    api: withSample,
+    widths: [1280, 390],
+    waitFor: ".p-portfolios .at-list",
+    expectText: ["1 open · 4 closed · 2 won, 1 lost, 1 even", "1 open · 3 closed · 1 won, 1 lost, 1 even", "did not enter: no stored open price that day"],
+    check: async (page) => {
+      const problems = [];
+      await page.click('[aria-label="Whose trades"] button:has-text("Mine")');
+      const text = await page.textContent('[aria-label="All paper trades"]');
+      if (!text.includes("sold 9 Oct") || !text.includes("bought 9 Oct")) problems.push("your own trades' dates not in words");
+      if (text.includes("planned exit")) problems.push("a planned exit shown on your own open lot");
+      await page.click('[aria-label="Whose trades"] button:has-text("Head-to-head")');
+      if (!(await page.textContent('[aria-label="All paper trades"]')).includes("1 without your-cost figure yet")) problems.push("missing your-cost count not shown");
+      return problems;
+    },
+  },
   {
     name: "paper-portfolios-all-trades",
     path: "/india/paper-portfolios",

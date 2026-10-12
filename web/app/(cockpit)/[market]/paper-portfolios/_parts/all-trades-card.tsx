@@ -151,7 +151,7 @@ function TradeList({ p, rows }: { p: Props["p"]; rows: AllTradesRow[] }) {
               <tr key={`${row.scope}-${row.id}`} className={row.state === "not_entered" ? "few" : ""}>
                 <td><Link className="tk" href={companyPath(p.market, row.ticker)}>{row.ticker}</Link><small className="muted" style={{ display: "block", fontSize: 11 }}>{nameOf(row.ticker)}</small></td>
                 <td className="whom">{who(p, row)}</td>
-                <td className="nowrap">{row.entry_date ? fmtDate(row.entry_date, false) : DASH}{" → "}{row.exit_date ? fmtDate(row.exit_date, false) : DASH}{row.state === "open" ? <small className="muted" style={{ display: "block", fontSize: 11 }}>planned exit</small> : null}</td>
+                <td className="nowrap">{row.scope === "mine" ? (row.side === "sell" ? `sold ${fmtDate(row.exit_date, false)}` : `bought ${fmtDate(row.entry_date, false)}`) : <>{row.entry_date ? fmtDate(row.entry_date, false) : DASH}{" → "}{row.exit_date ? fmtDate(row.exit_date, false) : DASH}</>}{row.state === "open" && row.exit_date ? <small className="muted" style={{ display: "block", fontSize: 11 }}>planned exit</small> : null}</td>
                 <td className="num cw">{row.price_pending ? DASH : price(cur, row.entry_price)}</td>
                 <td className="num cw">{row.price_pending ? DASH : price(cur, row.exit_or_last_price)}{lastWords ? <small className="muted" style={{ display: "block", fontSize: 11 }}>{lastWords}</small> : null}</td>
                 <td>{stateWords(row)}</td>

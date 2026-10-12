@@ -39,6 +39,7 @@ export interface AllTradesRow {
   outcome: "win" | "loss" | "flat" | null;
   not_entered_reason?: "no_entry" | "skipped_price_above_amount" | null;
   entry_price: number | null;
+  entry_price_source?: "daily_bar" | "intraday_check" | null;
   exit_or_last_price: number | null;
   last_price_date?: string | null;
   last_price_source?: "daily_close" | "intraday_check" | null;
