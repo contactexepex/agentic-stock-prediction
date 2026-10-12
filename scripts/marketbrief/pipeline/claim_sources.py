@@ -24,6 +24,7 @@ from marketbrief.pipeline.news_pending import enrichment_since
 from marketbrief.utils.timefmt import as_utc_timestamp
 
 READ_ACCESS = ("full", "partial", "paywalled")
+LAST_PRE_OPEN_SQL = "SELECT max(made_at) FROM ranges WHERE made_at <= ?::TIMESTAMPTZ"
 CLUSTERS_SQL = """
 SELECT * FROM news_clusters_asof(?::TIMESTAMPTZ)
 WHERE last_reported_at >= ?::TIMESTAMPTZ ORDER BY cluster_id"""
@@ -74,11 +75,18 @@ def current_clusters(con, now: pd.Timestamp, window_hours: float) -> list[dict]:
 
 def claims_window_hours(con, now: pd.Timestamp, cluster_settings: dict) -> float:
     """The clusters claims.py considers: those reported in the last `window_hours` (72), widened to reach back to
-    the last enrichment (marketbrief/pipeline/news_pending.py; + 1 h) so a long weekend or holiday is covered,
-    at most the clusters' `lookback_hours` (144)."""
+    the earlier of the last enrichment (marketbrief/pipeline/news_pending.py) and the last pre-open run's ranges
+    (+ 1 h), so a long weekend or holiday is covered, at most the clusters' `lookback_hours` (144). The weekend
+    news-only runs enrich news (routine/NEWS_PROMPT.md) but never run the claim-checker, so after a Friday holiday
+    the last enrichment alone would stop at Sunday; the last pre-open ranges (written only by the pre-open run,
+    after its claims step) still reach back to the previous claims run."""
     base = float(cluster_settings.get("window_hours", DEFAULT_CLAIMS_WINDOW_HOURS))
     cap = max(base, float(cluster_settings.get("lookback_hours", DEFAULT_CLUSTER_LOOKBACK_HOURS)))
-    span = (now - enrichment_since(con, now)).total_seconds() / 3600 + WINDOW_MARGIN_HOURS
+    since = enrichment_since(con, now)
+    last_run = con.execute(LAST_PRE_OPEN_SQL, [now.isoformat()]).fetchone()[0]
+    if last_run is not None:
+        since = min(since, as_utc_timestamp(last_run))
+    span = (now - since).total_seconds() / 3600 + WINDOW_MARGIN_HOURS
     return min(max(base, span), cap)
 
 

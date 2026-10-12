@@ -308,7 +308,11 @@ run lost a day, and busy outlet feeds rolled weekend items off before Monday. No
   and the gate `validate.py --stage news_collect` (files, schemas, duplicate ids and news sources of the
   news kinds `news`, `news_runs`, `news_updates`, `news_articles`, `news_clusters`, `announcements` written today, this
   run's `news_runs` row from today and `ok`, the collectors' summaries; no price or calendar check). No
-  agents, no Slack. The session commits and pushes only the news data folders the script lists
+  agents on weekdays, never Slack. Weekend sessions (Saturday or Sunday UTC at the session's start; owner decision
+  2026-10-12, after 5,561 items, 1,442 of them watchlist, waited for the US pre-open run of Monday 2026-10-12) also
+  run the news analyst on `news_pending.py`'s input, with the same `validate.py --stage news` gate (one retry, also
+  for `ENRICH_MISSING`) and the same append to `news_enriched`, committed on its own (NEWS_PROMPT.md step 3a), so
+  Monday's pre-open run finds only the items since the last weekend scoring. The session commits and pushes only the news data folders the script lists
   (`commit_paths`); a rejected push is retried after `git pull --rebase`; a rebase conflict (the pre-open
   run appended to the same day file meanwhile) is never resolved by hand: the session resets to
   `origin/main` and collects once more. On a gate failure nothing is committed and the next run reaches
@@ -327,7 +331,9 @@ run lost a day, and busy outlet feeds rolled weekend items off before Monday. No
   groups, and the gate warns `ENRICH_TEMPLATED` when more than 30% of at least 20 watchlist records repeat another
   record's summary (issue #46). `claims.py` considers clusters reported in the last 72 h or
   since that same `since` (+1 h) when longer, at most the clusters' 144 h lookback (`window_hours` in its
-  summary); `news_status.py` already reads 144 h. `collect_articles` keeps items up to the widest
+  summary); since the weekend sessions enrich news without the claim-checker, the window also reaches back to the
+  last pre-open run's `ranges` (`made_at`, + 1 h; the earlier of the two wins), so after a Friday holiday Monday's
+  claims still cover Thursday's events. `news_status.py` already reads 144 h. `collect_articles` keeps items up to the widest
   `window_hours` of the news runs in its 24 h lookback when that is wider than `max_age_hours` (48), so
   older items a catch-up run brought in are still read. Calls are still made only in the pre-open run,
   and every input a call cites must be public before its `made_at` (unchanged).
