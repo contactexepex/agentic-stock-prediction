@@ -24,6 +24,7 @@ import {
   receiptState, SOURCE, tradeRequest, type OpenFilter, type PaperPortfoliosPayload, type Receipt, type TradeForm,
 } from "../../../../../lib/strategy-pages/paper-portfolios.ts";
 import { CostSwitch, LuckBar } from "../../_b16/parts.tsx";
+import { AllTradesCard } from "./all-trades-card.tsx";
 import "./paper-portfolios.css";
 
 type Payload = PageBase & PaperPortfoliosPayload & { go_live: GoLive | null };
@@ -50,11 +51,12 @@ function Portfolios({ p }: { p: Payload }) {
   const [sent, setSent] = useState<Sent[]>([]);
   return (
     <>
-      <PageHead page={p} title="Paper portfolios" subtitle={`head-to-head portfolios, open paper trades by strategy, and your own · ${p.name} · data as of the ${fmtDate(p.as_of, false)} close · research only, nothing is an order`} />
+      <PageHead page={p} title="Paper portfolios" subtitle={`every paper trade in one place, head-to-head portfolios, open paper trades by strategy, and your own · ${p.name} · data as of the ${fmtDate(p.as_of, false)} close · research only, nothing is an order`} />
       <SignalsBand page={p} goLive={p.go_live} strategies={Object.keys(p.strategies).length} />
       <div className="ctrls">
         <CostSwitch value={cost} onChange={setCost} help="Market cost: brokerage, taxes and fees (the ranking view). Your cost adds your own broker’s charges; the go-live bar uses it (decision 50). Open trades are before costs." />
       </div>
+      <div style={{ marginTop: 16 }}><AllTradesCard p={p} all={p.all_trades} /></div>
       <Kpis p={p} cost={cost} pending={sent.length} />
       <div style={{ marginTop: 16 }}><H2hCard p={p} cost={cost} /></div>
       <div style={{ marginTop: 16 }}><OpenTradesCard p={p} /></div>

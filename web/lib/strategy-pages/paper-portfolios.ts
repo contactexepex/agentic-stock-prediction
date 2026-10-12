@@ -1,6 +1,7 @@
 // The Paper portfolios page's own presentation logic (B16; design/mockups/07-paper-portfolios, notes.md "Shown but
 // computed by the page"): the KPI sums, the open trades filtered and grouped by strategy, and the add-trade form's
 // request (body, Idempotency-Key, the receipt's words). A paper trade is a record, never an order. Pure.
+import type { AllTrades } from "./all-trades.ts";
 import { FAMILY_ORDER, type Family, type ScoreboardRow, type Strategy } from "./scoreboard.ts";
 
 export interface OpenTrade {
@@ -100,6 +101,8 @@ export interface PaperPortfoliosPayload {
   open_trades: OpenTrade[];
   trade_checks: TradeCheck[];
   owner: { trades: OwnerTrade[]; positions: OwnerPosition[]; default_amount: number; paper: boolean };
+  /** Every paper trade in one place (B13, owner request 2026-10-12); absent from older read models. */
+  all_trades?: AllTrades | null;
 }
 
 export const SOURCE: Readonly<Record<string, string>> = {
