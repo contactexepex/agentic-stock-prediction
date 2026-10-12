@@ -133,6 +133,14 @@ def test_fetch_never_requests_http_or_unlisted(src):
     assert r.status == 200 and "Chevron" in r.html and r.requests == 1
 
 
+def test_fetch_paces_every_redirect_hop(src):
+    """The caller paces the first request; each followed redirect hop waits for the same pacer."""
+    s = FakeSession({"https://www.livemint.com/r2": (302, URLS["bnn"]), URLS["bnn"]: "bnn_chevron"})
+    waits = []
+    r = article_pages.fetch_page(s, "https://www.livemint.com/r2", src, lambda: waits.append(len(s.calls)))
+    assert r.status == 200 and r.requests == 2 and waits == [1]      # one wait, after the first hop was sent
+
+
 # ---------- extraction ----------
 
 def test_extraction_order_jsonld_then_trafilatura_then_newspaper(monkeypatch, src):

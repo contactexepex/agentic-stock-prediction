@@ -41,6 +41,7 @@ from marketbrief.constants.statuses import SUMMARY_COLLECTOR, SUMMARY_FAILED, SU
 from marketbrief.core.cli import market_arg, require_market
 from marketbrief.core.clock import utc_now, utc_today
 from marketbrief.core.storage import append_jsonl, day_file
+from marketbrief.sources.yahoo_pacing import paced_yfinance, stop_report
 
 
 def quote_targets(cfg: dict) -> dict[str, str]:
@@ -88,8 +89,7 @@ def main() -> int:
     """Entry point of scripts/collect_quotes.py."""
     args = market_arg(__doc__).parse_args()
     cfg = require_market(args)
-    import yfinance
-
+    yfinance = paced_yfinance()
     now, rows, failed = utc_now(), [], []
     targets = quote_targets(cfg)
     for key, symbol in targets.items():
@@ -106,6 +106,7 @@ def main() -> int:
                 "symbols": len(targets),
                 "written": written,
                 SUMMARY_FAILED: failed,
+                **stop_report(),
             },
             indent=2,
         )

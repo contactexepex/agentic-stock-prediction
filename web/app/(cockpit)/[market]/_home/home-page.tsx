@@ -432,7 +432,7 @@ function RunsCard({ c }: { c: Ctx }) {
     <Card label="Last runs">
       <CardHead
         title="Runs today"
-        help="The routines of this market: pre-open (collect, model, strategies, AI traders, picks), two intraday checks, post-close (settlement, end-of-day analysis) and the news run every four hours (the latest one counts here). A tick means the run finished and its gates passed."
+        help="The routines of this market: pre-open (collect, model, strategies, AI traders, picks), two intraday checks, post-close (settlement, end-of-day analysis) and the news run (one combined session for both markets, 31 a week, weekends and holidays included: daily at 10:45 IST and 11:27 and 17:27 New York time, weekdays also at 13:45 IST and 14:27 New York time; the latest one counts here). A tick means the run finished and its gates passed."
         end={<Label tone={ok === total ? "success" : "neutral"}>{`${ok} of ${total} ok`}</Label>}
       />
       <ul className="runs">
@@ -445,7 +445,7 @@ function RunsCard({ c }: { c: Ctx }) {
         })}
         {item("post", r.post_close.ok, "Post-close", r.post_close.at ? "settlement · end-of-day analysis" : "settlement · end-of-day analysis · not yet",
           r.post_close.at ? fmtLocal(r.post_close.at, market, lt) : <span><small>next </small>{fmtLocal(r.post_close.next_at, market, lt)}</span>)}
-        {item("news", r.news.ok, "News (latest run)", `every 4 hours · ${r.news.new_items ?? 0} new items`, fmtLocal(r.news.at, market, lt))}
+        {item("news", r.news.ok, "News (latest run)", `31 runs a week · ${r.news.new_items ?? 0} new items`, fmtLocal(r.news.at, market, lt))}
       </ul>
       <p className="note">{`Cut-off ${fmtLocal(p.cutoff, market, lt, true)}: every number on this page was stored by then.`}</p>
     </Card>
