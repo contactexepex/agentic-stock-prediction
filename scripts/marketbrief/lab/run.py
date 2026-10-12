@@ -9,12 +9,12 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta
 
 from marketbrief.constants.kinds import (KIND_COST_VIEWS, KIND_HEAD_TO_HEAD_PICKS, KIND_STRATEGY_ABSTENTIONS,
-                                         KIND_STRATEGY_PREDICTIONS)
+                                         KIND_STRATEGY_PREDICTIONS, KIND_STRATEGY_PREDICTIONS_EVENING)
 from marketbrief.core.calendar import session_open_utc
 from marketbrief.core.storage import append_jsonl, day_file
 from marketbrief.lab import picks as lab_picks
 from marketbrief.lab import reads, registry, scoreboard
-from marketbrief.lab.constants import LAB_VERSION, MSG_NO_EURUSD, MSG_PICK_TOO_LATE
+from marketbrief.lab.constants import LAB_VERSION, MSG_NO_EURUSD, MSG_PICK_TOO_LATE, RUN_EVENING
 from marketbrief.lab.cost_views import KIND_PICK, KIND_PREDICTION, viability_row
 from marketbrief.lab.settle import as_date
 from marketbrief.lab.timing import entry_session
@@ -103,6 +103,17 @@ def write_predictions(cfg: dict, now: datetime, preds: list[dict], abstentions: 
             "abstentions": append_new(cfg["market"], KIND_STRATEGY_ABSTENTIONS, abstentions, "made_at",
                                       known_abstentions),
             **prediction_views(con, cfg, now, new)}
+
+
+def write_evening_predictions(cfg: dict, now: datetime, preds: list[dict], abstained: int, con) -> dict:
+    """Append the evening preview rows (`lab.py predict --evening`) to strategy_predictions_evening only, each with
+    run "evening", skipping ids already stored there; no abstentions, cost_views or picks (a preview is never
+    traded: settle and pick read strategy_predictions only)."""
+    known = {p["id"] for p in reads.stored(con, KIND_STRATEGY_PREDICTIONS_EVENING, "made_at", now)}
+    rows = [{**p, "run": RUN_EVENING} for p in preds]
+    return {"run": RUN_EVENING, "session_date": str(session_of(cfg, now)),
+            "rows": len(rows), "abstained_not_stored": abstained,
+            "predictions": append_new(cfg["market"], KIND_STRATEGY_PREDICTIONS_EVENING, rows, "made_at", known)}
 
 
 def session_of(cfg: dict, now: datetime) -> date:

@@ -1981,6 +1981,11 @@ is as of the run's clock (MB_NOW-aware): each lab kind by its time column, bars 
   (`registry.is_live`; null = not live). Settle never settles a prediction or pick whose strategy is not live on its
   D (also after the switch: D is fixed per row), pick lets only live strategies contend, and the forward summary
   counts only live settlements; predict runs regardless (a rehearsal before go-live).
+- **Evening preview.** `lab.py predict --evening` (after the close, option C with B17 and B10) writes the rows the
+  next pre-open predict will write (same D, same ids) from B10's evening ranges (`ranges_asof(..., run="evening")`)
+  to `strategy_predictions_evening` (`run` = "evening") only: no cost_views, abstentions or picks, and settle, pick,
+  scoring and the pages read only `strategy_predictions`, so a preview is never traded; the pre-open run appends
+  the revision of record (docs/ws/b2.md "Evening preview").
 - **Amount.** `contracts.watchlist.trade_amount` (B1): the `set_amount` override in force (higher or lower,
   decision 44), else the default (₹1,00,000 / $1,000), copied into each prediction at `made_at`.
 - **Quantity.** India `floor(amount / open)`; 0 gives `skipped_price_above_amount`. US `round(amount / open, 6)`.

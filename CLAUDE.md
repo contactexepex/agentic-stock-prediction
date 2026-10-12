@@ -375,7 +375,8 @@ root as `MB_NOW=2026-10-09T23:59:00Z PYTHONPATH=scripts python docs/plan_volatil
   `config/strategies.yaml` (`registry.is_live`: settle, pick and the forward summary skip pre-live rows, predict
   rehearses)): `predict` (pre-open, rule strategies and baselines from B10's
   per-horizon scores and ranges -> `strategy_predictions`, blocks as `strategy_abstentions`, the cost-viable rows
-  of decision 51 of the new qualifying ones -> `cost_views`), `pick` (pre-open,
+  of decision 51 of the new qualifying ones -> `cost_views`; `predict --evening` after the close ->
+  `strategy_predictions_evening` (preview from B10's evening ranges, never traded)), `pick` (pre-open,
   refused at or after D's open: the head-to-head picks per company, family and pick rule -> `head_to_head_picks`,
   and the cost-viable rows of every pick and of each qualifying prediction without one yet -> `cost_views`; "best expected gain" = the horizon with the highest
   expected gain per session held), `settle` (post-close: every due trade of both views -> `paper_trades_settled` in
