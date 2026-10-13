@@ -21,7 +21,7 @@ async function feedChecks(page) {
   const shown = await rows();
   const marketKinds = await page.locator(`${FEED} .feed .row .kind.mkt`).count();
   if (shown !== 10 || marketKinds !== 10) problems.push(`market-wide filter: ${shown} rows, ${marketKinds} market-wide (expected 10 and 10, page 1 of 12)`);
-  await page.locator(`${FEED} button.md-chip`, { hasText: "Can carry a call" }).click();
+  await page.locator(`${FEED} button.md-chip`, { hasText: "Checked news only" }).click();
   if ((await rows()) !== 1) problems.push(`can-carry filter shows ${await rows()} rows, expected 1`);
   if ((await page.locator(`${FEED} button.md-chip[aria-pressed="true"]`).count()) !== 1) problems.push("exactly one chip should be pressed");
   await page.locator(`${FEED} select[aria-label="Company"]`).selectOption("RELIANCE");
@@ -42,7 +42,7 @@ export const cases = [
     mockup: "09-news",
     widths: [1280, 390],
     waitFor: ".mv",
-    expectText: ["Market movers · last 3 days", "Last 3 days", "29 stories", "Coming up · 7 days", "RBI policy decision", "By company · 3 days", "Open article", "not verified per company"],
+    expectText: ["Market movers · last 3 days", "Last 3 days", "29 stories", "Coming up · 7 days", "RBI policy decision", "By company · 3 days", "Open article", "market-wide news"],
     expectSelector: [".mv .it .rk", ".feed .day", ".cal .ev.major", ".cos .co .mix", ".pager [aria-current='page']"],
   },
   { name: "news-india-filters", path: "/india/news", mockup: "09-news", widths: [1280], waitFor: ".mv", check: feedChecks },
@@ -55,8 +55,8 @@ export const cases = [
     waitFor: ".mv",
     expectText: ["JPMorgan results", "Market movers · last 3 days"],
     check: async (page) => {
-      await page.locator(`${FEED} button.md-chip`, { hasText: "Can carry a call" }).click();
-      return (await page.getByText("No story in the window is confirmed by a filing").count()) ? [] : ["US can-carry empty state missing"];
+      await page.locator(`${FEED} button.md-chip`, { hasText: "Checked news only" }).click();
+      return (await page.getByText("No story in the window is confirmed by an official filing").count()) ? [] : ["US can-carry empty state missing"];
     },
   },
   {

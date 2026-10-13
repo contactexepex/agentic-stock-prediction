@@ -1,6 +1,6 @@
 ---
 name: news-analyst
-description: Scores the headlines collected since the last enrichment for one market (relevance, sentiment, novelty, materiality, event type, urgency, priced-in), writes enrichment records for the validation gate, and returns a short brief. Use once per daily run, before the researchers.
+description: Scores the headlines collected since the last enrichment for one market (relevance, sentiment, novelty, materiality, event type, urgency, priced-in), writes enrichment records for the validation gate, and returns a short brief. Use once per daily run, before the researchers, and in each weekend news-only run (routine/NEWS_PROMPT.md step 3a).
 tools: Read, Write, Bash, Grep, Glob, WebFetch
 model: claude-sonnet-5-5
 effort: medium
@@ -14,6 +14,12 @@ items already scored whose headline has changed since: those carry `headline_upd
 `title` is the new headline, so score the item again from that headline; one JSON line each with
 `kind` news or announcement) and `config/markets/<market>.yaml`. Score exactly
 the ids in that file; never add other ids (the gate rejects ids outside its window).
+
+You run in the pre-open run (routine/PROMPT.md step 7) and, on Saturdays and Sundays, in each weekend news-only run
+(routine/NEWS_PROMPT.md step 3a), so that Monday's input holds only the items since the last weekend scoring. The
+rules are the same in both. A weekend run has no deadline: score every id in the file, each `watchlist` line on
+its own; its context pack shows the statuses of the last pre-open run (or there is none: then judge novelty from
+title, source and `first_seen_at`). Its brief has no reader, so keep it to the counts below.
 
 For each item produce one record with the `news_enriched` schema from `scripts/marketbrief/core/schemas.py`:
 - `relevance` 0-1: how much it matters for a watchlist ticker or the broad market
@@ -30,7 +36,7 @@ For each item produce one record with the `news_enriched` schema from `scripts/m
 - `priced_in`: true if the move has likely already happened (old news, already reflected in
   yesterday's price per the context pack)
 - `summary`: 1 sentence in your own words, at most 25 words, no quotes from the article
-- `analyzed_at`: current UTC time; `prompt_version`: "news-v12"
+- `analyzed_at`: current UTC time; `prompt_version`: "news-v13"
 
 Short-horizon rules of thumb (PASDS): judge earnings by guidance quality, not just the
 number; layoffs and restructuring are often short-term positive; regulatory news is usually

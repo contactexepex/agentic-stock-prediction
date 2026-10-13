@@ -8,6 +8,7 @@ from html import escape
 
 from marketbrief.analytics import scoring
 from marketbrief.constants import reader as text
+from marketbrief.constants.horizons import RUN_EVENING
 
 LEAN_WORDS = {"up": "lean up", "down": "lean down", "none": "no clear lean"}
 
@@ -69,6 +70,8 @@ def company_table(company: dict, card: dict, horizon: int, symbol: str) -> str:
                    + line("80% range", lambda r: rng(r["lo80"], r["hi80"]))
                    + line("Chance up", lambda r: "–" if r["prob_up"] is None else scoring.percent(r["prob_up"]))
                    + "</table>")
+    if main and main.get("run") == RUN_EVENING:
+        out.append(f"<p><b>{escape(text.PREVIEW_LABEL)}</b></p>")
     if main:
         out.append(f"<p>{escape(main['why'])}</p>")
     out += [f"<p><b>Warning:</b> {escape(flag['text'])}</p>" for flag in card.get("flags", [])]

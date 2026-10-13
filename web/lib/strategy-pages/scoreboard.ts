@@ -2,6 +2,7 @@
 // scoreboard row as B13's endpoints serve it (api/schemas/strategy-lab.yaml ScoreboardRow, Strategy) and the pure
 // logic the mockups compute on it: the cost view of a figure, the luck test's verdict and bar geometry, nice axis
 // ticks. Pure: no React, no DOM. Lives in lib/ so `npm test` covers its tests.
+import { REGIME_WORDS as SHARED_REGIME_WORDS } from "../ui/constants.ts";
 
 export type Family = "rule" | "baseline" | "ai";
 export type CostView = "market" | "your";
@@ -139,9 +140,8 @@ export function rowsOf(rows: readonly ScoreboardRow[], scope: string, horizon: n
     && String(row.horizon_days) === String(horizon));
 }
 
-export const REGIME_WORDS: Readonly<Record<string, string>> = {
-  CALM: "calm", TRENDING: "trending", EVENT_HEAVY: "event-heavy", UNSTABLE: "unstable",
-};
+/** The market mood in words (B7's shared words, docs/ux/plain_language_review.md W6). */
+export const REGIME_WORDS: Readonly<Record<string, string>> = SHARED_REGIME_WORDS;
 
 /** A row's market-cost profit as a sort key: a missing profit sorts after every number. */
 export const netKey = (row: ScoreboardRow): number => row.net_pnl ?? Number.NEGATIVE_INFINITY;

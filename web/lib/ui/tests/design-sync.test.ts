@@ -25,7 +25,7 @@ test("the vendored chart library matches its pin, its NOTICE and the dashboard's
 });
 
 test("no stylesheet or component loads anything from another origin", () => {
-  for (const f of ["styles/fonts.css", "styles/tokens.css", "styles/components.css", "styles/page.css", "styles/app.css", "app/layout.tsx", "components/charts/candles.tsx"]) {
+  for (const f of ["styles/fonts.css", "styles/tokens.css", "styles/tokens-dark.css", "styles/components.css", "styles/page.css", "styles/app.css", "app/layout.tsx", "components/charts/candles.tsx"]) {
     const text = readFileSync(join(web, f), "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
     assert.ok(!/@import|url\(\s*["']?https?:|src=["']https?:/.test(text), f);
   }

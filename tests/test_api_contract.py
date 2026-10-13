@@ -40,7 +40,7 @@ MARKETS = ("india", "us")
 @pytest.mark.parametrize("case", json.loads(FIXTURE.read_text())["cases"], ids=lambda c: c["name"])
 def test_serve_matches_the_shared_fixture(case):
     now = datetime.fromisoformat(json.loads(FIXTURE.read_text())["now"].replace("Z", "+00:00"))
-    assert contract.serve(case["row"], case["mode"], now) == case["expected"]
+    assert contract.serve(case["row"], case["mode"], now, case.get("synced_at")) == case["expected"]
 
 
 # ---------- schema checker ----------
@@ -218,6 +218,57 @@ def test_go_live_without_a_settled_trade():
     }
 
 
+@pytest.mark.parametrize("market", MARKETS)
+def test_go_live_checks_and_nearest_come_from_the_scoreboard(market):
+    rows = [
+        r
+        for r in catalogue("scoreboard_row.json")
+        if r["market"] == market and r["scope"] == "strategy" and r["view"] == "accuracy"
+        and r["basis"] == "forward" and str(r["horizon_days"]) == "all" and r.get("go_live")
+    ]
+    reference = next(r["go_live"] for r in rows if r["strategy_id"] == "rule.model_news.v1")
+    ctx = example_context(market)
+    checks = rm_common.go_live_checks(ctx)
+    assert {k: checks[k] for k in ("drawdown_within_limit", "holds_in_calm_and_volatile")} == {
+        "drawdown_within_limit": reference["drawdown_within_limit"],
+        "holds_in_calm_and_volatile": reference["holds_in_calm_and_volatile"],
+    }
+    contenders = [r for r in rows if r["family"] != "baseline"]
+    best = min(contenders, key=lambda r: (r["go_live"]["trades_needed"], -r["go_live"]["months_forward"],
+                                          r["strategy_id"]))
+    nearest = rm_common.go_live_nearest(ctx)
+    assert nearest["strategy_id"] == best["strategy_id"] and nearest["family"] != "baseline"
+    assert nearest["trades_needed"] == best["go_live"]["trades_needed"] and nearest["trades"] == best["trades"]
+    assert nearest["name"] and nearest["name"] != nearest["strategy_id"]
+
+
+def test_go_live_checks_and_nearest_without_a_settled_trade():
+    ctx = rm_registry.BuildContext(load_market("us"), None, datetime.fromisoformat(CUTOFF))
+    ctx.memo.update(settled_trades=[])
+    ctx.__dict__["dashboard"] = {"as_of": "2026-10-06"}
+    checks = rm_common.go_live_checks(ctx)
+    assert (checks["drawdown_within_limit"], checks["holds_in_calm_and_volatile"]) == (None, None)
+    assert rm_common.go_live_nearest(ctx) is None
+
+
+def test_earliest_go_live_is_live_from_plus_two_months():
+    assert rm_common.earliest_go_live("2026-10-12") == "2026-12-12"  # ceil(2 x 30.4375) = 61 days
+    assert rm_common.earliest_go_live(None) is None
+
+
+@pytest.mark.parametrize(
+    ("market", "cutoff", "expected"),
+    [
+        ("india", "2026-10-12T03:00:00+00:00", "2026-10-12T05:43:00Z"),  # before 11:13 IST: the first check
+        ("india", "2026-10-12T06:00:00+00:00", "2026-10-12T08:43:00Z"),  # between: the 14:13 IST check
+        ("india", "2026-10-12T12:00:00+00:00", "2026-10-13T05:43:00Z"),  # after both: the next session's first
+        ("us", "2026-10-10T12:00:00+00:00", "2026-10-12T16:27:00Z"),  # Saturday: Monday 12:27 New York time
+    ],
+)
+def test_next_intraday_is_the_next_scheduled_check_on_a_session_day(market, cutoff, expected):
+    assert rm_common.next_intraday(load_market(market), datetime.fromisoformat(cutoff)) == expected
+
+
 def test_strategies_count_settled_accuracy_trades_per_market():
     per_market = {market: rm_common.strategies(example_context(market)) for market in MARKETS}
     for spec in catalogue("strategy.json"):
@@ -361,8 +412,11 @@ def test_a_sync_revalidates_written_and_deleted_pages_in_both_modes(warehouse, m
             assert url == "https://omenix.vercel.app"
             assert gone in keys
             written = summary["pages_written"]
-            assert len(keys) == written + 1  # incremental: nothing else changed; full: every page is written anew
-            assert (written == 0) if not full else (written == sum(summary["read_model_pages"].values()))
+            assert len(keys) == written + 1  # incremental: only rm.status (rewritten every sync); full: every page
+            status = {"table": "status", "market": "us", "page_key": "_"}
+            assert status in keys  # its built_at is the freshness, so its cache is refreshed every sync
+            pages = summary["read_model_pages"]
+            assert (written == pages["status"]) if not full else (written == sum(pages.values()))
     finally:
         common.ROOT = saved_root
         mp.undo()

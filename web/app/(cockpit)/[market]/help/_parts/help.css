@@ -26,3 +26,6 @@
 details.gl{margin-top:6px} details.gl summary{cursor:pointer;color:var(--md-sys-color-primary);font-weight:600;font-size:13.5px}
 .note2{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:var(--mb-panel-radius);background:var(--mb-color-warn-container);color:var(--mb-color-on-warn-container);font-size:13.5px;line-height:1.5;margin-top:16px} .note2 .ms{flex:none;width:20px;height:20px;margin-top:1px}
 @media (max-width:760px){ .fam{grid-template-columns:1fr} .pages{grid-template-columns:1fr} .help dl{grid-template-columns:1fr;gap:2px 0} .help dt{margin-top:6px} }
+/* longer plain-language terms (review L4): a term wraps, and on a phone sits above its meaning */
+.help dt{white-space:normal;max-width:28ch}
+@media (max-width:599px){.help dl{grid-template-columns:minmax(0,1fr)} .help dt{max-width:none} .help dd{margin-bottom:6px}}

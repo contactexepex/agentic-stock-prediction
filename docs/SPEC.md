@@ -29,7 +29,7 @@ questions) from the dashboard, Slack, Claude Code and the Claude app.
 | 3 | Down signals | Buy-only in both markets: a "down" prediction creates no trade (it is still scored as a prediction). |
 | 4 | India share price above the amount | Skip the trade unless the company's amount is raised. Whole shares only in India. |
 | 5 | US shares | Fractional shares: exactly the amount is invested. |
-| 6 | Costs | India: Axis Direct. US: BUX (ABN AMRO), owner trades from the Netherlands. Charges in F1.6. Refined by decisions 49 and 52: the plans and charges the owner provided, confirmed final by the owner on 2026-10-08. |
+| 6 | Costs | India: Axis Direct (Groww from 2026-10-12, decision 54). US: BUX (ABN AMRO), owner trades from the Netherlands. Charges in F1.6. Refined by decisions 49 and 52: the plans and charges the owner provided, confirmed final by the owner on 2026-10-08. |
 | 7 | Trades per day | No limit on trades: every qualifying forecast is its own paper trade (accuracy view). The per-strategy money-view budget is superseded by decision 40. |
 | 8 | Who is better | Headline = profit after costs on the same trades and amounts; beside it win rate, price-prediction error, worst losing streak, drawdown and a luck test. |
 | 9 | AI traders | 3 on Sonnet (news & results; price pattern & market mood; combined) + 1 on Opus (combined), from day one. |
@@ -73,11 +73,12 @@ questions) from the dashboard, Slack, Claude Code and the Claude app.
 | 46 | News: two markets | An article may be stored once per market (India, US), never twice within a market. |
 | 47 | News de-duplication timing | Fixed now as a small batch, before the waves (Wave 0). |
 | 48 | Waves | The wave plan of section 10: each session in its own cloud session, built, judged and merged to main in parallel; sessions merge to main themselves after a PASS (no pull requests); the orchestrator watches and resolves clashes. More automation and autonomy, less owner attention. |
-| 49 | India broker plan | Axis Direct NRI, 0.75% plan, Normal tier, Non-PIS (charges in F1.6; owner-provided from the published schedule, confirmed final for paper trading by the owner on 2026-10-08, `config/costs.yaml` `broker:`). |
+| 49 | India broker plan | Superseded for India by decision 54 from 2026-10-12. Axis Direct NRI, 0.75% plan, Normal tier, Non-PIS (charges in F1.6; owner-provided from the published schedule, confirmed final for paper trading by the owner on 2026-10-08, `config/costs.yaml` `broker:`). |
 | 50 | Two cost views on every trade | "Market cost" = brokerage + statutory taxes + exchange/regulatory fees (US: the order fee, SEC fee and FINRA TAF, no FX); strategies are ranked on it. "Your cost" = market cost + the owner-specific items: India the ₹200 NRI reporting charge on the buy date and on the sell date and the DP charge; US BUX's FX markup of 0.75% each way and the 0.20% a year portfolio fee pro-rated over the calendar days held. The go-live bar and the owner's money decisions use your cost. |
 | 51 | Cost-viable flag | A prediction or pick is `cost_viable` when its expected gain after your cost is positive: P(up) × move − (1 − P(up)) × loss − your cost > 0, with move and loss the conditional expected rise/shortfall of the pick (lab/gain.py); null without a probability or 80% range, and when the amount buys no whole share at the reference close (no trade, no costs). It is still made, traded and scored either way; picks and Slack show the flag. (Owner decision in the B6 session, 2026-10-07, replacing the first wording "predicted move exceeds your cost".) |
 | 52 | US broker plan | BUX Basic: €0.99 per order, FX markup 0.75% on each EUR↔USD conversion, 0.20% a year portfolio fee (charges in F1.6; owner-provided, confirmed final for paper trading by the owner on 2026-10-08, `config/costs.yaml` `broker:`). |
 | 53 | Broker charges final | The `broker:` values of decisions 49 and 52 (Axis Direct: 0.75% brokerage, ₹50 minimum, ₹200 NRO reporting per trade date, DP charge ₹30 or 0.04%, AMC ₹885 a year; BUX Basic: €0.99 per order, 0.75% FX markup each way, 0.20% a year portfolio fee) are final for paper trading (owner, 2026-10-08); `config/costs.yaml` no longer marks them verify. The statutory rates keep their own source notes. |
+| 54 | India broker: Groww | From 2026-10-12 the India broker is Groww, a Non-PIS NRI account (owner, 2026-10-12), replacing Axis Direct (decisions 49 and 53 for India): brokerage 0.10% per order, at least ₹100; DP charge ₹20 per scrip sold (₹3.5 depository + ₹16.5 Groww) plus 18% GST; no NRI reporting charge (the owner: the bank adds no charges beyond Groww's); AMC ₹0. Read from https://groww.in/pricing on 2026-10-12. Trades settled before the switch keep the costs they were stored with (none: the first settlements are due on 2026-10-13, so every settled trade carries Groww costs). Rows stored before the switch keep their Axis Direct values and are not recomputed: the 12 Oct `cost_views` rows written at predict and pick time (their `cost_viable` flags) and the stored `lab_backtests`. PLAN_v16's India scenario is changed only through a clarification agreed with ChatGPT. |
 
 Proposals made by the orchestrator that are still open (decision 34 accepted the weekly
 research time, the chat-log retention and the Slack form; the owner may change any of these): every
@@ -143,27 +144,29 @@ part already does it, the feature says "exists" and what changes.
 
    | Market | Charge | Value | View | Source |
    |---|---|---|---|---|
-   | India (Axis Direct NRI, 0.75% plan, Normal tier, Non-PIS; decision 49) | Brokerage, delivery | 0.75% of the order value each side, at least ₹50 per order | market | owner-provided; confirmed final (owner, 2026-10-08) |
+   | India (Groww NRI, Non-PIS; decision 54, replacing Axis Direct of decision 49 from 2026-10-12) | Brokerage, delivery | 0.10% of the order value each side, at least ₹100 per order | market | Groww's published pricing, read 2026-10-12 |
    | India | GST | 18% on brokerage + exchange transaction charge + SEBI fee | market | owner-provided; verify |
    | India | STT | 0.1% each side | market | owner-provided (agrees with `config/costs.yaml`); verify |
    | India | Stamp duty | 0.015% on the buy side | market | owner-provided (agrees with `config/costs.yaml`); verify |
-   | India | NSE transaction charge, SEBI fee | 0.00307% and 0.0001% each side, as already in `config/costs.yaml` | market | as documented there (search-only sources) |
-   | India | NRO Non-PIS reporting charge | ₹200 per trade date: the full ₹200 on a paper trade's buy date and again on its sell date | your | owner-provided; confirmed final (owner, 2026-10-08) |
-   | India | DP charge per scrip sold | ₹30 or 0.04% of the sale value, the higher | your | secondary source; confirmed final (owner, 2026-10-08) |
-   | India | Demat AMC | about ₹885 a year: an account charge, in no trade's cost | none | owner-provided; confirmed final (owner, 2026-10-08) |
+   | India | NSE transaction charge (including the IPFT contribution), SEBI fee | 0.00307% and 0.0001% each side, as already in `config/costs.yaml` | market | NSE: circular NSE/FA/73061, read 2026-10-12; SEBI: as documented there (search only) |
+   | India | NRI reporting charge | none (Axis Direct's ₹200 per trade date until 2026-10-12) | your | owner, 2026-10-12 |
+   | India | DP charge per scrip sold | ₹20 (₹3.5 depository + ₹16.5 Groww) plus 18% GST = ₹23.60 (Axis Direct: ₹30 or 0.04%, the higher, no GST, until 2026-10-12) | your | Groww's published pricing, read 2026-10-12 |
+   | India | Demat AMC | ₹0 (Axis Direct: about ₹885 a year): an account charge, in no trade's cost | none | Groww's published pricing, read 2026-10-12 |
    | US (BUX Basic; decision 52) | Order fee | €0.99 per order, converted at the EUR/USD close on or before that side's session (when none is stored that early, the oldest stored close, i.e. a later rate known by the run's clock: `lab/market_data.py` `MarketData.eurusd_on`) | market | owner-provided; confirmed final (owner, 2026-10-08) |
    | US | FX markup | 0.75% of the value on each EUR↔USD conversion (on the buy and on the sale) | your | owner-provided; confirmed final (owner, 2026-10-08) |
    | US | Portfolio fee | 0.20% a year on the entry value, pro-rated over the calendar days from D to the exit session | your | owner-provided; confirmed final (owner, 2026-10-08) |
    | US | SEC fee, FINRA TAF | as already in `config/costs.yaml` | market | official, as documented there |
 
-   No GST is added to the reporting and DP charges (the owner's facts put GST on brokerage + exchange + SEBI only).
+   GST is added to the DP charge from decision 54 on (Groww lists it among the charges GST applies to); under Axis
+   Direct no GST was added to the reporting and DP charges (the owner's facts put GST on brokerage + exchange + SEBI only).
    Each cost line is rounded to cents and a view's total is the sum of its rounded lines.
 
    **Round trip at the default amount** (flat price, entry value = exit value; F1.7.3 and decision 51 use the same
    arithmetic at the latest close `C`), from `lab/costs.py`:
-   - India, ₹1,00,000: brokerage 2 × ₹750 = ₹1,500.00; STT ₹200.00; exchange ₹6.14; SEBI ₹0.20; stamp duty ₹15.00;
-     GST 18% × (1,500.00 + 6.14 + 0.20) = ₹271.14. **Market cost ₹1,992.48 = 1.99%.** Plus NRI reporting 2 × ₹200
-     and the DP charge ₹40.00 (0.04% of ₹1,00,000 > ₹30): **your cost ₹2,432.48 = 2.43%.**
+   - India (Groww, decision 54), ₹1,00,000: brokerage 2 × ₹100 = ₹200.00; STT ₹200.00; exchange ₹6.14; SEBI ₹0.20;
+     stamp duty ₹15.00; GST 18% × (200.00 + 6.14 + 0.20) = ₹37.14. **Market cost ₹458.48 = 0.46%.** No NRI
+     reporting charge; DP charge ₹20 + 18% GST = ₹23.60: **your cost ₹482.08 = 0.48%.** (Under Axis Direct, until
+     2026-10-12: market cost ₹1,992.48 = 1.99%, your cost ₹2,432.48 = 2.43%.)
    - US, $1,000 at an example EUR/USD of 1.17 (the stored close is used): order fee 2 × €0.99 × 1.17 = $2.32; SEC
      fee $20.60 per million on the sale = $0.02; FINRA TAF $0.00 until 2026-12-31. **Market cost $2.34 = 0.23%.**
      Plus the FX markup 0.75% on the buy and on the sale = $15.00 and the portfolio fee $0.01 for a one-day hold
@@ -375,7 +378,8 @@ shows the path.
    words for every head-to-head trade settled today and for the day's 5 biggest wins and 5 biggest
    misses across all trades (decision 43); each grounded in the trade's automatic reason (F1.10) and
    citing ids; a gate checks ids and numbers (like `lessons.py`).
-2. **Weekly research director** (Opus, in a new weekend run on Saturday, separate from the existing
+2. **Weekly research director** (Opus, in a new weekly run on Friday evening New York time for both markets since the owner's decision
+   of 2026-10-10 (first planned for Saturday), separate from the existing
    weekly review, which stays step 10a of the first pre-open run of the ISO week): reads the scoreboard (F7), the news-impact study
    (F3), the week's EOD analyses and lessons; writes the weekly report: who is ahead and why, which
    information helped, and proposals (new strategy versions, weights, thresholds) as config diffs for
@@ -663,7 +667,7 @@ trades to rank"), and keeps the best strategy overall beside the per-company bes
 | Anthropic API | dashboard chat and `/ask` | a dedicated workspace with a $20 monthly spend limit and a key in it |
 | Neo4j | relationship graph, optional | none |
 
-Routine schedule per market (per market per weekday: 1 pre-open + 2 intraday + 1 post-close; plus 31 combined news
+Routine schedule per market (per market per weekday: 1 pre-open + 2 intraday + 1 post-close + 1 evening forecast; plus 31 combined news
 sessions a week for both markets (owner decision 2026-10-12) and 1 weekly research run):
 
 | Run | India | US | Contents |
@@ -671,8 +675,9 @@ sessions a week for both markets (owner decision 2026-10-12) and 1 weekly resear
 | Pre-open (exists; moved 30 min earlier on 2026-10-07) | 07:40 IST | 07:45 New York | collect, features, model, rule strategies, 4 AI traders, gates, picks, sync, Slack morning picks; on the first trading day of the ISO week also the existing weekly review (step 10a); monthly the graph-builder |
 | Intraday x2 (WS5, extended) | 11:13, 14:13 IST | 12:27, 14:57 New York | trade checks, deviation explainer, alerts, sync |
 | Post-close (new) | 17:45 IST | 18:15 New York | close bars, settlement, EOD analyst, sync, Slack close results |
+| Evening forecast (owner decision 2026-10-10) | 21:30 UTC Mon-Fri | 18:30 New York Mon-Fri | preview ranges, model scores and rule predictions on the close (never traded), sync |
 | News (combined india+us session; owner decision 2026-10-12) | 10:45 IST daily, 13:45 IST weekdays | 11:27 and 17:27 New York daily, 14:27 New York weekdays | news, articles, clusters, sync |
-| Weekly research (new) | Saturday 09:51 IST | Saturday 09:51 New York | news-impact study, research director, weekly post |
+| Weekly research (new; Friday 19:30 New York since the owner's decisions of 2026-10-10 and 2026-10-12) | Friday 19:30 New York | Friday 19:30 New York | news-impact study, research director, weekly post |
 
 ## 8. How the UI connects to the backend
 

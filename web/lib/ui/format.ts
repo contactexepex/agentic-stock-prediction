@@ -4,7 +4,7 @@
 import { CURRENCY_SYMBOL, LOCALE, MARKET_ZONE } from "./constants.ts";
 
 export const DASH = "—";
-const MINUS = "−";
+export const MINUS = "−";
 export const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 export const DOW_LONG = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 export const MONTH = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -73,6 +73,10 @@ export const direction = (x: number) => (x > 0 ? "up" : x < 0 ? "down" : "flat")
 
 /** "N+3". */
 export const horizonLabel = (k: number) => `N+${k}`;
+/** Horizon k as the reader's words: "3-day hold" (N+k stays in tooltips; docs/ux/plain_language_review.md W4). */
+export const holdLabel = (k: number) => `${k}-day hold`;
+/** Horizon k on a tab: "1 day", "3 days". */
+export const holdTab = (k: number) => (k === 1 ? "1 day" : `${k} days`);
 /** What horizon k means in words (decision 37). */
 export function horizonWords(k: number): string {
   return k === 1 ? "the next session’s close" : `the close of the ${["", "1st", "2nd", "3rd", "4th", "5th"][k] ?? `${k}th`} session after the open`;

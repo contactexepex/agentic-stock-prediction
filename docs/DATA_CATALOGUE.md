@@ -48,7 +48,8 @@ Contents:
 - Strategies and predictions: [Strategy](#strategy), [Prediction](#prediction),
   [Abstention](#abstention), [Agreement](#agreement)
 - Trades: [Head-to-head pick](#head-to-head-pick), [Paper trade](#paper-trade) (with its
-  [automatic reason](#automatic-reason)), [Cost view](#cost-view), [Open trade](#open-trade), [Intraday trade check](#trade-check),
+  [automatic reason](#automatic-reason)), [Cost view](#cost-view), [Evening prediction](#evening-prediction),
+  [Open trade](#open-trade), [Intraday trade check](#trade-check),
   [Intraday alert](#intraday-alert)
 - Explanations and scores: [AI reason](#ai-reason), [End-of-day analysis](#eod-analysis),
   [Scoreboard row](#scoreboard-row), [Heatmap cell](#heatmap-cell), [Cumulative line](#cumulative-line),
@@ -221,8 +222,8 @@ traders. Example file: `strategy.json` (the registry entries plus counts).
 | parameters | Its settings (rule: signal, news weight, which news statuses and materiality count, global cues, regime filter; AI: model, inputs, whether it sees the model score) | registry | settings | `news_weight: 2.0` |
 | threshold | Lowest probability of a rise that still makes a trade (empty for always-up and momentum) | registry | 0-1 | `0.55`, `0.60` |
 | horizons | Horizons it predicts (decision 38) | registry | list of k | rule `[1,2,3,4,5]`, AI `[1,3,5]` |
-| live_from | First session it trades for real; empty until Wave 5 switches paper trading on | registry | date | empty |
-| live | Whether it is live | derived | yes/no | `false` |
+| live_from | First session it paper-trades (B2's settle, pick and forward summary skip earlier rows); Wave 5 (B19) set 2026-10-12 for all 15, a strategy added later gets its own; empty = not live yet | registry | date | `2026-10-12` |
+| live, status_note | Whether it is live by the clock (`live_from` on or before that day), with a short note; the examples are as of 7 Oct, so none is live yet | derived | yes/no, text | `false`, "not live at the examples' cut-off; live from 2026-10-12" |
 | settled_trades | Its settled trades so far | [Paper trade](#paper-trade) | count | `16` |
 
 The initial set has 15 strategies:
@@ -352,7 +353,7 @@ trades).
 | exit_quantity, adjustment_ids | Shares after a split or bonus in the window, and that adjustment | `adjustments` (exists) | shares, ids | `4.36167`, empty |
 | entry_value, exit_value | Quantity × price | engine | ₹ / $ | `1000.00` -> `1042.00` |
 | gross_pnl | Profit before costs | engine | ₹ / $ | `42.00` |
-| costs, cost_lines | Round-trip charges with their parts, the **market-cost view** that strategies are ranked on (F1.6; rates in `config/costs.yaml`: the statutory ones marked verify, the `broker:` charges owner-confirmed 2026-10-08). India: brokerage (0.75 %, at least ₹50 per order), STT, exchange, SEBI, stamp duty, GST. US: BUX order fee converted to $, SEC fee. The owner's own extra charges are in the [Cost view](#cost-view) | B2's engine | ₹ / $ | `2.34` = order fee `2.32` + SEC fee `0.02`; India RELIANCE N+1 `1966.41` |
+| costs, cost_lines | Round-trip charges with their parts, the **market-cost view** that strategies are ranked on (F1.6; rates in `config/costs.yaml`: the statutory ones marked verify, the `broker:` charges: India Groww from 2026-10-12, SPEC decision 54, US owner-confirmed 2026-10-08). India: brokerage (Groww 0.10 %, at least ₹100 per order; Axis Direct 0.75 %, at least ₹50, until 2026-10-12), STT, exchange, SEBI, stamp duty, GST. US: BUX order fee converted to $, SEC fee. The owner's own extra charges are in the [Cost view](#cost-view) | B2's engine | ₹ / $ | `2.34` = order fee `2.32` + SEC fee `0.02`; India RELIANCE N+1 `1966.41` |
 | net_pnl | Profit after costs (the headline number) | engine | ₹ / $ | `39.66` |
 | return_pct | Net profit as % of the amount (compares across amounts, decision 44) | engine | % | `3.97` |
 | prob_up, target_price, lo80, hi80 | What was predicted | prediction | 0-1, ₹ / $ | `0.583`, `227.84`, `218.36`-`237.72` |
@@ -386,8 +387,9 @@ The examples follow B2's split (`marketbrief/lab/reasons.py`).
 
 The two cost views of one record (owner decisions 50-51):
 - **market cost**: the costs strategies are ranked on, the same as the [paper trade](#paper-trade)'s `costs`;
-- **your cost**: market cost plus the owner's own charges. India: the NRI reporting charge ₹200 on the buy date and
-  ₹200 on the sell date, and the DP charge. US: BUX's FX markup 0.75 % each way and the 0.20 % a year portfolio fee,
+- **your cost**: market cost plus the owner's own charges. India: the DP charge (Groww: ₹20 plus GST per scrip sold)
+  and the NRI reporting charge per trade date (none with Groww; ₹200 on the buy date and ₹200 on the sell date under
+  Axis Direct until 2026-10-12). US: BUX's FX markup 0.75 % each way and the 0.20 % a year portfolio fee,
   pro-rated.
 
 It also holds the **cost-viable** flag: whether the expected gain after your cost is above zero (owner decision of
@@ -421,11 +423,32 @@ None of the example predictions or picks is cost-viable: a round trip at your co
 | expected_gain_your_pct | `p × move − (1 − p) × loss − your_cost_pct` (predictions and picks only) | B2, `lab/gain.py` | % | `-1.9891` |
 | cost_viable | Expected gain after your cost is above zero (predictions and picks only; empty without a probability) | B2, decision 51, owner decision of 2026-10-07 | yes/no | `false` |
 | market_costs, market_cost_lines | The market view, total and per charge | B2 | ₹ / $ | `2.34` = order fee `2.32` + SEC fee `0.02` |
-| your_costs, your_cost_lines | Your view, total and per charge | B2 | ₹ / $ | `17.68` = market lines + FX markup `15.31` + portfolio fee `0.03`; India adds `nri_reporting_buy` and `nri_reporting_sell` `200` each and `dp_charge` |
+| your_costs, your_cost_lines | Your view, total and per charge | B2 | ₹ / $ | `17.68` = market lines + FX markup `15.31` + portfolio fee `0.03`; India adds `nri_reporting_buy` and `nri_reporting_sell` (`200` each under Axis Direct, absent with Groww from 2026-10-12) and `dp_charge` (Groww: `23.6`) |
 | net_pnl_market, return_pct_market, net_pnl_your, return_pct_your | Profit after costs in each view (settlements only) | B2 | ₹ / $, % | `39.66` / `3.966`; `24.32` / `2.432` |
 | holding_days | Calendar days from D to the exit (the US portfolio fee) | calendar | days | `5` |
 | eurusd_entry, eurusd_exit | The EUR/USD closes used for the US order fee and FX markup | `EURUSD=X` (B2) | rate | `1.17` (example rate) |
 | computed_at, method_version | When it was computed; engine version | B2 | time, text | `engine-v1` |
+
+<a id="evening-prediction"></a>
+## Evening prediction (preview)
+
+The evening run's preview of the next pre-open [predictions](#prediction) (option C of the evening run, agreed by
+B17, B10 and B2; docs/ws/b2.md "Evening preview"). After the close, `lab.py predict --evening` computes the rows the
+next pre-open `predict` will write, for the same D and with the same ids, on the day's close: B10's evening ranges
+(`ranges_asof(..., run="evening")`, no overnight cue, no forecaster widening) and the model scores as of the
+evening clock. A preview is never traded: settlement, picks, the scoreboard, trade checks, scoring and the warehouse
+pages read only `strategy_predictions`, and no cost views, abstentions or picks are written for it. The pre-open row
+with the same id stays the revision of record, so a page can show how a forecast changed between the two
+runs. Status: kind `strategy_predictions_evening`; session **B2** writes it (`core/schema_b2.py`,
+`lab/run.py` `write_evening_predictions`); ids already stored there are skipped. Example file:
+`evening_prediction.json` (the 10 rule.model_news.v1 previews of NVDA and RELIANCE; their numbers are the pre-open
+example's, and the evening times are examples, since the evening run's schedule is B17's).
+
+| Field | Meaning | Source | Unit | Example |
+|---|---|---|---|---|
+| every [Prediction](#prediction) field | The same columns as `strategy_predictions` (derived from its schema), with the same id as the pre-open row it previews | B2 | as there | `rule.model_news.v1:2026-10-06-NVDA-1d`, D `2026-10-07` |
+| made_at | When the evening run made it (after the as-of close, before the next pre-open run) | B2 | time | `2026-10-06T22:30:00Z` (example: 18:30 New York) |
+| run | Always `evening` | B2 | text | `evening` |
 
 <a id="open-trade"></a>
 ## Open trade

@@ -28,9 +28,9 @@ async function tableChecks(page) {
   await page.getByLabel("Filter by symbol or name").fill("zzz");
   if (!(await page.getByText("No company matches the filter.").count())) problems.push("no empty row for an unmatched filter");
   await page.getByLabel("Filter by symbol or name").fill("");
-  await page.getByRole("button", { name: "N+5" }).click();
-  if (!(await page.getByText("Agreement at N+5").count())) problems.push("the horizon tab did not change the columns");
-  if (!(await page.locator('[aria-label="Horizon"] [aria-pressed="true"]', { hasText: "N+5" }).count())) problems.push("N+5 not pressed");
+  await page.getByRole("button", { name: "5 days" }).click();
+  if (!(await page.getByText("Would buy (5-day hold)").count())) problems.push("the horizon tab did not change the columns");
+  if (!(await page.locator('[aria-label="Horizon"] [aria-pressed="true"]', { hasText: "5 days" }).count())) problems.push("N+5 not pressed");
   return problems;
 }
 
@@ -61,10 +61,10 @@ export const cases = [
     widths: [1280],
     waitFor: "table.wl",
     api: publishedApi,
-    expectText: ["No proven strong signals today", "Companies followed", "Most agreed at N+1", "12 of 15 buy", "3 of 3 companies", "Not listed: InterGlobe Aviation (IndiGo)", "manage on the Companies page"],
+    expectText: ["Not proven yet: these are tests, not tips.", "Companies followed", "Most strategies like (1-day hold)", "12 of 15 buy", "3 of 3 companies", "Not listed: InterGlobe Aviation (IndiGo)", "manage on the Companies page"],
     expectSelector: ["table.wl tbody tr.row", ".rng svg", ".hzb svg", ".mb-agbar"],
   },
-  { name: "watchlist-india-narrow", path: "/india/watchlist", mockup: "02-watchlist", widths: [1024, 768, 390], waitFor: "table.wl", api: publishedApi, expectText: ["Most agreed at N+1", "RELIANCE"] },
+  { name: "watchlist-india-narrow", path: "/india/watchlist", mockup: "02-watchlist", widths: [1024, 768, 390], waitFor: "table.wl", api: publishedApi, expectText: ["Most strategies like (1-day hold)", "RELIANCE"] },
   { name: "watchlist-india-table", path: "/india/watchlist", mockup: "02-watchlist", widths: [1440], waitFor: "table.wl", api: publishedApi, check: tableChecks },
   { name: "watchlist-us", path: "/us/watchlist", market: "us", mockup: "02-watchlist", widths: [1280], waitFor: "table.wl", api: publishedApi, expectText: ["NVDA", "14 of 15 buy", "No check yet", "first intraday check pending"] },
   { name: "watchlist-flagged", path: "/india/watchlist", mockup: "02-watchlist", widths: [1280], waitFor: "table.wl", api: flaggedApi, expectText: ["Flagged today", "1 of 4"], expectSelector: ["table.wl .mb-label.warn"] },

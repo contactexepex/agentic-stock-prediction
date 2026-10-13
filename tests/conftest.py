@@ -259,6 +259,19 @@ def _no_network(request, _netguard_session_log):
         pytest.fail("the test reached for the network (tests must run offline):\n" + hits, pytrace=False)
 
 
+@pytest.fixture(autouse=True)
+def _no_pacing_sleep(monkeypatch):
+    """Request spacing (marketbrief/sources/pacing.py) never sleeps in a test, and every test starts with a fresh
+    Yahoo pacer (its polite stop holds for a whole process). Pacing tests inject their own clock and sleep."""
+    sys.path.insert(0, str(TESTS.parent / "scripts"))
+    from marketbrief.sources import pacing, yahoo_pacing
+
+    monkeypatch.setattr(pacing, "pause", lambda _seconds: None)
+    yahoo_pacing.reset_shared()
+    yield
+    yahoo_pacing.reset_shared()
+
+
 @pytest.fixture(scope="module")
 def all_strategies_live():
     """B4 (go-live): the read models show only live strategies' rows (lab/registry.is_live, through

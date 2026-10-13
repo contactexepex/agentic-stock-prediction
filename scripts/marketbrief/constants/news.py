@@ -11,6 +11,21 @@ SOCKET_TIMEOUT_SECONDS = 20
 FETCH_ATTEMPTS = 2                # one retry: Google News occasionally fails a single query
 RETRY_PAUSE_SECONDS = 2
 PERMANENT_STATUSES = (401, 403, 404)
+# Request spacing and Google News' polite stop (marketbrief/collectors/news_fetch.py; docs/DESIGN.md section 3,
+# "News timing"): at least `news.google_news.pause_seconds` between two news.google.com requests of a run and
+# `news.outlet_pause_seconds` between two outlet-feed requests. A Google answer of HTTP 429 or 503, Google's
+# /sorry/ (captcha) page, or an HTML page instead of RSS stops every later Google News request of the run
+# (never retried); the queries not asked are listed in `google_skipped` and the run is not `ok`.
+CFG_GOOGLE_PAUSE_SECONDS = "pause_seconds"
+CFG_OUTLET_PAUSE_SECONDS = "outlet_pause_seconds"
+GOOGLE_NEWS_PAUSE_SECONDS = 1.5
+OUTLET_PAUSE_SECONDS = 0.5
+GOOGLE_STOP_STATUSES = (429, 503)
+GOOGLE_SORRY_MARKER = "/sorry/"
+HTML_CONTENT_MARKER = "html"
+GOOGLE_STOP_HTTP = "http_{status}"
+GOOGLE_STOP_CAPTCHA = "captcha_page"
+GOOGLE_STOP_HTML = "html_instead_of_rss"
 TITLE_SEPARATOR = " - "
 
 # Catch-up window (marketbrief/collectors/news_window.py; docs/DESIGN.md section 3, "News timing"): the

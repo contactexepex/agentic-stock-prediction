@@ -19,6 +19,10 @@ MODEL_SCHEMAS: Schemas = {
         # B10 (docs/SPEC.md F2.7): n_plus_k on every row written from then on (null on older rows: open-to-close
         # 1-day = N+1, 5-day = legacy_5d_d4, core/horizons.legacy_label); D and the exit session of N+k
         "horizon_label": "VARCHAR", "entry_date": "DATE", "exit_date": "DATE",
+        # the run that wrote the row (B17's evening run, option C): "evening" (model_scores.py --evening, the day's
+        # close) or "pre_open"; null on rows written before = pre_open. Readers take the newest computed_at by
+        # their clock, so a pre-open row revises an evening one (written only when the probability changed)
+        "run": "VARCHAR",
     }),
     # One row per fitted model (monthly refit; model_scores.py appends it the first time a month is scored).
     # model = the formula as JSON (features, training means and sds, coefficients, intercept, z_clip,

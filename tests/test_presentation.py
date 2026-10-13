@@ -165,12 +165,13 @@ def reader():
     change = {"since": "2026-10-02T12:00:00Z", "target_pct": 1.25, "prob_pts": 0.031, "news_added": ["abcdef0123456789"]}
     aapl = {"ticker": "AAPL", "bars": [{"d": f"2026-09-{d:02d}", "c": 100.0 + d / 10} for d in range(21, 31)],
             "forecasts": [fcast(1, 104.0, 116.0, 0.58, "up", "clear", "2026-10-06", "Tue 6 Oct", change),
-                          fcast(3, 101.0, 119.0, 0.53, "up", "slight", "2026-10-08", "Thu 8 Oct"),
+                          {**fcast(3, 101.0, 119.0, 0.53, "up", "slight", "2026-10-08", "Thu 8 Oct"), "run": "evening"},
                           fcast(5, 98.25, 121.5, 0.51, "none", "none", "2026-10-12", "Mon 12 Oct")],
             "flags": [{"code": "earnings", "text": "Results in 3 days: prices can jump"}]}
     msft = {"ticker": "MSFT", "bars": [{"d": "2026-09-30", "c": 315.0}], "forecasts": [],
             "flags": [{"code": "contradicted", "text": "Some recent news was contradicted by other sources"}]}
     return {"horizons": [1, 3, 5], "default_horizon": 1, "lean": {"slight": 0.02, "clear": 0.05},
+            "preview_label": "Preview (evening run, never traded)",
             "cutoff": "2026-10-05T00:00:00+00:00", "as_of": "2026-10-02", "as_of_label": "Fri 2 Oct",
             "paper_label": "Paper only — no proven edge yet",
             "mood": {"code": "EVENT_HEAVY", "word": "Event-heavy", "plain": "Event-heavy: big events.", "stress": False},
@@ -397,6 +398,8 @@ def test_html_renders_in_a_browser_with_working_filters(tmp_path):
     assert out["sectors"] == ["", "Tech"] and out["tech"] == 2 and out["up"] == 1   # sectors of the shown companies
     assert out["flagged"] == 2                                           # both cards carry a warning
     assert "Why line N+3." in out["n3"] and "53%" in out["n3"] and "N+3" in out["g3"]   # the horizon switch
+    assert "Preview (evening run, never traded)" in out["n3"]           # AAPL's N+3 range is an evening run
+    assert "Preview (evening run" not in text                            # N+1 is a pre-open range: no label
     assert "Nothing has been checked yet" not in out["track"] and "80% ranges, N+1" in out["track"]
     assert out["hrefs"] and all(re.match(r"^(https?://|index\.html$|2026-10-05\.md$)", h) for h in out["hrefs"]), out["hrefs"]
     assert out["dates"] and all(re.match(r"^\d{1,2} [A-Z][a-z]{2}$", d) for d in out["dates"]), out["dates"]

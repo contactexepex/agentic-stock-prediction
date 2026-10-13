@@ -42,6 +42,7 @@ from marketbrief.constants.statuses import SUMMARY_COLLECTOR, SUMMARY_FAILED, SU
 from marketbrief.core.cli import market_arg, require_market
 from marketbrief.core.clock import utc_now, utc_today
 from marketbrief.core.storage import append_jsonl, day_file, recent_ids
+from marketbrief.sources.yahoo_pacing import paced_yfinance, stop_report
 
 
 def usable_quotes(chain: pd.DataFrame) -> pd.DataFrame:
@@ -190,6 +191,7 @@ class OptionsCollector:
                     "written": written,
                     "tickers": len({row[COL_TICKER] for row in self.rows}),
                     SUMMARY_FAILED: self.failed,
+                    **stop_report(),
                 },
                 indent=2,
             )
@@ -225,6 +227,5 @@ def main() -> int:
             )
         )
         return 0
-    import yfinance
-
+    yfinance = paced_yfinance()
     return OptionsCollector(cfg, yfinance, args.expiries, args.max_days).collect()

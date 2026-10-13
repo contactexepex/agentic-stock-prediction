@@ -22,9 +22,11 @@ from datetime import datetime
 import pandas as pd
 
 from marketbrief.constants.warehouse import (
+    INVALID_PAGES_KEY,
     MARKET_PAGE_KEY,
     RM_OVERVIEW,
     RM_WATCHLIST,
+    SERVE_STATUS,
 )
 from marketbrief.presentation.dashboard import reads
 from marketbrief.presentation.dashboard.stock import iso_day
@@ -119,7 +121,9 @@ def build_rows(
 ) -> tuple[dict, list[tuple[str, str, list[str]]]]:
     """(table -> page_key -> row, invalid pages) of a market as of the cut-off, from every registered builder
     (rm_registry). A row has READ_MODEL_COLUMNS with the payload as canonical JSON text; a page that fails its
-    schema in api/openapi.yaml is left out and listed as (table, page_key, problems)."""
+    schema in api/openapi.yaml is left out and listed as (table, page_key, problems). The status-mode pages are built
+    last and carry `invalid_pages` = the other pages that failed (their old rows stay), so the route never counts
+    such a page fresh from the sync time (web/lib/data/deps.ts)."""
     ctx = BuildContext(cfg, con, cutoff_time)
     document = openapi_spec.spec()
     envelope = {
@@ -131,9 +135,13 @@ def build_rows(
         "source_commit": source_commit,
     }
     rows, invalid = {}, []
-    for builder in rm_registry.builders():
+    ordered = sorted(rm_registry.builders(), key=lambda builder: builder.serve == SERVE_STATUS)
+    for builder in ordered:
         rows[builder.table] = {}
         for page_key, payload in builder.build(ctx).items():
+            if builder.serve == SERVE_STATUS:
+                failed = sorted((table, key) for table, key, _problems in invalid)
+                payload = {**payload, INVALID_PAGES_KEY: [{"table": t, "page_key": k} for t, k in failed]}
             problems = page_problems(builder, payload, document)
             if problems:
                 invalid.append((builder.table, page_key, problems))

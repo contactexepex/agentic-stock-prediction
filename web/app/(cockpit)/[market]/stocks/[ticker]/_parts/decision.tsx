@@ -12,7 +12,7 @@ import { HorizonTabs } from "../../../../../../components/ui/controls.tsx";
 import { HelpTip, Icon } from "../../../../../../components/ui/icon.tsx";
 import { Card, CardHead, Delta, FamilyLabel, Label, MoneyDelta, Odds } from "../../../../../../components/ui/primitives.tsx";
 import { FAMILY, FAMILY_SHORT, PICK_RULE, type Family } from "../../../../../../lib/ui/constants.ts";
-import { fmtDate, fmtDateYear, money, pct, price, signed } from "../../../../../../lib/ui/format.ts";
+import { fmtDate, fmtDateYear, holdLabel, money, pct, price, signed } from "../../../../../../lib/ui/format.ts";
 import { stockStrategiesPath } from "../../../../../../lib/ui/routes.ts";
 import { bandsOf, companyEventEffect, nextCompanyEvent, openSummary, publishedRangeAt, publishedRanges, referencePrediction } from "../../../../../../lib/company-pages/company-logic.ts";
 import { agreementAt, buyShare, expectedGainMoney } from "../../../../../../lib/company-pages/strategies-logic.ts";
@@ -41,7 +41,7 @@ export function CompanyLine({ p, ctx, actions }: { p: CompanyPayload; ctx: PageC
       {co.state === "active" ? (
         <Label tone="success" icon="check" tip="Active: predicted every session and traded on paper.">active</Label>
       ) : (
-        <Label tone="neutral" icon="pending" tip={`Inactive since ${fmtDateYear(co.state_since)}: still collected, never predicted or traded (decision 13).`}>
+        <Label tone="neutral" icon="pending" tip={`Inactive since ${fmtDateYear(co.state_since)}: still collected, never predicted or traded.`}>
           inactive since {fmtDate(co.state_since, false)}
         </Label>
       )}
@@ -58,13 +58,13 @@ export function CompanyLine({ p, ctx, actions }: { p: CompanyPayload; ctx: PageC
 
 function PickLine({ k, ctx }: { k: HeadToHeadPick; ctx: PageCtx }) {
   const st = strategyOf(ctx.strategies, k.strategy_id ?? "");
-  const tip = `${PICK_RULE[k.pick_rule] ?? k.pick_rule}: ${st.name} (${FAMILY[k.family][0]}, ranked on ${k.strongest_basis === "all_companies" ? "all companies" : "this company"}) picks N+${k.horizon_days}: chance ${pct(k.prob_up, 1)}, move if up ${signed(k.move_pct)}, loss if down ${signed(-k.loss_pct)}, market costs ${k.costs_pct.toFixed(2)}%.`;
+  const tip = `${PICK_RULE[k.pick_rule] ?? k.pick_rule}: ${st.name} (${FAMILY[k.family][0]}, ranked on ${k.strongest_basis === "all_companies" ? "all companies" : "this company"}) picks a ${holdLabel(k.horizon_days)} (N+${k.horizon_days}): chance ${pct(k.prob_up, 1)}, if right ${signed(k.move_pct)}, if wrong ${signed(-k.loss_pct)}, market fees ${k.costs_pct.toFixed(2)}%.`;
   return (
     <div className="p">
       <span className="p1" data-tip={tip}>
         <FamilyLabel family={k.family}>{FAMILY_SHORT[k.family]}</FamilyLabel>
         <small className="muted">{PICK_RULE[k.pick_rule] ?? k.pick_rule}</small>
-        <span className="h-lab">N+{k.horizon_days}</span>
+        <span className="h-lab">{holdLabel(k.horizon_days)}</span>
       </span>
       <span className="p2">
         <Odds p={k.prob_up} />
@@ -93,17 +93,17 @@ export function DecisionCard({ p, ctx, horizon, onHorizon }: { p: CompanyPayload
     <Card label="At a glance">
       <CardHead
         title={`${co.name} at a glance`}
-        help="What the strategies say about this company for the selected horizon, today’s head-to-head picks, the reference strategy’s published range, and what is coming. It helps you judge the company; it never tells you to buy or sell. Every signal is Paper until a strategy meets the go-live bar."
+        help="What the strategies say about this company for the selected holding period, today’s rule-vs-AI picks, the likely price range, and what is coming. Every signal is Paper until a strategy passes the test."
         end={
           <>
-            <span className="muted">Horizon <HelpTip tip="N+k: buy at the open of the session being predicted, sell at the close of the k-th market session after it. Opens on N+1 (decision 39)." /></span>
+            <HelpTip tip="A k-day hold (N+k): buy at the open of the trading day being predicted, sell at the close k trading days later. Opens on the 1-day hold." />
             <HorizonTabs horizons={p.horizons} value={horizon} onChange={onHorizon} />
           </>
         }
       />
       <div className="dec">
         <div className="cell">
-          <div className="l"><Icon name="trending_up" />Who would buy at N+{horizon}</div>
+          <div className="l"><Icon name="trending_up" />Who would buy · {holdLabel(horizon)}</div>
           {a ? (
             <>
               <div className="v">{a.buy} of {a.of}<small> strategies</small></div>
@@ -136,12 +136,15 @@ export function DecisionCard({ p, ctx, horizon, onHorizon }: { p: CompanyPayload
         </div>
         <div className="cell">
           <div className="l">
-            <Icon name="query_stats" />Published range at N+{horizon}
-            <button className="md-help" type="button" aria-label="Explain" data-tip={`The published range for this horizon, computed by ranges.py: the target is the expected exit close; the 50% and 80% ranges are where the close is expected to land that often. Drawn on the chart. The chance of a rise is the reference rule strategy’s (${reference.name}), when it has a prediction.`}>?</button>
+            <Icon name="query_stats" />Likely price range · {holdLabel(horizon)}
+            <button className="md-help" type="button" aria-label="Explain" data-tip={`Where the price is likely to close after ${horizon} trading day${horizon === 1 ? "" : "s"}: the target is the middle guess; the inner band catches the close about half the time, the outer band about 8 times in 10. Drawn on the chart. An evening preview is computed on the day’s close and never traded; the pre-open run replaces it. The chance of a rise is the main rule strategy’s (${reference.name}), when it has a prediction.`}>?</button>
           </div>
           {range && bands ? (
             <>
-              <div className="v">{price(ctx.currency, range.target_price)}<small> target</small></div>
+              <div className="v">
+                {price(ctx.currency, range.target_price)}<small> target</small>
+                {range.run === "evening" ? <> <Label tone="info" icon="schedule" tip="Computed in the evening run on the day’s close: a preview, never traded. The pre-open run replaces it before the open.">evening preview · never traded</Label></> : null}
+              </div>
               <RangeBar currency={ctx.currency} bands={bands} last={co.last_close ?? null} />
               <div className="s">
                 80% range {price(ctx.currency, range.lo80)}–{price(ctx.currency, range.hi80)} · exit {fmtDate(range.exit_date)}
@@ -151,14 +154,14 @@ export function DecisionCard({ p, ctx, horizon, onHorizon }: { p: CompanyPayload
           ) : (
             <>
               <div className="v muted">—</div>
-              <div className="s">{co.state !== "active" ? "Inactive companies get no published range." : `No published range stored for this company at N+${horizon} today.`}</div>
+              <div className="s">{co.state !== "active" ? "Inactive companies get no published range." : `No likely price range stored for this company for a ${holdLabel(horizon)} today.`}</div>
             </>
           )}
         </div>
         <div className="cell">
           <div className="l">
             <Icon name="layers" />Today’s head-to-head picks
-            <button className="md-help" type="button" aria-label="Explain" data-tip="Up to four paper trades a day per company: the strongest rule strategy and the strongest AI trader, each by two pick rules (best expected gain, highest probability). Expected gain = chance × move − (1 − chance) × loss − costs; “clears costs” when it is above zero (decisions 41-42, 51).">?</button>
+            <button className="md-help" type="button" aria-label="Explain" data-tip="Up to four paper trades a day per company: the best rule strategy and the best AI trader, each picked two ways (biggest expected gain, highest chance). Expected gain = chance × gain − (1 − chance) × loss − fees; it is an average if the odds hold, not a result. “Worth it” when it is above zero after the fees.">?</button>
           </div>
           {picked.length ? (
             <>
@@ -201,8 +204,8 @@ export function DecisionCard({ p, ctx, horizon, onHorizon }: { p: CompanyPayload
       <div className="plain">
         <Icon name="info" />
         <div>
-          {a ? `${a.buy} of ${a.of} strategies would buy ${co.name} at N+${horizon}${a.avg_prob_up != null ? ` with an average chance of ${pct(a.avg_prob_up)}` : ""}. ` : ""}
-          {picked.length ? `Of today’s ${picked.length} head-to-head picks, ${viableLine(picked)}. ` : "No head-to-head pick today. "}
+          {a ? `${a.buy} of ${a.of} strategies would buy ${co.name} for a ${holdLabel(horizon)}${a.avg_prob_up != null ? ` with an average chance of ${pct(a.avg_prob_up)}` : ""}. ` : ""}
+          {picked.length ? `Of today’s ${picked.length} rule-vs-AI picks, ${viableLine(picked)}. ` : "No rule-vs-AI pick today. "}
           {next ? `${eventWords(next.type).replace(/^./, (c) => c.toUpperCase())} due ${fmtDate(next.date)}${effect ? `: ${effect.plain}` : ""}. ` : ""}
           <b>
             {p.status.paper_label}: {a && a.buy > a.of / 2 ? "a majority says the strategies lean the same way, not that they are right" : "agreement says how the strategies lean, not whether they are right"}; nothing here is advice.

@@ -1,5 +1,6 @@
 // A head-to-head pick's two cost views (design/mockups/_shared/shell.js pickCand, yourViable, viableLine): the
-// market-cost expected gain it was ranked on, and decision 51's viability at the owner's own cost. Pure.
+// market-cost expected gain it was ranked on, and its viability at the owner's own cost (after their broker's fees).
+// Pure.
 
 export interface PickCandidate {
   horizon_days: number;
@@ -30,13 +31,13 @@ export function yourViable(pick: Pick): boolean | null {
   return c && c.cost_viable != null ? c.cost_viable : null;
 }
 
-/** "1 clears market costs · none viable at your cost" for a list of picks. */
+/** "1 expected to beat market fees · none worth it after your fees" for a list of picks. */
 export function viableLine(picked: readonly Pick[]): string {
   const market = picked.filter((k) => k.expected_gain_pct > 0).length;
   const yours = picked.filter((k) => yourViable(k) === true).length;
   const known = picked.filter((k) => yourViable(k) != null).length;
-  const left = market ? `${market} clear${market === 1 ? "s" : ""} market costs` : "none clears market costs";
-  const right = known ? (yours ? `${yours} viable at your cost` : "none viable at your cost") : "your-cost view not stored";
+  const left = market ? `${market} expected to beat market fees` : "none expected to beat market fees";
+  const right = known ? (yours ? `${yours} worth it after your fees` : "none worth it after your fees") : "your fees not stored";
   return `${left} · ${right}`;
 }
 

@@ -1,7 +1,7 @@
 "use client";
 // The app shell of every page (the mockups' shell, design/system/README.md "How a page uses it"): the dark sidebar
 // with the pages (labels from 1200 px, icons from 600 px, a drawer with a scrim below), the top bar (menu button, page
-// title, company search, the India / US market switch, Ask), the content area, the chat panel slot (B8) and the phone
+// title, company search, the India / US market switch, the theme button, Ask), the content area, the chat panel slot (B8) and the phone
 // bar. The sidebar's foot is the status bar: the market's Paper label, data date and freshness from /status.
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -12,6 +12,7 @@ import { PAGES, PHONE_BAR, pageByKey, pageOfPath, pagePath, switchMarketPath, ty
 import { Icon } from "../ui/icon.tsx";
 import { ChatPanelProvider, useChatPanel } from "./chat-panel.tsx";
 import { StatusBar } from "./status-bar.tsx";
+import { ThemeToggle } from "./theme-toggle.tsx";
 import { TooltipLayer } from "./tooltip-layer.tsx";
 
 function NavItem({ page, market, current, onNavigate }: { page: PageRoute; market: Market; current: boolean; onNavigate?: () => void }) {
@@ -126,6 +127,7 @@ function Shell({ market, children, chat }: { market: Market; children: ReactNode
             <span>Search a company…</span>
           </Link>
           <MarketSwitch market={market} />
+          <ThemeToggle />
           <AskButton market={market} />
         </div>
       </header>

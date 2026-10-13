@@ -73,7 +73,8 @@ MSG_IDS_NOT_FIRST_SEEN_IN_WINDOW = (
     "{count} ids are not news/announcements first seen since the last enrichment ({since}), e.g. {ids}"
 )
 MSG_NEWS_RUN_NOT_OK = (
-    "the news run at {ran_at} does not count as a successful collection (most Google News queries failed): "
+    "the news run at {ran_at} does not count as a successful collection (most Google News queries failed, or "
+    "Google News rate-limited the run: see google_stopped): "
     "the next run reaches back further"
 )
 MSG_IDS_ALREADY_ENRICHED = "{count} ids already in news_enriched, e.g. {ids}"
@@ -144,5 +145,10 @@ MSG_UNMATCHED_NUMBERS = (
     "(context pack, script-written report, cited news text, stored rows): {examples}"
 )
 MSG_UNMATCHED_NUMBER_EXAMPLE = '{token!r} in "{sentence}"'
+MSG_REPORT_STATUS_WRONG = ("{name}: {count} news status word(s) that differ from the cited id's stored status as of "
+                           "the run (news_status_ids_asof; issue #460): {examples}")
+MSG_REPORT_STATUS_EXAMPLE = '{id} called {word!r}, stored {stored} in "{sentence}"'
+MSG_REPORT_STATUS_UNCITED = ("{name}: {count} news status word(s) with no news id after them in the sentence, so "
+                             "unchecked (cite the id right after the word): {examples}")
 MSG_SIGN_ALARMS = ("{name}: {count} number(s) after a falling word (fell, dropped, down ...) whose sources are all "
                    "positive (optional sign check, issue #32): {examples}")

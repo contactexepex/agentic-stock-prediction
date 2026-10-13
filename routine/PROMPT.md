@@ -32,8 +32,9 @@ step:
 - summaries, report and Slack draft: `--stage report` (each number in agent-written text must
   match a number of the same kind, percent or plain, from the companies or symbols its sentence
   names, the market-level data or the news it cites; an invented number that happens to equal
-  such a number still passes, which the weekly spot-check is for; no AGENT markers left, every range published or explained)
-  and the weekly spot-check (claims are true).
+  such a number still passes, which the weekly spot-check is for; a news status word next to a cited id must be
+  that id's stored status or its event's as of the run, REPORT_STATUS, issue #460; no AGENT markers left, every range
+  published or explained) and the weekly spot-check (claims are true).
 Agent records stay in `work/` until their gate passes; only then append them to `data/`.
 Delete `work/lessons.jsonl`, `work/claims.jsonl`, `work/enriched.jsonl`, `work/results_digest.jsonl`, `work/predictions.jsonl`, `work/reasoning.jsonl` and `work/graph.jsonl` before each agent
 runs and right after each append, so a stale file can never be appended twice.
@@ -219,7 +220,9 @@ Warnings never block: list them in `data_quality`.
    `nse-ann-<seq_id>`, the one exception to the 16-character news id) first seen since the last
    enrichment and not enriched yet, plus items whose headline changed after their enrichment
    (`headline_updated_at`; scored again on the new headline). That covers the news-only light runs (routine/NEWS_PROMPT.md,
-   31 combined sessions a week, weekends and holidays included; docs/DESIGN.md section 2) and a failed earlier run, not just today's file: the window
+   31 combined sessions a week, weekends and holidays included; docs/DESIGN.md section 2) and a failed earlier run, not just today's file;
+   the weekend sessions already score their items with the same analyst, gate and append (NEWS_PROMPT.md step 3a), so
+   on a Monday only the items since the last weekend scoring are pending. The window
    starts at the earlier of the start of today (UTC) and the newest already-enriched item's
    `first_seen_at`, at most 7 days back (`since` in its summary). Delete `work/enriched.jsonl`, then run
    the news-analyst subagent on `work/news_pending.jsonl`. Keep its brief.
@@ -350,7 +353,10 @@ Warnings never block: list them in `data_quality`.
     markers; each number in the agent-written lines of the report, the Slack draft and
     `summaries/<market>/daily/TODAY.md` matches a same-kind number of the companies or symbols its
     sentence names, or of the market level, in the context pack, the script-written skeleton,
-    stored rows or the text of the news it cites; every ticker and horizon has a range or a calendar reason for none).
+    stored rows or the text of the news it cites; each news status word (rumour, unverified, single_source,
+    corroborated, promotional, contradicted, confirmed_primary) is a stored status of the news id it is written with,
+    as of the run: blocks as `REPORT_STATUS`, a status word with no id after it warns `REPORT_STATUS_UNCITED`
+    (templates/report.md); every ticker and horizon has a range or a calendar reason for none).
 
 11a. HTML report: only after the report gate passed (or each failed section was replaced as
     above and listed in `data_quality`), run `python scripts/html_report.py`. It refuses a report that
@@ -362,13 +368,8 @@ Warnings never block: list them in `data_quality`.
     further check. If it fails, add the failure to the Slack draft's failures line, then run
     `python scripts/validate.py --stage report` again, so the draft that is posted is the one the gate
     checked (one retry, as for the report), and post anyway.
-    Then run `python scripts/dashboard.py`: it builds `reports/<market>/dashboard.html` (the
-    decision-support dashboard: watchlist and market overview, a candlestick chart per stock with
-    the published ranges, the signal model's P(up) with its reasons, bull vs bear, news with
-    verification status, track record; labelled "Paper only — no proven edge yet" until the weekly
-    review finds skill) from the stored data only, and adds it to `work/slack_<market>_files.json`.
-    It writes no data and adds no narrative, so it needs no further check; if it fails, note it on
-    the Slack draft's failures line as above and go on.
+    The static dashboard (`reports/<market>/dashboard.html`) is retired (owner decision 2026-10-10): do not run
+    `scripts/dashboard.py`. The website (the warehouse sync of step 12a) shows the same data.
 
 12. Save (only after the report gate passed, or each failed section was
     replaced as above and listed in `data_quality`): `git add data summaries reports && git commit -m "<market> daily run TODAY"` then
@@ -407,7 +408,7 @@ Warnings never block: list them in `data_quality`.
     `work/slack_<market>.md` as a reply in the thread step 13a's morning picks started, or as the first
     message of a new thread when none exists (once per day, recorded in `data/<market>/slack_posts/`),
     then the chart images as one reply,
-    then the HTML report file as a reply, then the dashboard file as a reply. Without the token it
+    then the HTML report file as a reply. Without the token it
     posts the summary text as ONE message through the incoming webhook in `SLACK_WEBHOOK_URL`. If it
     exits with code 2 (neither configured) and a Slack connector is available in this session, post
     the same text as one message to #market-brief with the connector instead. Nothing else is posted.

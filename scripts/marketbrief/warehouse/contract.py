@@ -51,8 +51,11 @@ def iso_date(value) -> str | None:
     return None if value is None else str(value)[:10]
 
 
-def freshness(built_at, now: datetime) -> dict:
-    """How old a page is at `now`."""
+def freshness(built_at, now: datetime, synced_at=None) -> dict:
+    """How old a page is at `now`: since the later of its built_at and `synced_at` (the market's last sync, rm.status
+    built_at: an unchanged page keeps its built_at, but the sync still checked it)."""
+    if synced_at is not None and (built_at is None or pd.Timestamp(synced_at) > pd.Timestamp(built_at)):
+        built_at = synced_at
     if built_at is None:
         return {"state": FRESHNESS_UNKNOWN, "built_at": None, "age_minutes": None}
     age = max(int((pd.Timestamp(now) - pd.Timestamp(built_at)).total_seconds() // SECONDS_PER_MINUTE), 0)
@@ -63,11 +66,11 @@ def freshness(built_at, now: datetime) -> dict:
     }
 
 
-def served_payload(row: dict, mode: str, now: datetime) -> dict:
-    """The payload the route returns for a stored row."""
+def served_payload(row: dict, mode: str, now: datetime, synced_at=None) -> dict:
+    """The payload the route returns for a stored row (`synced_at`: the market's last sync, page mode only)."""
     payload = row["payload"]
     payload = json.loads(payload) if isinstance(payload, str) else payload
-    fresh = freshness(row.get("built_at"), now)
+    fresh = freshness(row.get("built_at"), now, synced_at if mode == SERVE_PAGE else None)
     if mode == SERVE_STATUS:
         return {**payload, "freshness": fresh}
     if mode != SERVE_PAGE:
@@ -78,11 +81,11 @@ def served_payload(row: dict, mode: str, now: datetime) -> dict:
     return out
 
 
-def serve(row: dict, mode: str, now: datetime) -> dict:
+def serve(row: dict, mode: str, now: datetime, synced_at=None) -> dict:
     """The whole response body: the envelope (times to the second) and the served payload."""
     meta = {key: row.get(key) for key in META_FIELDS}
     meta.update(as_of=iso_date(meta["as_of"]), cutoff=iso_second(meta["cutoff"]), built_at=iso_second(meta["built_at"]))
-    return {**meta, "payload": served_payload(row, mode, now)}
+    return {**meta, "payload": served_payload(row, mode, now, synced_at)}
 
 
 # ---------- shape ----------

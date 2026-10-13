@@ -219,21 +219,21 @@ def test_rule_vs_ai_records_are_the_mockups(market):
     )
     # the W41 reviews (written 10 Oct) are after the cut-off and never read
     assert [r["iso_week"] for r in built["reviews"]] == ["2026-W40"]
-    assert (
-        rm_compare.review_due(ctx, built["reviews"])
-        == mockup["review_due"]
-        == {
-            "date": "2026-10-10",
-            "iso_week": "2026-W41",
-        }
-    )
+    # the weekly run moved to Friday evening New York time (owner, 2026-10-10); the mockup still shows the Saturday
+    assert rm_compare.review_due(ctx, built["reviews"]) == {"date": "2026-10-09", "iso_week": "2026-W41"}
+    assert mockup["review_due"]["iso_week"] == "2026-W41"
 
 
 def test_review_due_moves_past_a_week_already_reviewed():
-    ctx = compare_context("us")
-    ctx.cutoff_time = datetime.fromisoformat("2026-10-10T18:00:00+00:00")  # Saturday, after the W41 review
-    assert rm_compare.review_due(ctx, [{"iso_week": "2026-W41"}]) == {"date": "2026-10-17", "iso_week": "2026-W42"}
-    assert rm_compare.review_due(ctx, []) == {"date": "2026-10-10", "iso_week": "2026-W41"}
+    for market in ("us", "india"):
+        ctx = compare_context(market)
+        # Friday 9 Oct 23:45 New York (Saturday morning in India), after the W41 review
+        ctx.cutoff_time = datetime.fromisoformat("2026-10-10T03:45:00+00:00")
+        assert rm_compare.review_due(ctx, [{"iso_week": "2026-W41"}]) == {"date": "2026-10-16", "iso_week": "2026-W42"}
+        assert rm_compare.review_due(ctx, []) == {"date": "2026-10-09", "iso_week": "2026-W41"}
+        # Saturday in New York: that week's Friday has passed, the next one is due
+        ctx.cutoff_time = datetime.fromisoformat("2026-10-10T18:00:00+00:00")
+        assert rm_compare.review_due(ctx, []) == {"date": "2026-10-16", "iso_week": "2026-W42"}
 
 
 # ---------- populated records against the contract (the stored data has no settled trade yet) ----------
@@ -485,12 +485,11 @@ def test_owner_portfolio_shows_collected_companies_only(monkeypatch):
 
     trades = [{"id": "t1", "ticker": "AAPL"}, {"id": "t2", "ticker": "GONE"}]
     positions = [{"ticker": "AAPL", "eur_view": {"ticker": "AAPL"}}, {"ticker": "GONE", "eur_view": {"ticker": "GONE"}}]
-    monkeypatch.setattr(rm_portfolio, "portfolio_context", lambda _ctx: None)
     monkeypatch.setattr(rm_portfolio, "owner_trades", lambda _context: trades)
     monkeypatch.setattr(rm_portfolio, "owner_positions", lambda _context: positions)
     ctx = lab_context("us")
     ctx.__dict__["collected"] = frozenset({"AAPL"})  # GONE was deleted
-    owner = rm_portfolio.owner(ctx)
+    owner = rm_portfolio.owner(ctx, None)
     assert [t["ticker"] for t in owner["trades"]] == ["AAPL"]
     assert [p["ticker"] for p in owner["positions"]] == ["AAPL"]
     assert owner["positions"][0]["eur_view"] == {"ticker": "AAPL"}

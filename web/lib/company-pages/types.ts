@@ -97,10 +97,14 @@ export interface ScoreRow {
 
 /** ranges.py's published range of one horizon for the as-of date (B12's rm.stock `published_ranges`, schema
  *  PublishedRange): shown whatever the strategies' live_from. */
+/** The run that wrote a range or score (schema ForecastRun, B12 for B17's evening run): `evening` = a preview on the
+ *  day's close, never traded; `pre_open` = the revision of record; null or absent on older rows reads as pre_open. */
+export type ForecastRun = "evening" | "pre_open" | null;
+
 export interface PublishedRange {
   id: string; made_at?: IsoTime | null; as_of_date: IsoDate; session_date?: IsoDate | null; exit_date: IsoDate | null;
   horizon_days: number; base_close?: number | null; target_price: number | null; lo50: number | null; hi50: number | null;
-  lo80: number | null; hi80: number | null; regime?: string | null;
+  lo80: number | null; hi80: number | null; regime?: string | null; run?: ForecastRun;
 }
 
 /** One stored ranges.py run of the forecast history (schema HistoryRange): target_price = base_close x exp(center);
@@ -109,7 +113,7 @@ export interface HistoryRange {
   id: string; ticker: string; made_at: IsoTime; as_of_date: IsoDate; session_date: IsoDate; exit_date: IsoDate;
   horizon_days: number; base_close: number; target_price: number; center?: number | null; sigma_h?: number | null;
   lo50: number; hi50: number; lo80: number; hi80: number; regime?: string | null; calibration_id?: string | null;
-  inputs: string[]; notes: string[];
+  inputs: string[]; notes: string[]; run?: ForecastRun;
   change: { from_id: string; from_made_at: IsoTime; target_pct: number | null; width80_pct: number | null; changed: string[] } | null;
 }
 
@@ -122,7 +126,7 @@ export interface HistoryScore {
   horizon_days: number; prob_up: number | null; prob_model?: number | null; base_rate?: number | null;
   news_score?: number | null; model_version: string | null; model_id?: string | null; trained_until?: string | null;
   groups: Record<string, number>; drivers_up: ScoreDriver[]; drivers_down: ScoreDriver[]; news_items?: number | null;
-  news_ids: string[];
+  news_ids: string[]; run?: ForecastRun;
   change: {
     from_id: string; from_computed_at: IsoTime; prob_up: number | null; groups: Record<string, number>;
     news_added: string[]; news_dropped: string[]; changed: string[];
@@ -153,4 +157,9 @@ export interface StockStrategiesPayload extends PageBase {
 export interface LifecyclePayload {
   market: string; ticker: string; session_date: IsoDate; predictions: Prediction[]; head_to_head: HeadToHeadPick[];
   trade_checks: TradeCheck[]; settled: SettledTrade[]; reasons: AiReason[];
+  /** UX3's "Full story" additions (absent in read models built before UX3). */
+  checks_attribution?: Array<{ check_at: IsoTime; session_date: IsoDate; move_pct: number | null; market_pct: number | null; market_pull_pct?: number | null; sector_pct: number | null; own_pct: number | null; beta: number | null; sector_source: string | null }>;
+  deviation_notes?: Array<{ check_at: IsoTime; session_date: IsoDate; text: string }>;
+  lessons?: Array<{ id: string; prediction_id: string; ticker: string; horizon_days: number | null; lesson: string | null; written_at: IsoTime | null }>;
+  prediction_reasons?: Array<{ prediction_id: string; reason: string }>;
 }

@@ -18,10 +18,10 @@ india:
   brokerage_each_side: 0.0          # verify. ASSUMPTION: a discount broker charging Rs 0 on delivery trades
   stt_each_side: 0.001              # verify. SEARCH ONLY: STT 0.1% on delivery purchase and sale (Finance (No. 2)
                                     # Act 2004, Chapter VII); official page not opened: https://incometaxindia.gov.in
-  exchange_txn_each_side: 0.0000307 # verify. SEARCH ONLY: NSE cash market 0.00307% from 2026-03-01 (0.00297%
-                                    # 2024-10-01..2026-02-28), NSE circular of 2026-02-27; nseindia.com was
-                                    # unreachable, so this rate comes from search results, the circular was not
-                                    # opened: https://nsearchives.nseindia.com/content/circulars/FA73061.pdf
+  exchange_txn_each_side: 0.0000307 # OFFICIAL, READ 2026-10-12: NSE/FA/73061 (dated 2026-02-27), Rs 307 per crore
+                                    # each side = transaction charge + IPFT contribution: 297 + 10 until 2026-02-28,
+                                    # 306.99 + 0.01 from 2026-03-01 (the same total, so this rate holds for both):
+                                    # https://nsearchives.nseindia.com/content/circulars/FA73061.pdf
   sebi_fee_each_side: 0.000001      # verify. SEARCH ONLY: SEBI turnover fee Rs 10 per crore = 0.0001%; official
                                     # document not opened: https://www.sebi.gov.in/sebi_data/meetingfiles/jul-2020/1594293677017_1.pdf
   stamp_duty_buy: 0.00015           # verify. SEARCH ONLY: 0.015% on the buy side of a delivery transfer, Indian Stamp
@@ -48,29 +48,34 @@ us:
 # paper portfolio (scripts/portfolio.py, F1.11), on top of the statutory rates above (india: STT, exchange, SEBI,
 # stamp duty, GST; us: SEC fee, FINRA TAF). The model's backtest keeps the sections above unchanged.
 # Owner decisions 49-52 (2026-10-07): the values marked "owner-provided" come from the brokers' published
-# schedules as the owner researched them (Axis Direct NRI, Normal tier, Non-PIS account; BUX Basic, investor in the
-# Netherlands with a EUR account); the owner confirmed them as final for paper trading on 2026-10-08 (docs/SPEC.md
-# decision 53). Two cost views (decision 50):
+# schedules as the owner researched them (BUX Basic, investor in the Netherlands with a EUR account); the owner
+# confirmed them as final for paper trading on 2026-10-08 (docs/SPEC.md decision 53). India: owner decision of
+# 2026-10-12 (docs/SPEC.md decision 54) replaces Axis Direct with Groww, a Non-PIS NRI account, values marked
+# "Groww" read from https://groww.in/pricing on 2026-10-12; the owner says the bank adds no charges. Two cost views (decision 50):
 #   market: brokerage, statutory taxes, exchange and regulatory fees (what any investor pays; strategies are
 #           ranked on it);
 #   your:   market + the owner-specific items marked `your_view` below (the go-live bar and the owner's money
 #           decisions use it).
 broker:
   india:
-    name: Axis Direct (NRI, Normal tier, Non-PIS)
-    brokerage_each_side: 0.0075        # owner-provided, confirmed final: 0.75% of trade value per side
-    brokerage_min_per_order: 50.0      # owner-provided, confirmed final: minimum Rs 50 per order
-    # GST 18% applies to brokerage + exchange transaction charge + SEBI fee (`gst_rate` above, owner-provided).
-    # STT 0.1% each side and stamp duty 0.015% on the buy side: as above (owner-provided figures agree).
-    nri_reporting_per_trade_date: 200.0   # your_view. owner-provided, confirmed final: NRO
-                                          # Non-PIS reporting charge Rs 200 per trade date, on the purchase date and
-                                          # again on the sale date
-    # your_view. Confirmed final by the owner (first from a secondary source): DP charge per scrip sold, Rs 30 or
-    # 0.04% of the sale value, the higher (docs/SPEC.md F1.6: a source quoted it for NRI accounts).
-    dp_charge_min: 30.0
-    dp_charge_rate: 0.0004
-    demat_amc_per_year: 885.0          # owner-provided, confirmed final: about Rs 885 a year;
-                                       # not per trade, so in no trade's cost
+    name: Groww (NRI, Non-PIS)
+    brokerage_each_side: 0.001         # Groww: "NRI brokerage charges: Equity (Delivery and Intraday) brokerage:
+    brokerage_min_per_order: 100.0     # 0.10% with min Rs 100 per order"
+    # GST 18% applies to brokerage + exchange transaction charge + SEBI fee (`gst_rate` above). STT 0.1% each side
+    # and stamp duty 0.015% on the buy side: as above (Groww's page agrees). `exchange_txn_each_side` above,
+    # 0.00307%, is NSE's transaction charge and investor protection fund (IPFT) contribution together: NSE/FA/73061
+    # (read 2026-10-12) splits Rs 307 per crore each side as 306.99 + 0.01 from 2026-03-01 (297 + 10 before, the
+    # split Groww's page still shows); the total did not change. IPFT is therefore included; never add it again.
+    nri_reporting_per_trade_date: 0.0  # your_view. owner, 2026-10-12: no bank or NRI reporting charge beyond Groww's
+    # your_view. Groww: DP charge per sell transaction Rs 3.5 depository (Rs 3.25 for women; the owner's rate
+    # assumed Rs 3.5) + Rs 16.5 Groww = Rs 20, plus GST 18% (Groww lists DP among the charges GST applies to):
+    # Rs 23.60 per sell transaction. Groww's Rs 16.5 is waived on a sale under Rs 100 (not modelled: no paper
+    # trade sells that little).
+    dp_charge_min: 20.0
+    dp_charge_rate: 0.0
+    dp_charge_gst: true                # GST at `gst_rate` on the DP charge
+    demat_amc_per_year: 0.0            # Groww: Rs 0 account maintenance (the page does not say whether this
+                                       # applies to NRI accounts); not per trade, so in no trade's cost
   us:
     name: BUX Basic
     order_fee_eur: 0.99                # owner-provided, confirmed final: EUR 0.99 per order,

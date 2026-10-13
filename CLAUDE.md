@@ -10,6 +10,49 @@ register `docs/PLAN_v16_errata.md` (DC-1 to DC-12, DC-11 withdrawn) and the 58 a
 `docs/PLAN_v16_stories.md` (GitHub issues #361-#418, index #419). Run its Appendix E script from the repository
 root as `MB_NOW=2026-10-09T23:59:00Z PYTHONPATH=scripts python docs/plan_volatility.py`.
 
+## How to work with the owner and with ChatGPT (always; owner decision 2026-10-12, same rules as `exepex/trading`)
+This is the owner's personal research tool for deciding their own trades; wrong results cost real money later. ChatGPT
+(and any other assistant) follows the same rules in `AGENTS.md`.
+- **Never hold back.** Share every relevant fact, risk, idea and doubt, including what the owner may not want to hear.
+- **Be brutally honest.** Disagree openly and say why; never agree just to please the owner or the other AI. Never
+  present a guess as a fact: label every recommendation **strong evidence** (data or published studies, cited),
+  **some evidence** or **reasoning only**.
+- **Simple, precise, concise.** Plain words, real numbers, short answers; explain any jargon you must use.
+- **Get past blockers** by another legitimate way (another source, a test, a workaround, a clear question); if it truly
+  cannot be done, say so plainly and why. Never skip it silently.
+- **Own limits too:** give the fullest, most direct answer possible; if a limit shapes an answer, say what was limited
+  and why, give everything that can be given and where the rest is. Never quietly water an answer down. Ask
+  questions and clarifications plainly and directly, and only when the answer changes what you do.
+- **No patches.** Find the root cause, validate it with data and tests, then fix the design; when a component keeps
+  needing fixes, question the design.
+- **No blind acceptance or rejection of reviews.** Check every comment (from the owner, ChatGPT, Codex, the judge or
+  a reviewing bot) with your own reasoning and, where possible, data: re-run the numbers, read the code, test the
+  claim. Accept only when the check shows it is correct; push back when it is not. Every acceptance and every
+  rejection states its reason and evidence; partial agreement says which part and why.
+- **Everything for the other AI goes in the repository**, never only in chat: ChatGPT writes
+  `reviews/chatgpt/review_<n>_<name>.md`, Claude writes `reviews/claude/response_<n>_<name>.md` (questions and
+  proposals included; numbered in sequence, each naming the review it answers), each folder with a README index; earlier files are never edited,
+  a follow-up gets a new number. A ChatGPT agreement does not replace the judge's PASS for merging (section "Judging
+  every change"); a design the owner sends to both AIs (`docs/PLAN_v16.md`, owner decision 2026-10-11;
+  `docs/STOCK_DESK_DESIGN.md`, owner 2026-10-12) needs both AIs' agreement and the owner's approval before anything
+  is built; any other design needs the owner's approval.
+- **The main job is finding net profitable trades from data** (the desk meeting, `docs/STOCK_DESK_DESIGN.md` once
+  approved): every role reasons from its own angle (`AGENTS.md`, "Roles"); a code or data bug is fixed directly and
+  mentioned in one line, never the main topic of a review round unless it changes a finding.
+- **Answer format:** the direct answer or verdict first; then reasons with numbers, sources and the confidence label;
+  then risks, what could make you wrong and how to test it. A reviewer lists agreements, disagreements with reasons,
+  and what is wrong or missing.
+- Hard lines stay: research only, no orders, no brokers, nothing illegal (no market manipulation), secrets never in
+  files or chat.
+
+## Dashboard frozen (owner decision 2026-10-12)
+The dashboard has moved to `github.com/exepex/omenix-dashboard`. Until the owner says the cutover is done, nothing in
+`web/`, `api/` or `design/` of this repository changes: no edits, no new mockups, no dependency bumps. All dashboard
+and mockup work happens only in `exepex/omenix-dashboard`. Backend work (`data/`, `scripts/`, routines, warehouse
+sync) continues as normal; a backend change that would need an edit under `web/`, `api/` or `design/` (for example a
+new API field or a rebuilt catalogue example) is held and raised with the owner instead. While the freeze lasts it overrides the web lane of "Delivery strategy",
+the one-builder permission to edit `web/` files, and the Layout's descriptions of those folders as being built.
+
 ## Layout
 - `config/markets/<market>.yaml` per market: exchange calendar, timezone, market-level symbols
   (benchmark, vol index, cues, factors), regime thresholds, sectors, `company_meta` (per-company metadata: name,
@@ -36,6 +79,9 @@ root as `MB_NOW=2026-10-09T23:59:00Z PYTHONPATH=scripts python docs/plan_volatil
   `earnings_estimates_asof(ts)`, context only), `collect_news` (catch-up window: Google News `when:` and the oldest item
   kept reach back to the market's last successful news run, +1 h, at most 7 days, never below 1 day / 3 days;
   a query filling Google News' 100-item answer is re-asked per day; one row per run in `data/<market>/news_runs/`;
+  requests spaced (`news.google_news.pause_seconds` 1.5 s, `news.outlet_pause_seconds` 0.5 s); a Google 429/503 or
+  captcha/HTML page stops Google News for the rest of the run (`google_stopped`, `google_skipped`; the run is not
+  `ok`, so the next window reaches back over it; `marketbrief/collectors/news_fetch.py`);
   `marketbrief/collectors/news_window.py`, DESIGN.md section 3 "News timing"; de-duplication, once per market:
   the same article link or the same normalised title from the same outlet (outlet key: host without www./m./amp.,
   allowlisted domain and its `same_as`, or a configured outlet name) within 9 days is not stored again, a new
@@ -43,7 +89,11 @@ root as `MB_NOW=2026-10-09T23:59:00Z PYTHONPATH=scripts python docs/plan_volatil
   on read via `news_id_map` (`news` view: one row per item with its latest headline by now, `news_asof(ts)`,
   `news_aliases`, `news_lookup` for any stored id; `marketbrief/analytics/news_dedup.py`, DESIGN.md section 3
   "News de-duplication")), `collect_filings`, `collect_options` (US option-chain
-  implied vol; India skips). Then `score_predictions` (calls and ranges; its summary adds the proper
+  implied vol; India skips). Every Yahoo call (prices, quotes, options, events, intraday checks, model_history,
+  onboarding) goes through `marketbrief/sources/yahoo_pacing.py` (`paced_yfinance`: `yahoo.pause_seconds` 0.5 s in
+  `config/settings.yaml`; after a rate limit no further Yahoo call in that process: summary `yahoo_stopped`,
+  `yahoo_skipped`, the symbols in `failed`); `tests/test_request_pacing.py` fails when a network library or an
+  unpaced request function is used outside the paced clients. Then `score_predictions` (calls and ranges; its summary adds the proper
   scores of `scoring.py`: Brier, log loss, reliability with Wilson intervals, interval and quantile
   scores, also in the context pack, weekly review and HTML track record), `lessons` (reflection log,
   pattern from TauricResearch/TradingAgents: `prepare` writes the deterministic facts of settled calls
@@ -60,13 +110,15 @@ root as `MB_NOW=2026-10-09T23:59:00Z PYTHONPATH=scripts python docs/plan_volatil
   ranges as a fan on the last 20 closes, B10's model P(up) as "chance of going up", the lean, a plain-language why from
   the score's points per feature group, flags (results soon, BLOCKED, contradicted news) and the change since the
   previous run from B12's forecast_history; paper trades and signal tiers in lean words, SIMULATED, once a strategy is
-  live; everything as of the run's clock), then `dashboard` builds
-  `reports/<market>/dashboard.html` (decision-support dashboard, stored data only as of the run's clock:
+  live; everything as of the run's clock). `dashboard` built
+  `reports/<market>/dashboard.html` until the owner retired the file on 2026-10-10: the routine no longer runs it,
+  and the website shows the same data. Its code in `marketbrief/presentation/dashboard/` stays, because the
+  warehouse read models are built from its `gather_dashboard` (decision-support dashboard, stored data only as of the run's clock:
   watchlist, sector heatmap, candlesticks with the published ranges via the vendored TradingView
   Lightweight Charts in `marketbrief/presentation/dashboard/vendor/` (version and SHA-256 in its NOTICE),
   the signal model's P(up) with its points and formula, bull vs bear, news with status, track record;
   "Paper only — no proven edge yet" until the weekly review's `model_skill` is true), and `notify_slack` posts a thread
-  (summary, chart images, HTML file, dashboard) with `SLACK_BOT_TOKEN`, or the summary text alone through
+  (summary, chart images, HTML file) with `SLACK_BOT_TOKEN`, or the summary text alone through
   `SLACK_WEBHOOK_URL`. Processing data (data/, context pack, summaries) and presentation (HTML,
   PNGs, Slack) are separate: `view_data.py` only reads the data for both presentation outputs.
   `backtest` evaluates the
@@ -96,7 +148,8 @@ root as `MB_NOW=2026-10-09T23:59:00Z PYTHONPATH=scripts python docs/plan_volatil
   (`horizon_label` legacy_5d_d4); every summary shows the two bases apart, never pooled. An open-to-close
   call whose window has a session without a bar stays open (`session_gap_open`), never shifted.
   `validate` is the daily run's deterministic gate (`--stage collect|news_collect|news|features|context|forecast|report|all`,
-  settings in `config/validate.yaml`; prediction rules shared with `ai_replay` in `marketbrief/analytics/prediction_rules.py`);
+  settings in `config/validate.yaml`; `--stage report` also blocks a news status word that is not the cited id's
+  stored status or its event's, `REPORT_STATUS`, issue #460, `pipeline/validate/report_status.py`; prediction rules shared with `ai_replay` in `marketbrief/analytics/prediction_rules.py`);
   `spotcheck` picks the weekly judge sample.
   Schemas live in `scripts/marketbrief/core/schemas.py` (`scripts/common.py` is only the `ROOT`/`CONFIG` patch point).
   Where the code of the daily steps lives (each `scripts/<name>.py` is a thin entry point with the same flags): `marketbrief/pipeline/` (validate, review and lessons as packages, `context`, `score_predictions`, `spotcheck`, `market_status`), `marketbrief/replay/` (`backtest/`, `rule_replay/`, `ai_replay/`), `marketbrief/graph/` (`connection_map`, `news_hits`, `neo4j/`) `marketbrief/presentation/report/` (the report skeleton and Slack draft) and `marketbrief/presentation/dashboard/` (the dashboard: read helpers, data assembly, page build; `assets/` and `vendor/` hold its JS, CSS and the charting library). Messages and constants of each live in `marketbrief/constants/`.
@@ -173,7 +226,10 @@ root as `MB_NOW=2026-10-09T23:59:00Z PYTHONPATH=scripts python docs/plan_volatil
   `news_items.news_items` (decision 12: a company deleted by the cut-off is never in an item's tags) and
   `news_window` (3 days, at most 50: up to 25 company and 25 market-wide, a share one scope leaves unused going to the
   other, each kept by market movers, high materiality, then newest; owner, 2026-10-08), `calendar_events.calendar_events`,
-  `company_records` (lifecycle events, commands with deleted companies masked). The Companies page's commands:
+  `company_records` (lifecycle events, commands with deleted companies masked). rm.home also carries the "Can I rely on
+  this yet?" fields `go_live_checks`, `go_live_nearest`, `skill` and `intraday_next_at` (rm_common, `extra_keys`;
+  docs/ux/plain_language_implementation.md); the pages' plain words live in `web/lib/ui/constants.ts` and the
+  "when will it fill" empty states in `web/lib/ui/empty.ts`. The Companies page's commands:
   `POST .../companies/preview` (summary, add_company's resolved identifiers; nothing written) and
   `.../companies/commands` (written through B5's tool layer only when `confirmed_summary` equals the server's own
   preview; delete typed; `web/lib/data/company-commands.ts`).
@@ -191,13 +247,26 @@ root as `MB_NOW=2026-10-09T23:59:00Z PYTHONPATH=scripts python docs/plan_volatil
   reasons, news of 30 days / newest 50, results, events of the next 60 days, the last 250 bars; owner, 2026-10-08;
   ranges.py's `published_ranges` whatever a strategy's live_from and the `forecast_history` of every stored range and
   score run of the last 10 as-of dates (B10's N+k labels) with each run's change, `company_history.py`; owner,
-  2026-10-10),
+  2026-10-10; each with `run` evening|pre_open, the evening preview shown until the pre-open range exists),
   rm.bars, rm.stock_strategies (04 page), rm.trades (`_`: every open trade, the latest check, the last 5 sessions'
   settlements; per ticker: the last 60 sessions) and rm.lifecycle (`<ticker>:<date>`, the last 30 sessions: the
   predictions and picks made for that session followed to their checks, settlements and AI reasons), served by
   `/api/v1/markets/{market}/stocks/{ticker}[/bars|/strategies|/lifecycle/{date}]` and `/trades[?ticker=]`
   (`api/paths|schemas/company.yaml`). `rm_company.trade_checks(ctx)` / `market_trade_checks(ctx)` give the latest
   check's rows to the market and portfolio pages.
+- Paper portfolio page v3 (UX3, docs/ux/paper_portfolio_redesign.md; owner approval 2026-10-12; dark mode came app-wide with UX4): the
+  reader's questions in order (up or down, which bets work, why, what the system learns). `warehouse/trade_why.py` adds
+  each strategy row's `why` (open: the latest intraday check's market / sector / own move and deviation note; closed:
+  B2's automatic reason and the end-of-day AI reason), `direction`, `prob_up`, `reason`, `sessions`, the `learning`
+  block and rm.lifecycle's "Full story" fields; `warehouse/trade_pages.py` adds rm.portfolio `open:<k>` and
+  `finished:<D>` (indexes `open_holds`, `finished_sessions`), served by `/api/v1/markets/{market}/portfolios/open/{hold}`
+  and `.../finished/{date}`. The story view is the lifecycle page with `#story=<prediction>&trade=<trade>`.
+- Dark mode (UX4, owner approval 2026-10-12): the cockpit imports `web/styles/tokens-dark.css` (a copy of
+  `design/system/tokens-dark.css` by `web/tools/sync-design.mjs`) and follows the device's prefers-color-scheme; the top
+  bar's theme button (`components/shell/theme-toggle.tsx`, `lib/ui/theme.ts`) cycles System / Light / Dark, remembered
+  in localStorage `mb-theme` and applied by a head script before the first paint. The few app roles that differ in dark
+  (heatmap fills and its no-trade dot, alert links, round marks) are in `web/styles/app.css`. The UI harness's dark cases (`tests/ui/cases/dark.mjs`,
+  `--theme dark`, `--contrast`) fail on text below WCAG AA (`tests/ui/contrast.mjs`).
 - Strategy lab and lifecycle formats (W1, docs/SPEC.md sections 3-4 and 10; field guide `docs/DATA_CATALOGUE.md`,
   example data `design/catalogue/*.json`, rebuilt by `design/catalogue/make_examples.py` with B2's engine code; notes
   `docs/ws/w1.md`): `config/strategies.yaml` is the strategy registry. It holds the horizon list
@@ -238,11 +307,13 @@ root as `MB_NOW=2026-10-09T23:59:00Z PYTHONPATH=scripts python docs/plan_volatil
   `strategy_abstentions` (gate_failed, timeout 15 minutes before the open, killed, blocked_quality, earnings_window,
   abstained). Post-close (`routine/POSTCLOSE_PROMPT.md`): B2's `scripts/lab.py settle`, the `eod-analyst` agent and
   its gate `eod-validate|add` -> `trade_reasons_ai`, `eod_analyses` (market-cost view), B6's close alerts. Weekly
-  (`routine/WEEKLY_PROMPT.md`, Saturday 09:51 local): the `research-director` agent and its gate
+  (`routine/WEEKLY_PROMPT.md`, Friday 19:30 New York time for both markets, owner decisions 2026-10-10
+  and 2026-10-12): the `research-director` agent and its gate
   `director-validate|add` (config diffs that apply to a copy, never applied) -> `research_reviews`,
   `reports/<market>/research-<week>.md`.
 - Tools and channels (B5, SPEC F10; docs/ws/b5.md): the `web/` Next.js project (App Router; `package.json`, lockfile,
-  `tsconfig.json`, `next.config.ts` owned by B5; later sessions only add dependency lines). The governed tool layer
+  `tsconfig.json`, `next.config.ts` owned by B5; later sessions only add dependency lines; the 2026-10-12 one-builder rule
+  below lets the builder of a change edit them). The governed tool layer
   `web/lib/tools/` implements `mcp/tools.yaml`; `mcp/build_registry.py` generates `registry.generated.ts` from it and
   `mcp/agents/*.yaml` (allowed tools, day budgets, kill switch per agent; `assistant` has read tools only), checked by
   `tests/test_b5_tools.py`. Identity comes only from the channel's auth, never from arguments. Every write needs an
@@ -353,7 +424,11 @@ root as `MB_NOW=2026-10-09T23:59:00Z PYTHONPATH=scripts python docs/plan_volatil
   N+1. Legacy rows are never pooled with N+k; the context pack's signal-model section shows N+k scores only, and
   `ai_replay score` scores calls recorded before `n_plus_k_from` on their old window apart (`legacy_cc`).
   `contracts/horizons.py` `scores_asof` (`variant=base|cross_market`) and `ranges_asof` give the N+k records as of
-  a time (no look-ahead).
+  a time (no look-ahead). The evening run (B17, option C): `ranges.py --evening` writes the day's-close ranges to
+  `ranges_evening` (same ids as the pre-open rows, `run: "evening"`, no overnight cue), never scored or traded;
+  `ranges_asof(..., run="evening")` reads them, its default stays the pre-open rows in `ranges`; new `model_scores`
+  rows carry `run` (`model_scores.py --evening`; null on older rows = pre_open); `range_runs` and `score_runs` give
+  every run of a window of as-of dates, labelled by run (B12's forecast history).
 - Paper portfolio and signal tiers (WS4; `scripts/portfolio.py --market india|us`, logic in `marketbrief/portfolio/`,
   settings `config/portfolio.yaml`, notes `docs/ws/ws4.md`): research only, a paper trade is a record, never an order.
   `add-trade` validates (watchlist ticker, a session, price = the stored bar's open/close or a manual price inside its
@@ -375,7 +450,8 @@ root as `MB_NOW=2026-10-09T23:59:00Z PYTHONPATH=scripts python docs/plan_volatil
   `config/strategies.yaml` (`registry.is_live`: settle, pick and the forward summary skip pre-live rows, predict
   rehearses)): `predict` (pre-open, rule strategies and baselines from B10's
   per-horizon scores and ranges -> `strategy_predictions`, blocks as `strategy_abstentions`, the cost-viable rows
-  of decision 51 of the new qualifying ones -> `cost_views`), `pick` (pre-open,
+  of decision 51 of the new qualifying ones -> `cost_views`; `predict --evening` after the close ->
+  `strategy_predictions_evening` (preview from B10's evening ranges, never traded)), `pick` (pre-open,
   refused at or after D's open: the head-to-head picks per company, family and pick rule -> `head_to_head_picks`,
   and the cost-viable rows of every pick and of each qualifying prediction without one yet -> `cost_views`; "best expected gain" = the horizon with the highest
   expected gain per session held), `settle` (post-close: every due trade of both views -> `paper_trades_settled` in
@@ -385,10 +461,10 @@ root as `MB_NOW=2026-10-09T23:59:00Z PYTHONPATH=scripts python docs/plan_volatil
   and Bonferroni correction, the go-live bar on your cost, paired comparisons, heatmap data), `backtest` (always-up,
   momentum and, on B10's walk-forward probabilities as of the clock, the model strategies without news; stored bars,
   `--history` adds the cache; basis backtest; `backtest --store` -> `lab_backtests`, once per run_id), `pick-study`. Costs (`lab/costs.py`): the statutory
-  rates of `config/costs.yaml` plus its `broker:` section (Axis Direct NRI Normal tier Non-PIS, BUX Basic;
-  owner-provided, confirmed final for paper trading by the owner on 2026-10-08, SPEC decision 53); market cost =
-  brokerage, statutory taxes and exchange or regulatory fees; your cost adds India's NRI
-  reporting charge (₹200 on the buy date and on the sell date) and DP charge, BUX's FX markup each way and the
+  rates of `config/costs.yaml` plus its `broker:` section (India: Groww NRI Non-PIS from 2026-10-12, SPEC decision 54,
+  replacing Axis Direct; US: BUX Basic, owner-provided, confirmed final for paper trading on 2026-10-08, SPEC decision
+  53); market cost = brokerage, statutory taxes and exchange or regulatory fees; your cost adds India's NRI
+  reporting charge per trade date (none with Groww) and DP charge (Groww: ₹20 plus GST per scrip sold), BUX's FX markup each way and the
   pro-rated portfolio fee; the BUX euro fee is converted at the stored `EURUSD=X` close. `cost_viable` = expected
   gain after your cost > 0 (`expected_gain_your_pct` = p x move - (1 - p) x loss - your cost, with the picks'
   conditional move and loss of `lab/gain.py`; null without a probability or 80% range, or when the amount buys no
@@ -436,14 +512,23 @@ root as `MB_NOW=2026-10-09T23:59:00Z PYTHONPATH=scripts python docs/plan_volatil
   checking, the reflector, the deviation explainer, the results-analyst, the researchers, the three Sonnet traders and
   the eod-analyst, Opus 5.5 for the forecaster (also the Opus trader), graph-builder, research-director and judge;
   table in DESIGN.md section 13).
+- `routine/EVENING_PROMPT.md` the evening forecast run (owner decision 2026-10-10; Mon-Fri, India 21:30 UTC, US 18:30
+  New York). On the day's final close it runs features, calibrate, `model_scores.py --evening`, `ranges.py --evening`
+  and `lab.py predict --evening`, which write preview rows to `ranges_evening`, `strategy_predictions_evening` and
+  model scores with `run: "evening"`. There are no AI agents and no Slack post. The rows are never traded or scored:
+  the next pre-open run writes the revision of record, and if it fails, nothing trades that day.
 - `routine/PROMPT.md` the routines' saved prompt (one per market). `routine/NEWS_PROMPT.md` the news-only light
   run (one combined session for both markets, India then the US, 31 a week: weekdays 10:45 and 13:45 IST and
   11:27, 14:27 and 17:27 New York time, weekends 10:45 IST, 11:27 and 17:27 New York time, holidays included;
   owner decision 2026-10-12): `collect_news_only.py` runs `collect_news`,
   India's NSE announcements, `collect_articles`, `news_clusters` and `validate --stage news_collect`, then the
-  session commits and pushes the news data folders only; no agents, no Slack. The pre-open run's news analyst
+  session commits and pushes the news data folders only; no agents on weekdays, no Slack. Weekend sessions (a
+  Saturday or Sunday UTC start; owner decision 2026-10-12) then also run the news analyst on `news_pending.py`'s
+  input with the same `--stage news` gate (one retry) and append to `news_enriched` (NEWS_PROMPT.md step 3a), so
+  Monday's pre-open run finds only the items since. The pre-open run's news analyst
   scores `news_pending.py`'s output: every news/announcement id first seen since the last enrichment
-  (`marketbrief/pipeline/news_pending.py`; the news gate and `claims.py` use the same window; each line has a
+  (`marketbrief/pipeline/news_pending.py`; the news gate and `claims.py` use the same window, `claims.py` reaching
+  back also to the last pre-open `ranges` row; each line has a
   `priority`, watchlist lines first; the news gate warns `ENRICH_TEMPLATED` on templated watchlist summaries)
 - Intraday checks (WS5; `scripts/intraday_check.py`, code `marketbrief/intraday/`, settings `config/intraday.yaml`,
   `routine/INTRADAY_PROMPT.md`; schedules in DESIGN.md section 2): a few times per session, Yahoo 5-minute bars of
@@ -502,6 +587,8 @@ orchestrating session itself (its own edits and merge-conflict resolutions inclu
   merge or push on an agent's word: only a judge PASS counts. (Daily-run appends to `data/` pass
   on the `validate.py` gates instead; see below.)
 - Any FALSE claim makes the verdict FAIL, even if the code is right (the report must be true too).
+- The builder checks every judge finding before fixing it (no blind acceptance, above); a finding the evidence shows
+  to be wrong is answered with that evidence in the next round, and the judge decides again.
 - Severity: every finding is a BLOCKER or COSMETIC. Blockers: broken or wrong functionality, wrong
   numbers, look-ahead, data loss or corruption, false claims or invented sources/data, broken rules,
   untested core logic. Cosmetic: doc wording, naming, formatting, nice-to-have tests for code that
@@ -513,8 +600,8 @@ orchestrating session itself (its own edits and merge-conflict resolutions inclu
 - Batches: plan work as a few batches (a feature, a refactor chunk, or a group of related fixes with
   the cosmetic issues that touch the same files), build the whole batch, then one review per batch;
   never a review cycle per small item. The reviewer lists every finding in one pass.
-- Build workflow (keep it fast): the builder runs the fast tier while iterating and the full suite
-  once at the end; live network checks only when a collector or fetcher changed (otherwise saved
+- Build workflow (keep it fast): the builder runs the fast tier while iterating and, for a real code
+  change, the full suite once at the end (see "Lean process" below); live network checks only when a collector or fetcher changed (otherwise saved
   fixtures); the golden harness (`tests/golden/golden.py`) once at the end for refactors. Every number
   in a build report (test counts, row counts, timings) is pasted from command output, never retyped.
   Mechanical work (moves, renames, refactor steps proven by the golden harness) runs on Sonnet with
@@ -529,13 +616,47 @@ orchestrating session itself (its own edits and merge-conflict resolutions inclu
 - Tests (offline; a guard in `tests/conftest.py` fails any test whose Python code reaches the network;
   it sees Python sockets only, not C libraries or node): the fast tier
   `python -m pytest -m "not slow" -n auto` on each edit, the full suite `python -m pytest -n auto`
-  before review or merge. GitHub Actions (`.github/workflows/tests.yml`) runs the full suite on every
+  before review or merge of a real code change (a small change relies on CI; see "Lean process" below). GitHub Actions (`.github/workflows/tests.yml`) runs the full suite on every
   push and PR, except `test_every_logged_commit_exists` (CI cannot see local, unpushed build branches).
   A reviewer may cite the passing CI run for the reviewed commit as evidence of the full suite instead
   of rerunning it, but still runs the tests specific to the change and `tests/test_judgments.py`
-  locally. A merge review reruns tests when a conflict touched code, and the orchestrator always runs
-  the full suite after any merge that brings in code changes (CI also runs on push). New end-to-end
-  tests go in `SLOW` in `tests/conftest.py`.
+  locally. A merge review reruns tests when a conflict touched code. After a merge, the green CI run on
+  main is the full-suite evidence; nobody reruns the full suite locally just because main moved. New
+  end-to-end tests go in `SLOW` in `tests/conftest.py`.
+- Lean process (owner decision 2026-10-12, to cut token cost):
+  - One builder per change: a single session makes the whole change, across every file it needs,
+    whoever built those files first. File ownership by session no longer splits a change.
+  - Small changes (docs, wording, agent instructions, page text): the judge reviews the diff only; the
+    reviewer still runs `tests/test_judgments.py` locally, and the green CI run replaces a local
+    full-suite run, before and after the merge.
+  - Real code changes (scripts, SQL views, schemas, config, web code) keep the full checks: the full
+    suite before review (the green CI run for the reviewed commit counts, as above) and the end-to-end
+    run where the scope rule asks for it.
+  - Nobody reruns the full suite locally only because main moved under a merge; the green CI run on
+    the merged commit is the evidence. A merge-conflict resolution is still judged.
+  - Finished build sessions are archived. A new change (a batch counts as one change) starts one fresh
+    session, which ends when the change is merged.
+  - This supersedes, for all work from 2026-10-12, docs/SPEC.md section 10's session workflow where it
+    differs: file ownership by session (the intro and step 5's shared-doc proposals), the full-suite runs
+    of step 1 (for small changes), step 3 and the "Rule change" paragraph, and step 3's exemption of
+    `judgments/log.jsonl` conflicts from judging. Every merge-conflict resolution is judged; the log's
+    merges follow the union rule below.
+- Delivery strategy (owner decision 2026-10-12, to avoid stale branches and repeated reviews):
+  - One build lane per area: the web app and its read models (`web/`, `api/`, `scripts/marketbrief/warehouse/`)
+    are one area, with at most one batch in flight there. Work in other areas runs in parallel only when
+    its files do not overlap; the orchestrator checks this before starting a session.
+  - One batch = one approved design or fix, built end to end (data, API, page, tests) by one builder,
+    with one judge review; a re-check covers only the blockers.
+  - Just before the judge review, the builder merges the latest main into the branch; the orchestrator
+    holds other merges into that area until the batch is merged, so what was judged is what lands.
+  - `judgments/log.jsonl` merges with git's union driver (`.gitattributes`): both sides' lines are kept
+    unchanged, so a log-only merge never conflicts and needs no judging; lines from the two sides may
+    interleave by side (no line is lost, edited or duplicated), and `tests/test_judgments.py` still checks
+    every line. Where GitHub's merge button reports a conflict anyway, merge locally with git.
+  - Merging main into a branch is not judged again when it has no conflict (for example only daily-run
+    `data/` commits came in); the green CI run on the merged commit is the evidence. A conflict in code
+    is judged.
+  - Owner-requested trivial changes (an icon, a wording fix) may skip the judge when the owner says so.
 - Daily runs are gated by `scripts/validate.py` (deterministic checks after each stage, settings
   in `config/validate.yaml`) and, for the reflector's lessons, by `scripts/lessons.py validate`, for the results-analyst's bullets by `scripts/results_digest.py validate`,
   for the deviation-explainer's notes by `scripts/intraday_check.py validate`, for the AI traders by

@@ -204,3 +204,10 @@ def test_watchlist_published_ranges_show_before_go_live(ctx, monkeypatch):
     assert set(out[0]) == {"ticker", *PUBLISHED_RANGE_FIELDS}   # center and width are not page fields
     monkeypatch.setattr(BuildContext, "as_of", property(lambda _self: None))
     assert rm_watchlist.published_ranges(ctx) == []
+
+
+def test_home_skill_is_the_weekly_reviews_verdict(ctx, monkeypatch):
+    skill = {"state": "paper", "label": "Paper only", "why": "No skill.", "rule": "r", "review": None}
+    monkeypatch.setitem(ctx.__dict__, "dashboard", {"skill": skill})
+    assert rm_home.skill(ctx) == {"state": "paper", "why": "No skill."}
+    assert set(rm_home.HOME_EXTRA_KEYS) == {"go_live_checks", "go_live_nearest", "skill", "intraday_next_at"}

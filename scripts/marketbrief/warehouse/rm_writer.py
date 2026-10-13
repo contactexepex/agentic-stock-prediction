@@ -1,18 +1,19 @@
 """Writing the read models (docs/ARCHITECTURE.md 4.4), inside the sync's transaction: per table, a page whose
 payload_sha256 equals the stored one is left alone (built_at unchanged, counted unchanged), a changed or new
-page replaces its row, and a stored page_key the build no longer produces (a ticker that left the watchlist)
-is deleted. A page that failed validation is neither written nor deleted: its old row stays. The build itself
-is appended to rm.builds."""
+page replaces its row, and so does every page of a table served in status mode (rm.status: its built_at is the
+route's freshness, so it records the last sync even when nothing changed). A stored page_key the build no longer
+produces (a ticker that left the watchlist) is deleted. A page that failed validation is neither written nor
+deleted: its old row stays. The build itself is appended to rm.builds."""
 
 from __future__ import annotations
 
 import json
 from pathlib import Path
 
-from marketbrief.constants.warehouse import BUILDS_TABLE, READ_MODEL_SCHEMA
+from marketbrief.constants.warehouse import BUILDS_TABLE, READ_MODEL_SCHEMA, SERVE_STATUS
 from marketbrief.core.database import column_spec
 from marketbrief.warehouse.read_models import READ_MODEL_COLUMNS
-from marketbrief.warehouse.rm_registry import tables
+from marketbrief.warehouse.rm_registry import builders, tables
 from marketbrief.warehouse.sql_statements import column_definitions, insert_row, quoted
 
 BUILDS_COLUMNS = {
@@ -75,12 +76,15 @@ def write_read_models(
     stored rows are neither replaced nor deleted). `wiped` = the stored hashes read before a --full rebuild deleted
     every row of the market: a page in it that is no longer built counts as deleted. Returns pages_written,
     pages_unchanged, pages_deleted and changed_keys (table, market, page_key of every written or deleted page: the
-    app's cache tags to revalidate)."""
+    app's cache tags to revalidate). Pages of a status-mode table always count as written."""
     stored = stored_hashes(warehouse, market)
+    every_sync = {builder.table for builder in builders() if builder.serve == SERVE_STATUS}
     counts = {"pages_written": 0, "pages_unchanged": 0, "pages_deleted": 0, "changed_keys": []}
     for table in tables():
         built = rows.get(table, {})
-        changed = [key for key, row in built.items() if stored[table].get(key) != row["payload_sha256"]]
+        changed = [
+            key for key, row in built.items() if table in every_sync or stored[table].get(key) != row["payload_sha256"]
+        ]
         departed = [key for key in stored[table] if key not in built and (table, key) not in keep]
         gone = [key for key in sorted((wiped or {}).get(table, {})) if key not in built and key not in departed]
         counts["pages_deleted"] += len(gone)

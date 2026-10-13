@@ -1,16 +1,17 @@
 """F1.6 costs of one paper trade in the market currency, in the two views of owner decision 50, from
 config/costs.yaml: the statutory rates (`india`, `us`) plus the broker charges (`broker`, owner-provided and
-confirmed final by the owner on 2026-10-08, docs/SPEC.md decision 53).
+confirmed final by the owner on 2026-10-08, docs/SPEC.md decision 53; India's broker Groww from 2026-10-12,
+decision 54).
 
 market view (what any investor pays; strategies are ranked on it), on entry value B and exit value S:
-  India (Axis Direct): brokerage = max(rate x value, min per order) on each side; stt = rate x (B + S); exchange =
+  India: brokerage = max(rate x value, min per order) on each side; stt = rate x (B + S); exchange =
     rate x (B + S); sebi = rate x (B + S); stamp_duty = rate x B; gst = gst_rate x (brokerage + exchange + sebi);
     slippage = rate x (B + S).
   US (BUX): order_fee = order_fee_eur x the EUR/USD close of each side's session (two orders); sec_fee = rate x S;
     finra_taf = min(per share x quantity, max per trade); commission and slippage x (B + S).
 your view = market + the owner-specific items:
   India: nri_reporting = Rs per trade date, once on the purchase date and once on the sale date; dp_charge =
-    max(dp_charge_min, dp_charge_rate x S) on the sale.
+    max(dp_charge_min, dp_charge_rate x S) on the sale, times (1 + gst_rate) when dp_charge_gst is true.
   US: fx_markup = fx_fee_rate x (B + S) (EUR->USD on the buy, USD->EUR on the sale); portfolio_fee =
     portfolio_fee_per_year x B x holding days / 365.
 Each line is rounded to cents and a view's total is the sum of its rounded lines. A trade with only one side
@@ -66,7 +67,8 @@ def india_your_lines(rate: dict, entry_value: float, exit_value: float) -> dict[
     out = {"nri_reporting_buy": reporting if entry_value else 0.0,
            "nri_reporting_sell": reporting if exit_value else 0.0}
     if exit_value:
-        out["dp_charge"] = max(rate.get("dp_charge_min", 0.0), rate.get("dp_charge_rate", 0.0) * exit_value)
+        charge = max(rate.get("dp_charge_min", 0.0), rate.get("dp_charge_rate", 0.0) * exit_value)
+        out["dp_charge"] = charge * (1 + rate["gst_rate"]) if rate.get("dp_charge_gst") else charge
     return out
 
 

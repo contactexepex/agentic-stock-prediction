@@ -51,16 +51,16 @@ PREDICTION_FIELDS = ("id", "strategy_id", "family", "ticker", "made_at", "as_of_
 FORECAST_HISTORY_SESSIONS = 10
 HISTORY_RANGE_FIELDS = ("id", "ticker", "made_at", "as_of_date", "session_date", "exit_date", "horizon_days",
                         "base_close", "target_price", "center", "sigma_h", "lo50", "hi50", "lo80", "hi80", "regime",
-                        "calibration_id", "inputs", "notes")
+                        "calibration_id", "inputs", "notes", "run")
 HISTORY_RANGE_CHANGED = ("regime", "calibration_id", "inputs")
 HISTORY_SCORE_FIELDS = ("id", "ticker", "computed_at", "as_of_date", "entry_date", "exit_date", "horizon_days",
                         "prob_up", "prob_model", "base_rate", "news_score", "model_version", "model_id",
-                        "trained_until")
+                        "trained_until", "run")
 HISTORY_SCORE_CHANGED = ("model_version", "model_id", "trained_until")
 # ranges.py's published range per horizon (B10's ranges rows; independent of a strategy's live_from); target_price =
 # base_close x exp(center), as a strategy prediction copies it
 PUBLISHED_RANGE_FIELDS = ("id", "made_at", "as_of_date", "session_date", "exit_date", "horizon_days", "base_close",
-                          "target_price", "lo50", "hi50", "lo80", "hi80", "regime")
+                          "target_price", "lo50", "hi50", "lo80", "hi80", "regime", "run")
 STRATEGIES_PREDICTION_FIELDS = ("id", "strategy_id", "family", "ticker", "made_at", "as_of_date", "session_date",
                                 "exit_date", "horizon_days", "direction", "prob_up", "confidence", "threshold",
                                 "qualifies", "base_close", "target_price", "lo50", "hi50", "lo80", "hi80",

@@ -91,3 +91,32 @@
 @media (max-width:1359px){ .mb-ot th.cw,.mb-ot td.cw,.mb-ot .cw{display:none} .mb-ot th{padding:8px 6px} .mb-ot td{padding:8px 6px} .mb-ot .st{white-space:normal;align-items:start} .mb-ot tr.grp td small{display:block;margin-left:0} }
 @media (max-width:760px){ .mb-ot th.cm,.mb-ot td.cm{display:none} .mb-ot td.num{white-space:normal} }
 @media (max-width:599px){ .mb-ot tr.grp td small{display:block;margin-left:0} .mb-ot td.num{white-space:normal} }
+
+/* The horizon tabs' leading word ("Hold 1 day · 2 days …"; docs/ux/plain_language_review.md W4) */
+.hold-tabs { display: inline-flex; align-items: center; gap: var(--mb-space-2); flex-wrap: wrap; }
+.hold-tabs .hold-l { font: var(--md-sys-typescale-label-large); color: var(--md-sys-color-on-surface-variant); }
+/* An expected value: plain ink, never styled like a realised gain or loss (W2) */
+.mb-expected { color: var(--md-sys-color-on-surface-variant); white-space: nowrap; }
+.mb-expected b { font-weight: 600; color: var(--md-sys-color-on-surface); }
+/* The "Technical details" toggle (L5) */
+details.mb-tech > summary { cursor: pointer; color: var(--md-sys-color-on-surface-variant); }
+details.mb-tech[open] > summary { margin-bottom: var(--mb-space-2); }
+/* A pick's expected-value label is a sentence now (W2): it wraps inside the pick row instead of pushing it wider */
+.pk .gain{min-width:0;max-width:100%}
+.pk .gain .mb-label{white-space:normal}
+/* the KPI cost labels are words now ("none expected to beat market fees"): they wrap inside the card */
+.mb-kpi .labs .mb-label{white-space:normal;text-align:left}
+/* Dark mode (UX4): tokens-dark.css recolours every design token; these few app roles need a different mix in dark,
+   so text keeps WCAG AA on them. Light keeps the values the pages had. The same two selectors as tokens-dark.css:
+   the reader's choice (data-theme) or, on System, the device. */
+:root{--mb-heat-up:var(--mb-color-up);--mb-heat-down:var(--mb-color-down);--mb-quiet-mark:var(--md-sys-color-outline)}
+:root[data-theme="dark"]{--mb-heat-up:color-mix(in srgb, var(--mb-color-up) 50%, var(--md-sys-color-shadow));--mb-heat-down:color-mix(in srgb, var(--mb-color-down) 50%, var(--md-sys-color-shadow));--mb-quiet-mark:var(--md-sys-color-on-surface-variant)}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){--mb-heat-up:color-mix(in srgb, var(--mb-color-up) 50%, var(--md-sys-color-shadow));--mb-heat-down:color-mix(in srgb, var(--mb-color-down) 50%, var(--md-sys-color-shadow));--mb-quiet-mark:var(--md-sys-color-on-surface-variant)}
+}
+/* a link inside an alert band takes the band's ink in dark (primary on primary-container is below AA there); light
+   keeps the rules it had (components.css a, app.css .mb-state-links a) */
+:root[data-theme="dark"] .mb-alert a{color:inherit}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .mb-alert a{color:inherit} }
+/* the round marks' glyph: the fill's "on" ink (white in light, as components.css draws it; dark ink on dark's light fills) */
+.mb-mark.ok,.mb-mark.hit{color:var(--mb-color-on-up)} .mb-mark.no,.mb-mark.miss{color:var(--mb-color-on-down)} .mb-mark.na{color:var(--mb-color-on-neutral)}
