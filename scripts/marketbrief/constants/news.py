@@ -62,3 +62,11 @@ NEWS_ID_MAP_TABLE = "news_id_map"   # every stored news id -> its canonical id (
 
 # Google News `after:`/`before:` days end at midnight Pacific time (DESIGN.md section 3, "News timing")
 GOOGLE_NEWS_DAY_TIMEZONE = "America/Los_Angeles"
+
+# Link schemes (issue #478; marketbrief/collectors/news_links.py): only https:// links are stored. A plain http://
+# link is rewritten to https:// (no request made) only on a config/news_sources.yaml domain with
+# `https_links: true` (its feed gives http:// links, its pages are served over HTTPS); any other non-https link is
+# skipped, never stored, and counted in the summary's `skipped_not_https`.
+HTTPS_LINKS_KEY = "https_links"
+NOT_HTTPS_EXAMPLES = 5   # examples of skipped links in the summary
+NOT_HTTPS_LINK_CHARS = 120   # each example link cut to this length

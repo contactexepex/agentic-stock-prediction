@@ -22,6 +22,7 @@ An outlet with `watchlist_only: true` (press-release wires) keeps only items who
 summary names a watchlist company: case-insensitive whole-word matching on each ticker's
 `wire_names` (full company names; default its name and aliases) after removing the
 `news.wire_exclude` phrases; `skipped_off_watchlist` counts the rest.
+Only https:// links are stored (collectors/news_links.py, issue #478: `upgraded_to_https`, `skipped_not_https`).
 Catch-up window (marketbrief/collectors/news_window.py): the Google News `when:` and the oldest item
 kept follow the time since the market's last successful collection (+1 h, at most 7 days, never below
 the config's `news.google_news.window` and 3 days); a Google News query that fills its 100-item answer
@@ -47,6 +48,7 @@ from marketbrief.analytics.news_dedup import Sighting, load_outlet_keys
 from marketbrief.analytics.news_tags import TAG_VERSION, Tagger, article_id, company_queries, item_id, source_domain
 from marketbrief.collectors.news_fetch import NewsPacing, google_block
 from marketbrief.collectors.news_history import stored_index, update_record
+from marketbrief.collectors.news_links import LinkGuard
 from marketbrief.collectors.news_window import parse_utc, run_ok, slice_days, window_for
 from marketbrief.constants.columns import COL_ID, COL_TITLE
 from marketbrief.constants.config_keys import CFG_MARKET, CFG_NEWS
@@ -172,7 +174,8 @@ class NewsCollector:
         self.tagger = Tagger(watchlist)
         self.now, self.now_dt = utc_now(), now_utc()
         self.seen_at = parse_utc(self.now)
-        self.dedup, self.seen = stored_index(self.market, self.seen_at, load_outlet_keys())
+        self.dedup, self.seen = stored_index(self.market, self.seen_at, outlet_keys := load_outlet_keys())
+        self.links = LinkGuard(outlet_keys.src)  # https:// links only (issue #478)
         self.updates: list[dict] = []
         self.duplicates: Counter = Counter()
         self.window = window_for(self.market, self.now_dt, self.google.get("window", DEFAULT_WINDOW))
@@ -229,14 +232,17 @@ class NewsCollector:
             return
         domain = source_domain(source_info.get("href"))
         news_id = item_id(title, source, domain)
-        row = Sighting(news_id, title, source, domain, entry.get("link"), self.seen_at)
-        if self.is_duplicate(job, row, published):
+        row = Sighting(news_id, title, source, domain, link := self.links.link(entry.get("link")), self.seen_at)
+        if link is not None and self.is_duplicate(job, row, published):
             return
         # headline first; the plain-text summary only when the title names no company
         tags = self.tagger.classify_item(title, entry.get("summary"), source, wire=job.get("watchlist_only", False))
         if job.get("watchlist_only") and not tags["tickers"]:
             self.skipped_off_watchlist += 1  # wire feeds: keep only releases naming a watchlist company
             return
+        if link is None:  # never stored, nor matched against stored links: the news gate allows https:// only
+            return self.links.skip(job["feed"], entry.get("link"))
+        self.links.stored(link, entry.get("link"))
         self.dedup.add(row)
         self.items[news_id] = {
             COL_ID: news_id,
@@ -323,6 +329,7 @@ class NewsCollector:
                     "headline_updates": len(self.updates),
                     "duplicates_skipped": dict(sorted(self.duplicates.items())),
                     "skipped_off_watchlist": self.skipped_off_watchlist,
+                    **self.links.summary(),
                     "window": self.window.summary(),
                     "ok": record["ok"],
                     "google_queries": self.google_queries,

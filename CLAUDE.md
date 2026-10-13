@@ -82,6 +82,9 @@ the one-builder permission to edit `web/` files, and the Layout's descriptions o
   requests spaced (`news.google_news.pause_seconds` 1.5 s, `news.outlet_pause_seconds` 0.5 s); a Google 429/503 or
   captcha/HTML page stops Google News for the rest of the run (`google_stopped`, `google_skipped`; the run is not
   `ok`, so the next window reaches back over it; `marketbrief/collectors/news_fetch.py`);
+  only https:// links are stored: an http:// link on a `config/news_sources.yaml` domain with `https_links: true`
+  (Business Wire) is stored as https://, nothing requested, any other non-https entry is skipped (`skipped_not_https`;
+  `marketbrief/collectors/news_links.py`, issue #478);
   `marketbrief/collectors/news_window.py`, DESIGN.md section 3 "News timing"; de-duplication, once per market:
   the same article link or the same normalised title from the same outlet (outlet key: host without www./m./amp.,
   allowlisted domain and its `same_as`, or a configured outlet name) within 9 days is not stored again, a new

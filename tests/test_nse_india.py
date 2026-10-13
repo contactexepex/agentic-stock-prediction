@@ -20,6 +20,7 @@ REPO = Path(__file__).resolve().parents[1]
 SCRIPTS = REPO / "scripts"
 REAL = REPO / "tests" / "fixtures" / "nse" / "real"
 TODAY = "2026-10-05"
+FIXTURE_NOW = "2026-10-06T06:00:00+00:00"   # a clock just after the fixtures were fetched
 
 
 def setup(tmp: Path, tickers: dict | None = None) -> tuple[Path, Path]:
@@ -41,8 +42,10 @@ def setup(tmp: Path, tickers: dict | None = None) -> tuple[Path, Path]:
     return root, cfg
 
 
-def run(script: str, root: Path, cfg: Path, *args: str) -> subprocess.CompletedProcess:
+def run(script: str, root: Path, cfg: Path, *args: str, now: str | None = None) -> subprocess.CompletedProcess:
     env = {**os.environ, "MB_ROOT": str(root), "MB_CONFIG": str(cfg), "MB_MARKET": "india"}
+    if now:
+        env["MB_NOW"] = now
     return subprocess.run([sys.executable, str(SCRIPTS / script), *args], cwd=SCRIPTS, env=env,
                           capture_output=True, text=True, check=False)
 
@@ -94,7 +97,9 @@ def test_relations_on_real_responses(tmp_path):
     again = replay("collect_relations_india.py", root, cfg, again_dir)
     assert again["new"] == {"insiders": 0, "deals": 0, "holdings": 0}
 
-    ctx = run("context.py", root, cfg)
+    # the context pack on a fixed clock: the PIT disclosure of 2026-09-28 is inside its 14-day insider window
+    # until 2026-10-12 only, so the real clock failed this test from 2026-10-13
+    ctx = run("context.py", root, cfg, now=FIXTURE_NOW)
     assert ctx.returncode == 0, ctx.stderr
     assert "| HDFCBANK | 2026-06-30 | 0.0 |" in ctx.stdout and "Infosys Employee Benefits Trust" in ctx.stdout
 

@@ -1314,6 +1314,15 @@ Later (parked): options for India and US, paper first, only once stock ranges ar
     HTTP 200 with 20 items, and so did urllib with an RSS Accept header, but curl (HTTP/2 reset
     or empty reply) and several earlier urllib requests got the connection closed without an
     answer. `www.businesswire.com` and `www.spglobal.com` refuse cloud traffic (site-side 403).
+  - Link schemes (issue #478, 2026-10-13): Business Wire's feed gives every item link as
+    `http://www.businesswire.com/...` (78 of 78 on 2026-10-13), which the news gate's NEWS_SOURCE
+    check (https only) blocked, so the first watchlist release from it (JPMorganChase's Q3 results)
+    failed every US news run of the day. `collect_news` stores only https:// links
+    (`marketbrief/collectors/news_links.py`): an http:// link on a `config/news_sources.yaml` domain
+    with `https_links: true` (Business Wire only; its pages answer over HTTPS, TLS checked
+    2026-10-13) is stored with https:// and nothing is requested over plain HTTP; any other
+    non-https entry is not stored (summary `skipped_not_https`, `not_https_examples`), so one bad
+    link never fails the gate and with it the whole run. The gate is unchanged.
 - Issue #9, history: before 2026-10-05 ~21:30 UTC the cloud environment's egress proxy refused a
   connection (CONNECT answered 403) to each domain in backticks below, except the ones marked
   reachable:

@@ -62,7 +62,10 @@ domains:
   bls.gov: {tier: primary}
   fda.gov: {tier: primary}
   prnewswire.com: {tier: primary, names: [PR Newswire, PR Newswire UK, PR Newswire India], note: "company press releases"}
-  businesswire.com: {tier: primary, names: [Business Wire], note: "company press releases"}
+  # https_links: the feed gives http:// links (78 of 78 item links of the Earnings feed on 2026-10-13);
+  # the same pages are served over HTTPS (TLS checked 2026-10-13), so collect_news stores them with https://
+  # (issue #478); nothing is fetched over plain HTTP.
+  businesswire.com: {tier: primary, names: [Business Wire], https_links: true, note: "company press releases"}
   globenewswire.com: {tier: primary, names: [GlobeNewswire, GlobeNewswire News Room], note: "company press releases"}
   lilly.com: {tier: primary, names: [Eli Lilly and Company, Lilly], note: "company releases"}
   # tier1: agencies and major outlets (global)

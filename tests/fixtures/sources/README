@@ -25,3 +25,7 @@ prnewswire_all.rss          www.prnewswire.com/rss/news-releases-list.rss (head 
 businesswire_earnings.rss   feed.businesswire.com/rss/home/?rss=G1QFDERJXkJeEF9YXA== (head + first 6 items)
 globenewswire_public.rss    www.globenewswire.com/RssFeed/orgclass/1/... (public companies; head + first 6
                             items; fetched ~22:40 UTC with urllib and an RSS Accept header)
+businesswire_earnings_jpm.rss
+                            the same Business Wire feed fetched on 2026-10-13 (~22:00 UTC): channel head, the
+                            JPMorganChase results item and the next 2 items naming no JPMorgan (issue #478:
+                            every item link is http://)
