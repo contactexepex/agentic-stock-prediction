@@ -1,0 +1,1 @@
+{"id": "ic-us-2026-10-16T16:28Z", "check_at": "2026-10-16T16:28:00+00:00", "session_date": "2026-10-16", "status": "ok", "tickers": 20, "written": 20, "flagged": 12, "stale": [], "failed": [], "note": null, "method_version": "intraday-v1", "computed_at": "2026-10-16T16:28:24+00:00", "open_trades": 634, "trades_flagged": 80, "alerts": 15}
