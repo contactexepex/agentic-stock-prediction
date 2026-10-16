@@ -1,0 +1,36 @@
+# Research review india 2026-W42 (2026-10-12 to 2026-10-18)
+
+_Research only, not investment advice. Paper trades are records, never orders. Proposals change nothing until the owner applies them._
+
+## Leaders to date (accuracy view, after costs)
+
+| family | strategy | trades | wins | net P&L | return % |
+|---|---|---|---|---|---|
+| ai | ai.pattern_mood.sonnet.v1 | 13 | 8 | 11358.02 | 0.87 |
+| ai | ai.news_results.sonnet.v1 | 2 | 1 | -1144.77 | -0.57 |
+| baseline | base.always_up.v1 | 197 | 107 | 150566.0 | 0.76 |
+| baseline | base.momentum.v1 | 128 | 62 | 47311.49 | 0.37 |
+| rule | rule.model_news_double.v1 | 1 | 1 | 1722.19 | 1.72 |
+
+## This week
+
+| family | strategy | trades | wins | net P&L | return % |
+|---|---|---|---|---|---|
+| ai | ai.pattern_mood.sonnet.v1 | 13 | 8 | 11358.02 | 0.87 |
+| ai | ai.news_results.sonnet.v1 | 2 | 1 | -1144.77 | -0.57 |
+| baseline | base.always_up.v1 | 197 | 107 | 150566.0 | 0.76 |
+| baseline | base.momentum.v1 | 128 | 62 | 47311.49 | 0.37 |
+| rule | rule.model_news_double.v1 | 1 | 1 | 1722.19 | 1.72 |
+
+## Findings
+
+- base.always_up.v1 leads: 197 trades, 107 wins, net 150566 INR, +0.76%; base.momentum.v1 has 47311.49 INR, +0.37%. To-date equals this first live week: one rising week, not skill. The biggest wins were IT stocks lifted mostly by their sector (INFY, TCS); the one lesson agrees, a TCS down call missed against the sector rally. (base.always_up.v1, base.momentum.v1, tra:acc:base.always_up.v1:2026-10-09-INFY-4d:biggest_win, lesson-2026-10-12-TCS-1d)
+- Among strategies with several trades, ai.pattern_mood.sonnet.v1 returned most: +0.87% on 13 trades, 8 wins, against +0.76% for always-up. Its settled head-to-head wins (HINDUNILVR, TATASTEEL) were credited mainly to the market part, so its edge cannot be told apart from the market's rise. ai.news_results.sonnet.v1: 2 trades, -0.57%. Too few to judge. (ai.pattern_mood.sonnet.v1, base.always_up.v1, tra:h2h:highest_probability:ai.pattern_mood.sonnet.v1:2026-10-12-HINDUNILVR-3d, tra:h2h:highest_probability:ai.pattern_mood.sonnet.v1:2026-10-12-TATASTEEL-3d, ai.news_results.sonnet.v1)
+- The rule family barely traded: rule.model_news_double.v1 made its only trade (RELIANCE, +1.72%, credited mostly to news), and the reference rule.model_news.v1 and base.model_only.v1 show none settled. Why is not in these inputs; a guess is that few model scores reached the 0.55 threshold. One trade says nothing about news weight. (rule.model_news_double.v1, tra:h2h:highest_probability:rule.model_news_double.v1:2026-10-14-RELIANCE-1d, rule.model_news.v1, base.model_only.v1)
+- Verified news gave no evidence yet: every confirmed_primary and corroborated row has 1 to 3 events and is marked not enough (e.g. earnings confirmed_primary high and medium, flows corroborated high). The confirmed-only rule counts only these statuses, so its news idea cannot be judged from this week. (ni-india-2026-W42-earnings-confirmed_primary-high-1, ni-india-2026-W42-earnings-confirmed_primary-medium-1, ni-india-2026-W42-flows-corroborated-high-1, rule.model_news_confirmed.v1)
+- Rows with enough events mostly echo the IT rally: earnings single_source medium shows +2.56% abnormal at five sessions (interval 1.58 to 3.54) beside a mean sector move of 11.57%; low unverified 'other' news shows -1.18% over 129 events. Same week, overlapping days and repeated news ids: intervals are likely too narrow. Not evidence of news value. (ni-india-2026-W42-earnings-single_source-medium-5, ni-india-2026-W42-other-unverified-low-5)
+- Data doubt: every trade reason in the inputs marks target_reached in the first session, losers included (ITC, LT, INDIGO, HDFCLIFE all lost money with the target reached). The target appears to lie below the entry for up trades, so the flag carries no information; the target definition should be checked. (tra:acc:base.always_up.v1:2026-10-09-ITC-1d:biggest_miss, tra:acc:base.always_up.v1:2026-10-09-LT-4d:biggest_miss, tra:acc:base.always_up.v1:2026-10-09-INDIGO-4d:biggest_miss, tra:acc:base.always_up.v1:2026-10-12-HDFCLIFE-1d:biggest_miss)
+
+## Proposals (status: proposed; each is a diff for the owner to approve)
+
+None this week.
