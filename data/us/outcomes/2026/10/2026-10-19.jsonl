@@ -1,0 +1,1 @@
+{"prediction_id": "2026-10-08-NVDA-5d", "scored_at": "2026-10-19T11:59:19+00:00", "base_date": "2026-10-08", "base_close": 230.48, "target_date": "2026-10-16", "target_close": 214.13, "actual_return": -0.084425, "hit": false, "label_basis": "open_to_close", "horizon_label": "n_plus_k", "entry_date": "2026-10-09", "entry_open": 233.875}
