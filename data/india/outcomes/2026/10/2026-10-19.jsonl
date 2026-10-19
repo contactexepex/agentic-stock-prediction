@@ -1,0 +1,1 @@
+{"prediction_id": "2026-10-08-TCS-5d", "scored_at": "2026-10-19T02:25:51+00:00", "base_date": "2026-10-08", "base_close": 2076.0, "target_date": "2026-10-16", "target_close": 2465.0, "actual_return": 0.181687, "hit": false, "label_basis": "open_to_close", "horizon_label": "n_plus_k", "entry_date": "2026-10-09", "entry_open": 2086.0}
