@@ -1,0 +1,1 @@
+{"id": "india-2026-10-23T02:14:20+00:00", "ran_at": "2026-10-23T02:14:20+00:00", "ok": true, "since": "2026-10-22T02:14:08+00:00", "window_hours": 26.0, "google_when": "26h", "max_age_hours": 72.0, "reason": "since_last_run", "feeds": 46, "failed": 0, "google_queries": 40, "google_failed": 0, "sliced_queries": 6, "new_items": 1327, "google_stopped": null, "google_skipped": 0}
