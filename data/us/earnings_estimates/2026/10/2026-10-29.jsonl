@@ -1,0 +1,2 @@
+{"id": "GOOGL-2027-02-03", "ticker": "GOOGL", "report_at": "2027-02-03T20:00:00+00:00", "report_date": "2027-02-03", "eps_estimate": 3.35, "reported_eps": null, "surprise_pct": null, "source": "yfinance", "collected_at": "2026-10-29T11:51:20+00:00"}
+{"id": "GOOGL-2026-10-28", "ticker": "GOOGL", "report_at": "2026-10-28T20:00:00+00:00", "report_date": "2026-10-28", "eps_estimate": 3.01, "reported_eps": 2.12, "surprise_pct": -29.52, "source": "yfinance", "collected_at": "2026-10-29T11:51:20+00:00"}
