@@ -1,0 +1,2 @@
+{"id": "ADANIPORTS-earnings-2027-01-28", "date": "2027-01-28", "type": "earnings", "ticker": "ADANIPORTS", "name": "Adani Ports earnings", "source": "yfinance", "first_seen_at": "2026-10-30T02:12:34+00:00", "amount": null, "timing": null}
+{"id": "HINDUNILVR-ex_dividend-2026-11-12", "date": "2026-11-12", "type": "ex_dividend", "ticker": "HINDUNILVR", "name": "Hindustan Unilever ex-dividend (est. 22, last dividend)", "source": "yfinance", "first_seen_at": "2026-10-30T02:12:34+00:00", "amount": 22.0, "timing": null}
