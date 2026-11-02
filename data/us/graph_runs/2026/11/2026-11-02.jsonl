@@ -1,0 +1,1 @@
+{"id": "us-graph-run-2026-11-02T13:44:19+00:00", "run_at": "2026-11-02T13:44:19+00:00", "month": "2026-11", "edges": 192, "tickers_without_edges": 0, "note": "monthly refresh: 43 rows added (TSLA proxy, new 13G stakes, BAC/DE directors, CVX Hess Midstream sale; 11 stale Vanguard Group edges removed, 9 Vanguard Capital Management stakes added); judge PASS round 2"}
