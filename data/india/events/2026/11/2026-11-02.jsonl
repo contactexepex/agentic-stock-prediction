@@ -1,0 +1,3 @@
+{"id": "INDIGO-earnings-2027-01-21", "date": "2027-01-21", "type": "earnings", "ticker": "INDIGO", "name": "InterGlobe Aviation earnings", "source": "yfinance", "first_seen_at": "2026-11-02T02:12:26+00:00", "amount": null, "timing": null}
+{"id": "RELIANCE-earnings-2027-01-15", "date": "2027-01-15", "type": "earnings", "ticker": "RELIANCE", "name": "Reliance Industries earnings", "source": "yfinance", "first_seen_at": "2026-11-02T02:12:26+00:00", "amount": null, "timing": null}
+{"id": "SUNPHARMA-earnings-2027-01-28", "date": "2027-01-28", "type": "earnings", "ticker": "SUNPHARMA", "name": "Sun Pharma earnings", "source": "yfinance", "first_seen_at": "2026-11-02T02:12:26+00:00", "amount": null, "timing": null}
