@@ -1,7 +1,17 @@
 # Dip-Watch design
 
-- **Version:** 1 (draft for ChatGPT's review)
+- **Version:** 1.1 (draft for ChatGPT's review)
 - **Date:** 2026-11-13
+- **Changes in 1.1:** fixes for the 7 findings of the Codex review on pull request #491. The changes cover:
+  - quality is now checked before the crash-day ranking (sections 2, 6.3);
+  - flagged stocks get a transient history fetch for RSI and the chart (sections 2, 4.3);
+  - the Saturday scorecard has a branch before the market-closed exit (section 2);
+  - `/sell` names the mode when both modes are held (section 8.1);
+  - weekend Telegram reads happen twice a day (section 11);
+  - limit-order fill and expiry rules are fixed for scoring (sections 7, 13);
+  - the backtest's daily-bar proxy is now explicit (section 12);
+  - the money bar adds a net-profit condition (section 13).
+  The owner confirms three new values in section 18.
 - **Status:** not approved, and nothing is built. Building starts only after ChatGPT's review is settled and the
   owner approves (`CLAUDE.md`, "How to work with the owner and with ChatGPT").
 - **Source:** the owner's brief, kept unchanged in [DIP_WATCH_BRIEF_ORIGINAL.md](DIP_WATCH_BRIEF_ORIGINAL.md). This
@@ -25,7 +35,7 @@ It is independent of the market-brief daily routines. Those are paused and stay 
 where that code fits:
 - the paced Yahoo client `marketbrief/sources/yahoo_pacing.py`;
 - the XNYS calendar `core/calendar.py`;
-- the `#market-brief` conventions for gates and commits.
+- market-brief's conventions for gates and commits.
 
 It does not touch `web/`, `api/` or `design/`, which are frozen.
 
@@ -33,25 +43,28 @@ It does not touch `web/`, `api/` or `design/`, which are frozen.
 
 1. **Telegram commands.** Read any `/buy`, `/sell`, `/positions` and `/undo` messages to the bot, record the valid
    ones and reply to each (section 8).
-2. **Market check.** If the XNYS calendar says the market is closed (holiday or weekend), stop here.
-3. **Reference file.** On the first run of the day, build the daily reference file (section 3).
-4. **Prices.** Fetch today's prices for the universe, plus the benchmarks: S&P 500, Nasdaq, VIX, the 10-year yield
+2. **Weekend scorecard.** On the first weekend run of a Saturday (New York date), compute the weekly scorecard
+   (section 13), pass it through the gate, send it and commit it.
+3. **Market check.** If the XNYS calendar says the market is closed (holiday or weekend), stop here.
+4. **Reference file.** On the first run of the day, build the daily reference file (section 3).
+5. **Prices.** Fetch today's prices for the universe, plus the benchmarks: S&P 500, Nasdaq, VIX, the 10-year yield
    and the sector ETFs.
-5. **Triggers.** Apply the Mode A and Mode B triggers (section 4) and drop repeats (section 4.4).
-6. **Results window, ranking and quality.**
-   - Look up the next results date for the flagged stocks only.
-   - Rank the flagged stocks (section 6.3) and keep at most 10.
-   - Run the quality check (section 5) on those stocks only.
-7. **Position checks.** Check open positions for sell, target, stop and review alerts (section 8).
-8. **Output.** Write a compact `work/context.json`. If nothing is flagged and no position has an alert, stop. Nothing
+6. **Triggers.** Apply the Mode A and Mode B triggers (section 4) and drop repeats (section 4.4).
+7. **Ranking, history and quality** (section 6.3):
+   - pre-rank the flagged stocks without quality and keep the top 30;
+   - fetch one year of daily history for those 30 only, transiently (used for RSI and the chart, never stored);
+   - run the quality check (section 5) on them, then the full ranking with quality, and keep at most 10;
+   - look up the next results date for the 10 only.
+8. **Position checks.** Check open positions for sell, target, stop and review alerts (section 8).
+9. **Output.** Write a compact `work/context.json`. If nothing is flagged and no position has an alert, stop. Nothing
    is posted or committed, apart from Telegram entries and the reference file.
-9. **Claude's part** (Sonnet 5.5):
-   - researches the flagged stocks on Bigdata.com;
-   - classifies each dip's cause and decides (section 6);
-   - writes the decisions file.
-10. **Report.** `report.py` builds the HTML and markdown reports and the chart images (section 9).
-11. **Gate.** `validate.py` checks the output (section 10). There is one retry.
-12. **Send and commit.** Send by Telegram, then commit and push to main.
+10. **Claude's part** (Sonnet 5.5):
+    - researches the flagged stocks on Bigdata.com;
+    - classifies each dip's cause and decides (section 6);
+    - writes the decisions file.
+11. **Report.** `report.py` builds the HTML and markdown reports and the chart images (section 9).
+12. **Gate.** `validate.py` checks the output (section 10). There is one retry.
+13. **Send and commit.** Send by Telegram, then commit and push to main.
 
 ## 3. Universe
 
@@ -75,7 +88,8 @@ It does not touch `web/`, `api/` or `design/`, which are frozen.
 - **Daily reference file:** built on the first run of each trading day and committed (decision 13).
   - Columns: ticker, the 52-week closing high and its date, the average daily dollar volume, the liquidity pass, and
     the 50- and 200-day moving averages.
-  - It holds no price history. Later runs that day fetch only today's prices.
+  - It holds no price history. Later runs that day fetch only today's prices for the universe. The few stocks a run
+    flags get a transient one-year fetch for RSI and the chart (section 2, step 7).
 - **Speed** (measured 2026-11-13): one year of daily bars for 100 tickers took 15.2 s in one batched Yahoo download.
   A linear estimate for 2,000+ tickers is about 5-7 minutes. That is why the daily reference file exists. The
   estimate and Yahoo's rate limits at full size are not yet tested.
@@ -178,12 +192,23 @@ The credit cost per call is not yet measured. The trial measures it.
 ### 6.3 Crash-day cap (decision 18)
 
 - At most 10 stocks are researched per run.
-- Python ranks the flagged stocks first, in this order:
-  1. on the owner's Revolut list;
-  2. quality `pass` before `speculative`;
-  3. a larger fall relative to its sector ETF and the S&P 500;
-  4. larger market cap.
-- The rest are listed as `flagged, not researched (cap)` with their numbers.
+- Quality is only known after its check, and the check is one Yahoo call per stock. So Python ranks in two steps,
+  with no AI and no credits:
+  1. **Pre-rank** every flagged stock without quality, in this order:
+     1. on the owner's Revolut list;
+     2. a larger fall relative to its sector ETF and the S&P 500;
+     3. larger market cap.
+
+     Keep the top 30 (`research_prerank`).
+  2. **Final rank.** Run the quality check on those 30, drop `fail`, and rank:
+     1. on the Revolut list;
+     2. quality `pass` before `speculative`;
+     3. relative fall;
+     4. market cap.
+
+     Keep the top 10.
+- Stocks outside the top 30 have no quality result. They are listed as `flagged, not researched (cap)` with their
+  price numbers, as are places 11-30 with their quality.
 - On a crash day the message starts with a headline, for example "Market down 3.4%; 143 stocks flagged; top 10
   researched."
 
@@ -207,10 +232,16 @@ The Revolut list is a label, never a filter (decision 7). The owner confirms tic
 ## 7. Buy suggestion
 
 - **Suggested limit price** (decision 16):
-  - Mode A: 3% below the last price, standing until the next stage triggers;
+  - Mode A: 3% below the last price. It stands until the next stage triggers or the dip resets, and at most 20
+    sessions (`limit_expiry_sessions_a`, a value for the owner to confirm).
   - Mode B: 1% below the last price, for the same day only.
-- **Shown with each suggestion:** the stage, the limit price, the Mode B target and stop (from the limit price until
-  the owner reports a buy), and the next results date.
+- **Fill rule for scoring,** fixed in advance so the scorecard never picks an entry after seeing the outcome:
+  - On the alert day, only prices seen by later runs that day count; the day's earlier low does not.
+  - On later days, the day's low at or below the limit fills it. The fill is at the limit, or at the open if the
+    open is already below the limit.
+  - A suggestion not filled by expiry is `unfilled`.
+- **Shown with each suggestion:** the stage, the limit price and its expiry, the Mode B target and stop (from the
+  limit price until the owner reports a buy), and the next results date.
 
 ## 8. Positions and Telegram commands
 
@@ -219,7 +250,7 @@ The Revolut list is a label, never a filter (decision 7). The owner confirms tic
 | Command | Meaning |
 |---|---|
 | `/buy TICKER SHARES PRICE [A\|B]` | a buy; the mode defaults to A; the stage is taken from the last alert, else `manual` |
-| `/sell TICKER SHARES PRICE` | a sell |
+| `/sell TICKER SHARES PRICE [A\|B]` | a sell; the mode is required when the owner holds that ticker in both modes; without it the bot asks again and records nothing |
 | `/positions` | open positions with gain or loss before and after fees |
 | `/undo` | cancels the owner's last entry (appends a cancelling row; nothing is deleted) |
 
@@ -231,8 +262,9 @@ The Revolut list is a label, never a filter (decision 7). The owner confirms tic
   $289.74".
 - **Storage:** `dip-watch/data/positions.csv` is append-only. Columns: id, recorded_at, ticker, mode, action, shares,
   price, stage, telegram_message_id, supersedes.
-- **The 24-hour limit:** Telegram's `getUpdates` keeps messages for 24 hours. The trading runs (holidays included)
-  and the weekend runs (section 11) cover every gap.
+- **The 24-hour limit:** Telegram's `getUpdates` keeps messages for 24 hours. With the schedule in section 11, the
+  longest gap between two reads is 18 hours (a weekday's 15:35 run to the next weekday's 9:35 run, New York time). The
+  weekend gaps are 12-17 hours, and 13 hours across the autumn clock change (computed in elapsed UTC hours).
 
 ### 8.2 Alerts on open positions
 
@@ -304,8 +336,11 @@ The Revolut list is a label, never a filter (decision 7). The owner confirms tic
 
 - **Trading runs:** Monday-Friday at 9:35, 10:35, ..., 15:35 New York time, 7 runs, using
   `CRON_TZ=America/New_York`, so daylight saving is automatic. On US holidays the runs only read Telegram.
-- **Weekend runs:** Saturday and Sunday at 12:35 New York time, for Telegram commands only. Saturday's run also
-  sends the weekly scorecard.
+- **Weekend runs:** Saturday and Sunday at 08:35 and 20:35 New York time, for Telegram commands only. Saturday's
+  08:35 run also sends the weekly scorecard (section 2, step 2).
+  - Version 1 had one run a day at 12:35. Those runs are 24 hours apart, and 25 hours across the autumn clock
+    change, which is longer than Telegram keeps messages (Codex finding).
+  - Two runs a day keep every gap under 24 hours. This costs two more runs a week. The owner confirms in section 18.
 - **Model:** Sonnet 5.5, with Opus 5.5 as the fallback if the trial shows weak classifications.
 - **Cost:** every routine run starts a Claude session, so even a quiet run costs a few tokens. The trial measures
   tokens and Bigdata.com credits per run. If the weekend runs prove costly, they could move to a free GitHub Actions
@@ -314,12 +349,20 @@ The Revolut list is a label, never a filter (decision 7). The owner confirms tic
 ## 12. Backtest (decision 11)
 
 - **How it runs:** a manual tool, never in the routine. It runs once before the trial, on the S&P 500 first.
-- **What it does:** replays the Mode A and Mode B price rules over 3 years of daily Yahoo history. The history is
-  fetched, not stored.
+- **What it does:** replays a daily-bar proxy of the Mode A and Mode B price rules over 3 years of daily Yahoo
+  history. The history is fetched, not stored.
+- **The proxy differs from live in stated ways.** Daily bars cannot show the hourly trigger or the order of events
+  within a day.
+  - **Triggers** use closes: Mode B when the S&P 500 and the stock close down at least 2% and 5%; Mode A when the
+    close is at least 15% below the 52-week closing high.
+  - **Entry** is at the next session's open. Limit fills are not modelled.
+  - **Target and stop** are checked on each day's high and low from the entry day on. If both fall inside one day's
+    range, the trade counts as a stop (the conservative bound) and is counted as `ambiguous`. The share of ambiguous
+    trades is reported.
 - **For each past signal it records:**
   - the return after 5, 10, 20 and 60 sessions;
   - the maximum drawdown;
-  - whether the target or the stop came first.
+  - whether the target or the stop came first, under the rule above.
 - **Output:** summary tables by mode, size bucket and sector (hit rate, median, worst case, days to target). Only the
   summary is saved.
 - **Stated limits:**
@@ -331,16 +374,22 @@ The Revolut list is a label, never a filter (decision 7). The owner confirms tic
 
 - **Length:** 4-6 weeks with no real money. The owner may still report trades for tracking.
 - **Weekly scorecard** (Saturday; computed by Python, with no Bigdata.com cost):
-  1. CANDIDATE returns after 5 and 20 sessions from the suggested limit price (or the last price if the limit never
-     filled), against the S&P 500;
-  2. the same for WATCH and AVOID, to check whether avoided stocks did worse;
+  1. CANDIDATE returns after 5 and 20 sessions from the fill (section 7's fill rule), against the S&P 500 over the
+     same sessions. Unfilled suggestions are counted and listed apart, never given a substitute entry price.
+  2. the same for WATCH and AVOID, measured from the alert's last price, since no buy was suggested for them;
   3. Mode B: target first or stop first;
   4. pre-results views: right or wrong;
-  5. tokens and credits per run.
-- **Bar for real money, fixed now:** both conditions must hold. Otherwise, extend the trial or change the rules.
-  1. at least 30 scored candidates;
+  5. net results: each filled candidate as a paper trade of a reference size of $1,000 (`score_reference_usd`, a
+     value for the owner to confirm), less €1 to buy and €1 to sell;
+  6. tokens and credits per run.
+- **Bar for real money, fixed now:** all three conditions must hold. Otherwise, extend the trial or change the rules.
+  1. at least 30 scored (filled) candidates;
   2. the CANDIDATEs' 20-session median return beats both the S&P 500 and the backtest's plain price-rule result over
-     the same windows.
+     the same windows;
+  3. the CANDIDATEs' mean and median 20-session returns are both above zero **after fees** (item 5).
+     - Beating benchmarks while losing money is not enough (Codex finding; `AGENTS.md` goal: profit after the owner's
+       real costs and taxes).
+     - Taxes are not modelled. The owner states whether any tax applies to these gains (section 18).
 
 ## 14. Configuration (`dip-watch/config/rules.yaml`; no threshold in code)
 
@@ -359,6 +408,9 @@ The Revolut list is a label, never a filter (decision 7). The owner confirms tic
 | `limit_below_last_pct` | A: 3, B: 1 |
 | `results_window_sessions` | 3 |
 | `research_cap_per_run` | 10 |
+| `research_prerank` | 30 |
+| `limit_expiry_sessions_a` | 20 (owner to confirm) |
+| `score_reference_usd` | 1000 (owner to confirm) |
 | `quality.*` | the table in section 5 |
 | `costs.fee_per_trade_eur` | 1 |
 | `delivery.telegram_chat_id` | the owner's chat |
@@ -389,7 +441,10 @@ reports/dip-watch/   YYYY-MM-DD-HH.html|md
   - the crash-day ranking and cap;
   - the quality limits, including financials and missing data;
   - average entry, sell levels, review alerts and fees;
-  - Telegram parsing (valid, invalid, other chat, `/undo`);
+  - Telegram parsing (valid, invalid, other chat, `/undo`, `/sell` without a mode when both modes are held);
+  - the limit fill rule (alert-day prices only after the alert, gap-down open, expiry, unfilled);
+  - the weekend branch (the Saturday scorecard runs before the market-closed exit);
+  - the backtest's same-day target-and-stop rule;
   - every gate check;
   - the HTML report with every section, including the quiet case.
 - **Speed:** a full-universe scan within 5 minutes on a normal run, measured. The first run of the day, which builds
@@ -424,6 +479,11 @@ reports/dip-watch/   YYYY-MM-DD-HH.html|md
    later? This is raised with the owner. It is not decided here.
 2. **Bigdata.com credits per call and per run:** unknown until measured.
 3. **Full-universe Yahoo speed and rate limits** at 2,000+ tickers: not yet measured.
+4. **New values in version 1.1 for the owner to confirm:**
+   - the Mode A limit expiry of 20 sessions;
+   - the scoring reference size of $1,000;
+   - two weekend runs a day instead of one (decision 19 changes);
+   - whether any tax applies to these gains, for the net-profit bar.
 
 ## Appendix A: Decision register (owner, 2026-11-13)
 
@@ -450,7 +510,7 @@ question.
 | 16 | Limit price | A 3% for A, 1% for B; B 3% for both; C none | A |
 | 17 | Fees | A fees in config; B gross only; C later | A: USD account, Metal, €1 per trade, no FX fee |
 | 18 | Crash-day cap | A 10 per run, ranked; B 5 or 20; C no cap | A |
-| 19 | Schedule | A New York time, 7 runs plus weekends; B 4 runs; C Amsterdam by hand | A |
+| 19 | Schedule | A New York time, 7 runs plus weekends; B 4 runs; C Amsterdam by hand | A (version 1.1 proposes two weekend runs a day, pending the owner) |
 | 20 | Mode A downside | A review alerts; B hard stop; C none | A |
 | 21 | Model | A Sonnet 5.5; B Opus 5.5; C mixed | A |
 | 22 | Trial bar | A scorecard plus a fixed bar; B no bar; C stricter | A |
